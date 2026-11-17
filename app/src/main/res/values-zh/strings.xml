@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_discover">发现</string>
+    <string name="tab_library">听过</string>
+    <string name="tab_downloads">下载</string>
+    <string name="tab_me">我的</string>
+
+    <string name="mini_player_idle">未在播放</string>
+    <string name="action_play">播放</string>
+    <string name="action_cancel">取消</string>
+
+    <string name="setting_language">语言</string>
+    <string name="language_system">跟随系统</string>
+</resources>

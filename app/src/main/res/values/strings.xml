@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">XMPlus MD3</string>
+
+    <string name="tab_discover">Discover</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_downloads">Downloads</string>
+    <string name="tab_me">Me</string>
+
+    <string name="mini_player_idle">Nothing playing</string>
+    <string name="action_play">Play</string>
+    <string name="action_cancel">Cancel</string>
+
+    <string name="setting_language">Language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_zh" translatable="false">简体中文</string>
+    <string name="language_en" translatable="false">English</string>
+</resources>

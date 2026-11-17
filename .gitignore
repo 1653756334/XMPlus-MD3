@@ -1,0 +1,25 @@
+# Gradle / build
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+
+# Signing material
+*.jks
+*.keystore
+keystore.properties
+
+# Native media tools (built in CI)
+app/src/main/jniLibs/
+
+# OS / temp
+.DS_Store
+Thumbs.db
+*.log
