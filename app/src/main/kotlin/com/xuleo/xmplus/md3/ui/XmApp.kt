@@ -102,7 +102,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
             }
         },
     ) {
-        // One player, outside every entry transition. IME insets move it above the keyboard.
+        // One player on every page, outside every entry transition. IME insets move it above the keyboard.
         Column(Modifier.fillMaxSize().imePadding()) {
             NavDisplay(
                 backStack = stack,
@@ -159,8 +159,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                     }
                 },
             )
-            // Idle, it only belongs on the tab pages; a real player will show on every page.
-            if (isHome) MiniPlayer()
+            MiniPlayer()
         }
     }
 }
