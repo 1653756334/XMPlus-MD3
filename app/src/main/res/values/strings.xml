@@ -60,7 +60,8 @@
     <string name="login_phone_title">Phone login</string>
     <string name="login_phone_intro">Complete the security check first, then confirm sending the code.</string>
     <string name="login_phone_number">Phone number</string>
-    <string name="login_send">Verify and send code</string>
+    <string name="login_send">Send code</string>
+    <string name="login_resend">Resend</string>
     <string name="login_resend_in">Resend in %1$d s</string>
     <string name="login_phone_code">SMS code</string>
     <string name="login_phone_code_hint">Valid for 10 minutes, up to 5 attempts.</string>

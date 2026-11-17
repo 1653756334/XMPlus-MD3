@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.account.*
 import com.xuleo.xmplus.md3.core.designsystem.*
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
@@ -90,7 +94,7 @@ internal fun AccountsContent(
 @Composable
 private fun AccountRow(account: AccountSummary, busy: Boolean, onPrimary: () -> Unit, onRemove: () -> Unit,
     onRefresh: () -> Unit, onImport: () -> Unit) {
-    var menu by remember { mutableStateOf(false) }
+    var actions by remember { mutableStateOf(false) }
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
@@ -108,54 +112,75 @@ private fun AccountRow(account: AccountSummary, busy: Boolean, onPrimary: () -> 
                     style = MaterialTheme.typography.bodySmall,
                     color = if (account.expired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Box {
-                IconButton(onClick = { menu = true }, enabled = !busy) {
-                    Icon(Icons.Outlined.MoreVert, stringResource(R.string.account_options, accountName(account)))
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (!account.primary) DropdownMenuItem(text = { Text(stringResource(R.string.account_make_primary)) },
-                        onClick = { menu = false; onPrimary() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.account_refresh)) }, onClick = { menu = false; onRefresh() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.account_reimport)) }, onClick = { menu = false; onImport() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.account_remove), color = MaterialTheme.colorScheme.error) },
-                        onClick = { menu = false; onRemove() })
-                }
+            IconButton(onClick = { actions = true }, enabled = !busy) {
+                Icon(Icons.Outlined.MoreVert, stringResource(R.string.account_options, accountName(account)))
             }
         }
     }
+    if (actions) AccountActions(account, onDismiss = { actions = false }, onPrimary, onRefresh, onImport, onRemove)
+}
+
+/** The per-account actions, as a bottom sheet: a short list reads better there than in a small popup menu. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountActions(account: AccountSummary, onDismiss: () -> Unit, onPrimary: () -> Unit, onRefresh: () -> Unit,
+    onImport: () -> Unit, onRemove: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    // Slide the sheet away first so the chosen action does not start under a half-closed sheet.
+    fun choose(action: () -> Unit) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss(); action() }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text(accountName(account), Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.titleMedium)
+        if (!account.primary) AccountAction(Icons.Outlined.Star, R.string.account_make_primary) { choose(onPrimary) }
+        AccountAction(Icons.Outlined.Refresh, R.string.account_refresh) { choose(onRefresh) }
+        AccountAction(Icons.Outlined.Key, R.string.account_reimport) { choose(onImport) }
+        AccountAction(Icons.Outlined.Delete, R.string.account_remove, destructive = true) { choose(onRemove) }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun AccountAction(icon: ImageVector, @StringRes label: Int, destructive: Boolean = false, onClick: () -> Unit) {
+    val colors = if (destructive) {
+        val error = MaterialTheme.colorScheme.error
+        ListItemDefaults.colors(containerColor = Color.Transparent, headlineColor = error, leadingIconColor = error)
+    } else {
+        ListItemDefaults.colors(containerColor = Color.Transparent)
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(label)) }, leadingContent = { Icon(icon, contentDescription = null) },
+        colors = colors, modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 @Composable
 internal fun ImportAccountContent(
     draft: String, makePrimary: Boolean, busy: Boolean, errorCode: String?, onDraft: (String) -> Unit,
     onPrimary: (Boolean) -> Unit, onSubmit: () -> Unit, onBack: () -> Unit,
-    recovery: Boolean = false, onPhoneLogin: () -> Unit = {},
+    recovery: Boolean = false, showPrimaryOption: Boolean = true, onPhoneLogin: () -> Unit = {},
 ) {
     var visible by remember { mutableStateOf(false) }
-    AccountScaffold(if (recovery) R.string.account_reimport else R.string.account_import, onBack) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).imePadding(), contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = XmLayout.FormWidth).fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(XmLayout.PagePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(stringResource(R.string.account_import_detail), style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.account_login_info)) }, enabled = !busy,
-                    minLines = 5, maxLines = 8, isError = errorCode != null,
-                    visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
-                    trailingIcon = { IconButton(onClick = { visible = !visible }) {
-                        Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            stringResource(if (visible) R.string.account_hide_info else R.string.account_show_info))
-                    } })
-                if (!recovery) PrimaryAccountOption(makePrimary, !busy, onPrimary)
-                AccountOperationFeedback(busy, errorCode)
-                Button(onClick = onSubmit, enabled = !busy && draft.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(if (busy) R.string.account_verifying else R.string.account_import))
-                }
-                Text(stringResource(R.string.account_import_privacy), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!recovery) TextButton(onClick = onPhoneLogin, enabled = !busy) { Text(stringResource(R.string.login_use_phone)) }
-            }
+    FormPage(Icons.Outlined.Key, if (recovery) R.string.account_reimport else R.string.account_import,
+        R.string.account_import_detail, onBack) {
+        OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.account_login_info)) },
+            enabled = !busy, minLines = 5, maxLines = 8, isError = errorCode != null,
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+            trailingIcon = { IconButton(onClick = { visible = !visible }) {
+                Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                    stringResource(if (visible) R.string.account_hide_info else R.string.account_show_info))
+            } })
+        if (!recovery && showPrimaryOption) PrimaryAccountOption(makePrimary, !busy, onPrimary)
+        AccountOperationFeedback(busy, errorCode)
+        PrimaryAction(stringResource(if (busy) R.string.account_verifying else R.string.account_import), onSubmit,
+            enabled = !busy && draft.isNotBlank())
+        Text(stringResource(R.string.account_import_privacy), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!recovery) TextButton(onClick = onPhoneLogin, enabled = !busy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text(stringResource(R.string.login_use_phone))
         }
     }
 }
@@ -182,27 +207,41 @@ internal fun AccountReadError(onRetry: () -> Unit, busy: Boolean) {
 @Composable
 internal fun AccountOperationFeedback(busy: Boolean, errorCode: String?) {
     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-    if (errorCode != null) Text(stringResource(when (errorCode) {
-        "invalid_credentials" -> R.string.account_invalid_info
-        "credential_mismatch" -> R.string.account_mismatched_info
-        "input_too_long" -> R.string.account_input_too_long
-        "login_expired", "login_required" -> R.string.account_expired
-        "network", "network_error", "http_error" -> R.string.account_network_error
-        "invalid_mobile" -> R.string.login_error_mobile
-        "invalid_code" -> R.string.login_error_code
-        "sms_verify_rejected" -> R.string.login_error_sms_verify
-        "sms_send_rejected" -> R.string.login_error_sms_send
-        "quick_login_rejected" -> R.string.login_error_quick
-        "invalid_captcha", "captcha_reused" -> R.string.login_error_captcha
-        "challenge_invalid", "challenge_expired" -> R.string.login_error_challenge
-        "rate_limited", "sms_cooldown" -> R.string.account_rate_limited
-        "invalid_quota", "invalid_json", "protocol", "response_too_large" -> R.string.account_verification_error
-        "account_read_failed" -> R.string.account_read_error
-        "account_write_failed" -> R.string.account_write_error
-        else -> R.string.account_operation_error
-    }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+    if (errorCode != null) {
+        Surface(Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) {
+            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Outlined.ErrorOutline, contentDescription = null)
+                Text(stringResource(errorMessage(errorCode)), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
 }
+
+@StringRes
+private fun errorMessage(code: String): Int = when (code) {
+    "invalid_credentials" -> R.string.account_invalid_info
+    "credential_mismatch" -> R.string.account_mismatched_info
+    "input_too_long" -> R.string.account_input_too_long
+    "login_expired", "login_required" -> R.string.account_expired
+    "network", "network_error", "http_error" -> R.string.account_network_error
+    "invalid_mobile" -> R.string.login_error_mobile
+    "invalid_code" -> R.string.login_error_code
+    "sms_verify_rejected" -> R.string.login_error_sms_verify
+    "sms_send_rejected" -> R.string.login_error_sms_send
+    "quick_login_rejected" -> R.string.login_error_quick
+    "invalid_captcha", "captcha_reused" -> R.string.login_error_captcha
+    "challenge_invalid", "challenge_expired" -> R.string.login_error_challenge
+    "rate_limited", "sms_cooldown" -> R.string.account_rate_limited
+    "invalid_quota", "invalid_json", "protocol", "response_too_large" -> R.string.account_verification_error
+    "account_read_failed" -> R.string.account_read_error
+    "account_write_failed" -> R.string.account_write_error
+    else -> R.string.account_operation_error
+}
+
+/** The primary-account choice only means something once another account exists. */
+internal val AccountsState.hasAccounts: Boolean
+    get() = this is AccountsState.Ready && accounts.isNotEmpty()
 
 @Composable
 internal fun accountName(account: AccountSummary): String = stringResource(R.string.account_name, account.uid)

@@ -152,13 +152,15 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                                 ImportAccountContent(accounts?.draft.orEmpty(), primary, accounts?.busy == true,
                                     accounts?.errorCode, { accounts?.updateDraft(it) }, { primary = it },
                                     { accounts?.importCredentials(primary, route.recoveryIdentity) }, { navigator.pop() },
-                                    recovery = route.recoveryIdentity != null, onPhoneLogin = ::openPhone)
+                                    recovery = route.recoveryIdentity != null, showPrimaryOption = accountState.hasAccounts,
+                                    onPhoneLogin = ::openPhone)
                             }
                         }
                     }
                 },
             )
-            MiniPlayer()
+            // Idle, it only belongs on the tab pages; a real player will show on every page.
+            if (isHome) MiniPlayer()
         }
     }
 }

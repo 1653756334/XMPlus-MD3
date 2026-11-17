@@ -56,7 +56,8 @@
     <string name="login_phone_title">短信登录</string>
     <string name="login_phone_intro">先完成安全验证，再确认发送验证码。</string>
     <string name="login_phone_number">手机号</string>
-    <string name="login_send">安全验证并发送验证码</string>
+    <string name="login_send">发送验证码</string>
+    <string name="login_resend">重新发送</string>
     <string name="login_resend_in">%1$d 秒后可重发</string>
     <string name="login_phone_code">短信验证码</string>
     <string name="login_phone_code_hint">10 分钟内有效，最多尝试 5 次。</string>
