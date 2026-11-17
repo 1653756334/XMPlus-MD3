@@ -135,7 +135,8 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                         Surface(Modifier.fillMaxSize()) {
                             AccountsContent(accountState, accounts?.busy == true, accounts?.errorCode,
                                 { navigator.pop() }, ::openPhone, { accounts?.setPrimary(it) }, { accounts?.remove(it) },
-                                { accounts?.refreshQuota(it) }, { accounts?.retryLoad() }, { openImport(it) })
+                                { accounts?.refreshQuota(it) }, { accounts?.retryLoad() }, { openImport(it) },
+                                { accounts?.claim(it) }, { accounts?.resumeRewards(it) }, { accounts?.setAutoClaim(it) })
                         }
                     }
                     entry<AppRoute.PhoneLogin> {

@@ -48,9 +48,12 @@ internal fun AccountScaffold(title: Int, onBack: () -> Unit, content: @Composabl
 internal fun AccountsContent(
     state: AccountsState, busy: Boolean, errorCode: String?, onBack: () -> Unit, onImport: () -> Unit,
     onPrimary: (String) -> Unit, onRemove: (String) -> Unit, onRefresh: (String) -> Unit, onRetry: () -> Unit,
-    onReimport: (String) -> Unit = {},
+    onReimport: (String) -> Unit = {}, onClaim: (String) -> Unit = {}, onResume: (String) -> Unit = {},
+    onAutoClaim: (Boolean) -> Unit = {},
 ) {
     var removing by rememberSaveable { mutableStateOf<String?>(null) }
+    var rewardPrompt by rememberSaveable { mutableStateOf<RewardPrompt?>(null) }
+    var rewardTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val accounts = (state as? AccountsState.Ready)?.accounts.orEmpty()
     AccountScaffold(R.string.account_manage, onBack) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -68,9 +71,17 @@ internal fun AccountsContent(
                                 Text(stringResource(R.string.account_empty), style = MaterialTheme.typography.titleMedium)
                             }
                         }
+                        if (accounts.isNotEmpty()) item {
+                            SwitchRow(R.string.reward_auto, R.string.reward_auto_summary, state.autoClaim, !busy) {
+                                // Turning it on needs a deliberate yes; turning it off never does.
+                                if (it) rewardPrompt = RewardPrompt.AutoClaim else onAutoClaim(false)
+                            }
+                        }
                         items(accounts, key = { it.identity }) { account ->
                             AccountRow(account, busy, { onPrimary(account.identity) }, { removing = account.identity },
-                                { onRefresh(account.identity) }, { onReimport(account.identity) })
+                                { onRefresh(account.identity) }, { onReimport(account.identity) },
+                                { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Claim },
+                                { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Resume })
                         }
                         item { Button(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Outlined.Add, contentDescription = null)
@@ -81,6 +92,18 @@ internal fun AccountsContent(
                 }
             }
         }
+    }
+    rewardPrompt?.let { prompt ->
+        val account = accounts.firstOrNull { it.identity == rewardTarget }
+        if (prompt == RewardPrompt.AutoClaim || account != null) RewardConfirmation(prompt, account?.uid.orEmpty(),
+            onConfirm = {
+                rewardPrompt = null
+                when (prompt) {
+                    RewardPrompt.AutoClaim -> onAutoClaim(true)
+                    RewardPrompt.Claim -> onClaim(requireNotNull(account).identity)
+                    RewardPrompt.Resume -> onResume(requireNotNull(account).identity)
+                }
+            }, onDismiss = { rewardPrompt = null })
     }
     val target = accounts.firstOrNull { it.identity == removing }
     if (target != null) AlertDialog(onDismissRequest = { removing = null },
@@ -93,7 +116,7 @@ internal fun AccountsContent(
 
 @Composable
 private fun AccountRow(account: AccountSummary, busy: Boolean, onPrimary: () -> Unit, onRemove: () -> Unit,
-    onRefresh: () -> Unit, onImport: () -> Unit) {
+    onRefresh: () -> Unit, onImport: () -> Unit, onClaim: () -> Unit, onResume: () -> Unit) {
     var actions by remember { mutableStateOf(false) }
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
@@ -111,20 +134,22 @@ private fun AccountRow(account: AccountSummary, busy: Boolean, onPrimary: () -> 
                 Text(if (account.expired) stringResource(R.string.account_expired) else checkedText(account),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (account.expired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                if (account.rewardPaused) Text(stringResource(R.string.reward_paused), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error)
             }
             IconButton(onClick = { actions = true }, enabled = !busy) {
                 Icon(Icons.Outlined.MoreVert, stringResource(R.string.account_options, accountName(account)))
             }
         }
     }
-    if (actions) AccountActions(account, onDismiss = { actions = false }, onPrimary, onRefresh, onImport, onRemove)
+    if (actions) AccountActions(account, onDismiss = { actions = false }, onPrimary, onRefresh, onImport, onClaim, onResume, onRemove)
 }
 
 /** The per-account actions, as a bottom sheet: a short list reads better there than in a small popup menu. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountActions(account: AccountSummary, onDismiss: () -> Unit, onPrimary: () -> Unit, onRefresh: () -> Unit,
-    onImport: () -> Unit, onRemove: () -> Unit) {
+    onImport: () -> Unit, onClaim: () -> Unit, onResume: () -> Unit, onRemove: () -> Unit) {
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     // Slide the sheet away first so the chosen action does not start under a half-closed sheet.
@@ -135,6 +160,8 @@ private fun AccountActions(account: AccountSummary, onDismiss: () -> Unit, onPri
         Text(accountName(account), Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.titleMedium)
         if (!account.primary) AccountAction(Icons.Outlined.Star, R.string.account_make_primary) { choose(onPrimary) }
         AccountAction(Icons.Outlined.Refresh, R.string.account_refresh) { choose(onRefresh) }
+        if (account.rewardPaused) AccountAction(Icons.Outlined.PlayArrow, R.string.reward_resume) { choose(onResume) }
+        else AccountAction(Icons.Outlined.Redeem, R.string.reward_claim) { choose(onClaim) }
         AccountAction(Icons.Outlined.Key, R.string.account_reimport) { choose(onImport) }
         AccountAction(Icons.Outlined.Delete, R.string.account_remove, destructive = true) { choose(onRemove) }
         Spacer(Modifier.height(16.dp))
@@ -185,6 +212,33 @@ internal fun ImportAccountContent(
     }
 }
 
+private enum class RewardPrompt { Claim, Resume, AutoClaim }
+
+@Composable
+private fun RewardConfirmation(prompt: RewardPrompt, uid: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val (title, detail, action) = when (prompt) {
+        RewardPrompt.Claim -> Triple(R.string.reward_claim_title, stringResource(R.string.reward_claim_detail, uid), R.string.reward_claim)
+        RewardPrompt.Resume -> Triple(R.string.reward_resume_title, stringResource(R.string.reward_resume_detail, uid), R.string.reward_resume_confirm)
+        RewardPrompt.AutoClaim -> Triple(R.string.reward_auto_title, stringResource(R.string.reward_auto_detail), R.string.reward_auto_enable)
+    }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(title)) }, text = { Text(detail) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } })
+}
+
+@Composable
+private fun SwitchRow(@StringRes title: Int, @StringRes summary: Int, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+        .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+        .padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
 @Composable
 internal fun PrimaryAccountOption(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -225,6 +279,9 @@ private fun errorMessage(code: String): Int = when (code) {
     "input_too_long" -> R.string.account_input_too_long
     "login_expired", "login_required" -> R.string.account_expired
     "network", "network_error", "http_error" -> R.string.account_network_error
+    "uncertain" -> R.string.account_uncertain
+    "reward_paused" -> R.string.reward_paused_error
+    "reward_rejected" -> R.string.reward_rejected_error
     "invalid_mobile" -> R.string.login_error_mobile
     "invalid_code" -> R.string.login_error_code
     "sms_verify_rejected" -> R.string.login_error_sms_verify
@@ -233,7 +290,7 @@ private fun errorMessage(code: String): Int = when (code) {
     "invalid_captcha", "captcha_reused" -> R.string.login_error_captcha
     "challenge_invalid", "challenge_expired" -> R.string.login_error_challenge
     "rate_limited", "sms_cooldown" -> R.string.account_rate_limited
-    "invalid_quota", "invalid_json", "protocol", "response_too_large" -> R.string.account_verification_error
+    "invalid_quota", "invalid_json", "invalid_response", "protocol", "response_too_large" -> R.string.account_verification_error
     "account_read_failed" -> R.string.account_read_error
     "account_write_failed" -> R.string.account_write_error
     else -> R.string.account_operation_error

@@ -31,6 +31,7 @@ private fun ascii(value: String): ByteArray = value.toByteArray(Charsets.US_ASCI
 private fun md5(data: ByteArray): ByteArray = MessageDigest.getInstance("MD5").digest(data)
 
 private fun lowerHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+internal fun md5Hex(value: String): String = lowerHex(md5(value.toByteArray(Charsets.UTF_8)))
 
 /**
  * Ximalaya Lite protocol constants and primitives, ported rule for rule from XMPlus

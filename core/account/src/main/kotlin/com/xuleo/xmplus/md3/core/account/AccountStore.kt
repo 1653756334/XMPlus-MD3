@@ -11,12 +11,16 @@ data class AccountRecord(
     val deviceHint: String,
     val credentials: Credentials?,
     val quota: Quota,
+    /** Set when a claim's outcome is unknown or it failed; claiming stays off until the user has checked the official app. */
+    val rewardPaused: Boolean = false,
     val retained: JsonObject = JsonObject(emptyMap()),
 )
 
 data class AccountSnapshot(
     val records: List<AccountRecord> = emptyList(),
     val primaryIdentity: String? = null,
+    /** Opt-in: top accounts up automatically. It applies to every account. */
+    val autoClaim: Boolean = false,
 )
 
 interface AccountStore {
@@ -29,6 +33,11 @@ fun interface QuotaReader {
     suspend fun query(credentials: Credentials): Quota
 }
 
+/** Sends one claim request. It never retries: the caller owns what an unknown outcome means. */
+fun interface RewardClaimer {
+    suspend fun claim(credentials: Credentials)
+}
+
 data class AccountSummary(
     val identity: String,
     val uid: String,
@@ -36,10 +45,11 @@ data class AccountSummary(
     val quota: Quota,
     val primary: Boolean,
     val expired: Boolean,
+    val rewardPaused: Boolean,
 )
 
 sealed interface AccountsState {
     data object Loading : AccountsState
     data object Unavailable : AccountsState
-    data class Ready(val accounts: List<AccountSummary>) : AccountsState
+    data class Ready(val accounts: List<AccountSummary>, val autoClaim: Boolean = false) : AccountsState
 }

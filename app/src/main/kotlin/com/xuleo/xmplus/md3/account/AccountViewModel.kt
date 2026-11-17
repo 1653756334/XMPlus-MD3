@@ -48,6 +48,9 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
     fun setPrimary(identity: String) = operations.launch { repository.setPrimary(identity) }
     fun remove(identity: String) = operations.launch { repository.remove(identity) }
     fun refreshQuota(identity: String) = operations.launch { repository.refreshQuota(identity) }
+    fun claim(identity: String) = operations.launch { repository.claimOnce(identity) }
+    fun resumeRewards(identity: String) = operations.launch { repository.resumeRewards(identity) }
+    fun setAutoClaim(enabled: Boolean) = operations.launch { repository.setAutoClaim(enabled) }
     fun clearError() = operations.clearError()
     fun consumeImport() {
         importCompleted = false

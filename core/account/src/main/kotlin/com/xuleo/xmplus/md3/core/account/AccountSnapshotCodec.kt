@@ -13,6 +13,7 @@ object AccountSnapshotCodec {
         return buildJsonObject {
             put("version", 1)
             put("primary", snapshot.primaryIdentity?.let(::JsonPrimitive) ?: JsonNull)
+            put("auto_claim", snapshot.autoClaim)
             putJsonArray("accounts") {
                 snapshot.records.forEach { record -> add(buildJsonObject {
                     put("identity", record.identity)
@@ -22,6 +23,7 @@ object AccountSnapshotCodec {
                     put("remaining_seconds", record.quota.remainingSeconds)
                     put("new_device", record.quota.newDevice)
                     put("checked_at", record.quota.checkedAt.toEpochMilliseconds())
+                    put("reward_paused", record.rewardPaused)
                     put("retained", record.retained)
                 }) }
             }
@@ -44,10 +46,11 @@ object AccountSnapshotCodec {
                     record.getValue("new_device").let { require(it is JsonPrimitive && !it.isString); it.boolean },
                     Instant.fromEpochMilliseconds(record.getValue("checked_at").integer()),
                 ),
+                rewardPaused = record["reward_paused"]?.boolean() ?: false,
                 retained = record.getValue("retained").jsonObject,
             )
         }
-        AccountSnapshot(records, primary).also(::validate)
+        AccountSnapshot(records, primary, root["auto_claim"]?.boolean() ?: false).also(::validate)
     } catch (_: Exception) {
         throw XmlyException("account_read_failed")
     }
@@ -66,6 +69,11 @@ object AccountSnapshotCodec {
     private fun JsonElement.string(): String {
         require(this is JsonPrimitive && isString)
         return content
+    }
+
+    private fun JsonElement.boolean(): Boolean {
+        require(this is JsonPrimitive && !isString)
+        return boolean
     }
 
     private fun JsonElement.integer(): Long {

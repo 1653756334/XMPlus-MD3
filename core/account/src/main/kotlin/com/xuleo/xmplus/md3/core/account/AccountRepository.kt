@@ -1,7 +1,9 @@
 package com.xuleo.xmplus.md3.core.account
 
 import com.xuleo.xmplus.md3.core.model.Credentials
+import com.xuleo.xmplus.md3.core.model.Quota
 import com.xuleo.xmplus.md3.core.model.XmlyException
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -17,10 +19,16 @@ import kotlinx.coroutines.withContext
  * publish second: failed validation/storage leaves the previous selection and credentials intact.
  * Media and ledger integrations must pause/settle their producers before invoking removal or renewal.
  */
-class AccountRepository(private val store: AccountStore, private val quotaReader: QuotaReader) {
+class AccountRepository(
+    private val store: AccountStore,
+    private val quotaReader: QuotaReader,
+    private val rewards: RewardClaimer,
+    private val locks: BalanceLocks = BalanceLocks(),
+) {
     private val mutex = Mutex()
-    private var snapshot: AccountSnapshot? = null
-    private val expired = mutableSetOf<String>()
+    // Written only under [mutex]; the automatic top-up reads it without the lock to notice a change of mind.
+    @Volatile private var snapshot: AccountSnapshot? = null
+    private val expired: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val mutableState = MutableStateFlow<AccountsState>(AccountsState.Loading)
     val state = mutableState.asStateFlow()
 
@@ -58,13 +66,14 @@ class AccountRepository(private val store: AccountStore, private val quotaReader
             deviceHint = if (credentials.deviceId.length <= 4) "****" else "…" + credentials.deviceId.takeLast(4),
             credentials = credentials,
             quota = quota,
+            rewardPaused = previous?.rewardPaused ?: false,
             retained = previous?.retained ?: kotlinx.serialization.json.JsonObject(emptyMap()),
         )
         val records = before.records.toMutableList()
         val index = records.indexOfFirst { it.identity == record.identity }
         if (index < 0) records.add(record) else records[index] = record
         val primary = if (recoveryIdentity == null && (makePrimary || before.primaryIdentity == null)) record.identity else before.primaryIdentity
-        commit(AccountSnapshot(records.toList(), primary), clearExpiry = record.identity)
+        commit(before.copy(records = records.toList(), primaryIdentity = primary), clearExpiry = record.identity)
     }
 
     suspend fun setPrimary(identity: String) = mutex.withLock {
@@ -82,7 +91,7 @@ class AccountRepository(private val store: AccountStore, private val quotaReader
         val primary = if (before.primaryIdentity == identity) {
             (remaining.firstOrNull { it.identity !in expired } ?: remaining.firstOrNull())?.identity
         } else before.primaryIdentity
-        commit(AccountSnapshot(records, primary), clearExpiry = identity)
+        commit(before.copy(records = records, primaryIdentity = primary), clearExpiry = identity)
     }
 
     suspend fun refreshQuota(identity: String) = mutex.withLock {
@@ -103,6 +112,101 @@ class AccountRepository(private val store: AccountStore, private val quotaReader
             if (it.identity == identity) it.copy(quota = quota) else it
         }), clearExpiry = identity)
     }
+
+    suspend fun setAutoClaim(enabled: Boolean) = mutex.withLock {
+        val before = loaded()
+        if (before.autoClaim != enabled) commit(before.copy(autoClaim = enabled))
+    }
+
+    /** The user has checked the official app; claiming may run again. */
+    suspend fun resumeRewards(identity: String) = mutex.withLock {
+        val before = loaded()
+        if (active(identity).rewardPaused) commit(before.withPaused(identity, false))
+    }
+
+    /**
+     * One claim request, never repeated. Whatever goes wrong after it started, the outcome is unknown, so claiming
+     * pauses for this account until [resumeRewards].
+     */
+    suspend fun claimOnce(identity: String) = mutex.withLock {
+        val before = loaded()
+        val record = active(identity)
+        if (identity in expired) throw XmlyException("login_expired", definitive = true)
+        if (record.rewardPaused) throw XmlyException("reward_paused", definitive = true)
+        val credentials = requireNotNull(record.credentials)
+        val quota = try {
+            locks.withLock(identity) {
+                rewards.claim(credentials)
+                quotaReader.query(credentials)
+            }
+        } catch (failure: Throwable) {
+            recordFailure(identity, failure)
+            throw failure
+        }
+        currentCoroutineContext().ensureActive()
+        commit(before.withQuota(identity, quota))
+    }
+
+    /**
+     * Tops [identity] up from below [LowSeconds] towards [TargetSeconds] while automatic claiming stays enabled and
+     * the login is unchanged. Each claim is a single request: a failure stops the loop and pauses the account. The
+     * network work runs outside [mutex], so account screens stay responsive while this runs.
+     */
+    suspend fun topUp(identity: String) {
+        val credentials = mutex.withLock { loaded().eligibleCredentials(identity) } ?: return
+        fun allowed() = snapshot?.eligibleCredentials(identity)?.cacheIdentity == credentials.cacheIdentity
+        var quota = try {
+            quotaReader.query(credentials)
+        } catch (failure: XmlyException) {
+            if (failure.code == "login_expired") withContext(NonCancellable) { mutex.withLock { recordFailure(identity, failure) } }
+            throw failure
+        }
+        if (!allowed() || quota.remainingSeconds >= LowSeconds) return
+        // At most MaxClaims per run, so a one-second reward cannot keep this loop going for ever.
+        for (count in 0 until MaxClaims) {
+            if (!allowed() || quota.remainingSeconds >= TargetSeconds) break
+            val previous = quota.remainingSeconds
+            try {
+                val claimed = locks.withLock(identity) {
+                    if (!allowed()) return@withLock false
+                    rewards.claim(credentials)
+                    true
+                }
+                if (!claimed) break
+                quota = quotaReader.query(credentials)
+            } catch (failure: Throwable) {
+                withContext(NonCancellable) { mutex.withLock { recordFailure(identity, failure) } }
+                if (failure is CancellationException) throw failure
+                break
+            }
+            if (quota.remainingSeconds <= previous) break
+        }
+        mutex.withLock { if (allowed()) commit(loaded().withQuota(identity, quota)) }
+    }
+
+    /** Caller holds [mutex]. */
+    private suspend fun recordFailure(identity: String, failure: Throwable) {
+        withContext(NonCancellable) {
+            val current = loaded()
+            if ((failure as? XmlyException)?.code == "login_expired") {
+                // Definitely not applied: the login needs renewing, not the user's check of the official app.
+                expired.add(identity)
+                publish(current)
+            } else if (current.records.any { it.identity == identity }) {
+                commit(current.withPaused(identity, true))
+            }
+        }
+    }
+    private fun AccountSnapshot.eligibleCredentials(identity: String): Credentials? {
+        if (!autoClaim || identity in expired) return null
+        return records.firstOrNull { it.identity == identity && !it.rewardPaused }?.credentials
+    }
+
+    private fun AccountSnapshot.withPaused(identity: String, paused: Boolean) =
+        copy(records = records.map { if (it.identity == identity) it.copy(rewardPaused = paused) else it })
+
+    private fun AccountSnapshot.withQuota(identity: String, quota: Quota) =
+        copy(records = records.map { if (it.identity == identity) it.copy(quota = quota) else it })
 
     private fun loaded() = snapshot ?: throw XmlyException("account_read_failed")
 
@@ -125,7 +229,13 @@ class AccountRepository(private val store: AccountStore, private val quotaReader
     private fun publish(value: AccountSnapshot) {
         mutableState.value = AccountsState.Ready(value.records.filter { it.credentials != null }.map {
             AccountSummary(it.identity, it.uid, it.deviceHint, it.quota,
-                it.identity == value.primaryIdentity, it.identity in expired)
-        })
+                it.identity == value.primaryIdentity, it.identity in expired, it.rewardPaused)
+        }, value.autoClaim)
+    }
+
+    private companion object {
+        const val LowSeconds = 7_200
+        const val TargetSeconds = 14_400
+        const val MaxClaims = 64
     }
 }

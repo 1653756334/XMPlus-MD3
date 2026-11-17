@@ -32,4 +32,5 @@ internal class Endpoint(
 
 internal object Endpoints {
     val Config = Endpoint(Host.Mobile, "POST", "/lite-mobile/audi/func/v1/config", idempotent = true)
+    val RewardClaim = Endpoint(Host.Welfare, "POST", "/lite-earn/ting/welfare/rewardDuration/ts-{ts}")
 }
