@@ -195,7 +195,7 @@ class XmlyLogin internal constructor(
                 status = response.status
                 retryHeader = response.retryAfter
                 if (status != 200) throw LoginFailure("http_error",
-                    retryAfter = retryHeader?.let { maxOf(1000L shl attempt, loginRetryAfter(it, clock()) ?: 0).milliseconds })
+                    retryAfter = retryHeader?.let { maxOf(1000L shl attempt, parseRetryAfter(it, clock()) ?: 0).milliseconds })
                 val result = try {
                     Json.parseToJsonElement(decodeUtf8Strict(response.body)) as? JsonObject ?: fail("invalid_response")
                 } catch (_: Exception) { fail("invalid_response") }
@@ -205,7 +205,7 @@ class XmlyLogin internal constructor(
                 throw cancelled
             } catch (error: Exception) {
                 checkSession(epoch)
-                if (error is LoginTransportFailure) { status = error.status; retryHeader = error.retryAfter; transportError = error.cause }
+                if (error is HttpTransportException) { status = error.status; retryHeader = error.retryAfter; transportError = error.cause }
                 else if (error is IOException) transportError = error
                 when {
                     error is LoginFailure -> error
@@ -219,7 +219,7 @@ class XmlyLogin internal constructor(
                 (failure.definitive && failure.upstreamCode == 429) ||
                 (request.method == "GET" && transportError != null && transportError !is SSLException)
             if (!retry || attempt == 4) throw failure
-            interruptible(abort, epoch) { delay(maxOf(1000L shl attempt, loginRetryAfter(retryHeader, clock()) ?: 0)) }
+            interruptible(abort, epoch) { delay(maxOf(1000L shl attempt, parseRetryAfter(retryHeader, clock()) ?: 0)) }
         }
         fail("network_error")
     }
