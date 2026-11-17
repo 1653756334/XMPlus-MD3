@@ -24,7 +24,7 @@ class AccountRepository(
     private val quotaReader: QuotaReader,
     private val rewards: RewardClaimer,
     private val locks: BalanceLocks = BalanceLocks(),
-) {
+) : UsageStore {
     private val mutex = Mutex()
     // Written only under [mutex]; the automatic top-up reads it without the lock to notice a change of mind.
     @Volatile private var snapshot: AccountSnapshot? = null
@@ -67,6 +67,7 @@ class AccountRepository(
             credentials = credentials,
             quota = quota,
             rewardPaused = previous?.rewardPaused ?: false,
+            usage = previous?.usage ?: UsageState(),
             retained = previous?.retained ?: kotlinx.serialization.json.JsonObject(emptyMap()),
         )
         val records = before.records.toMutableList()
@@ -113,6 +114,21 @@ class AccountRepository(
         }), clearExpiry = identity)
     }
 
+    override val identities: List<String> get() = snapshot?.records?.map { it.identity }.orEmpty()
+
+    override fun usage(identity: String): UsageState? = snapshot?.records?.firstOrNull { it.identity == identity }?.usage
+
+    override fun credentials(identity: String): Credentials? = snapshot?.records?.firstOrNull { it.identity == identity }?.credentials
+
+    override suspend fun updateUsage(identity: String, update: (UsageState) -> UsageState) = mutex.withLock {
+        val before = loaded()
+        val record = before.records.firstOrNull { it.identity == identity } ?: throw XmlyException("missing_account", definitive = true)
+        val next = update(record.usage)
+        if (next != record.usage) {
+            commit(before.copy(records = before.records.map { if (it.identity == identity) it.copy(usage = next) else it }))
+        }
+    }
+
     suspend fun setAutoClaim(enabled: Boolean) = mutex.withLock {
         val before = loaded()
         if (before.autoClaim != enabled) commit(before.copy(autoClaim = enabled))
@@ -128,25 +144,32 @@ class AccountRepository(
      * One claim request, never repeated. Whatever goes wrong after it started, the outcome is unknown, so claiming
      * pauses for this account until [resumeRewards].
      */
-    suspend fun claimOnce(identity: String) = mutex.withLock {
-        val before = loaded()
-        val record = active(identity)
-        if (identity in expired) throw XmlyException("login_expired", definitive = true)
-        if (record.rewardPaused) throw XmlyException("reward_paused", definitive = true)
-        val credentials = requireNotNull(record.credentials)
+    suspend fun claimOnce(identity: String) {
+        // The account lock is only ever held briefly: the ledger writes under it while holding the balance lock.
+        val credentials = mutex.withLock {
+            val record = active(identity)
+            if (identity in expired) throw XmlyException("login_expired", definitive = true)
+            if (record.rewardPaused) throw XmlyException("reward_paused", definitive = true)
+            requireNotNull(record.credentials)
+        }
         val quota = try {
             locks.withLock(identity) {
+                // A claim that failed while this one waited has paused the account.
+                if (snapshot?.records?.firstOrNull { it.identity == identity }?.rewardPaused == true) {
+                    throw XmlyException("reward_paused", definitive = true)
+                }
                 rewards.claim(credentials)
                 quotaReader.query(credentials)
             }
         } catch (failure: Throwable) {
-            recordFailure(identity, failure)
+            withContext(NonCancellable) { mutex.withLock { recordFailure(identity, failure) } }
             throw failure
         }
-        currentCoroutineContext().ensureActive()
-        commit(before.withQuota(identity, quota))
+        mutex.withLock {
+            currentCoroutineContext().ensureActive()
+            commit(loaded().withQuota(identity, quota))
+        }
     }
-
     /**
      * Tops [identity] up from below [LowSeconds] towards [TargetSeconds] while automatic claiming stays enabled and
      * the login is unchanged. Each claim is a single request: a failure stops the loop and pauses the account. The

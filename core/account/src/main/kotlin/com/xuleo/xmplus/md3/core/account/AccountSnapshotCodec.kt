@@ -24,6 +24,7 @@ object AccountSnapshotCodec {
                     put("new_device", record.quota.newDevice)
                     put("checked_at", record.quota.checkedAt.toEpochMilliseconds())
                     put("reward_paused", record.rewardPaused)
+                    put("ledger", UsageStateCodec.encode(record.usage, record.identity))
                     put("retained", record.retained)
                 }) }
             }
@@ -47,6 +48,7 @@ object AccountSnapshotCodec {
                     Instant.fromEpochMilliseconds(record.getValue("checked_at").integer()),
                 ),
                 rewardPaused = record["reward_paused"]?.boolean() ?: false,
+                usage = record["ledger"]?.let { UsageStateCodec.decode(it.jsonObject, record.getValue("identity").string()) } ?: UsageState(),
                 retained = record.getValue("retained").jsonObject,
             )
         }

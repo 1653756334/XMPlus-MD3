@@ -9,28 +9,43 @@ import kotlinx.serialization.json.*
 import kotlin.time.Instant
 
 /**
- * The authenticated config/queryQuota read of XMPlus xmly_client.dart. A candidate stays separate until this read
- * validates its credentials, so it takes the credentials as an argument rather than owning an account.
+ * The authenticated config (read) and report (debit) calls of XMPlus xmly_client.dart. A candidate stays separate
+ * until the read validates its credentials, so both take the credentials as an argument rather than owning an account.
  */
 class XmlyQuotaClient(
     private val http: XmlyHttp,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    suspend fun queryQuota(credentials: Credentials): Quota {
-        // Dart creates the signed body once; the transport repeats that same body on a retry.
+    suspend fun queryQuota(credentials: Credentials): Quota =
+        decodeQuota(http.call(Endpoints.Config, credentials, body = signedBody(credentials, null)), clock)
+
+    /**
+     * Spends [seconds] of listening time. This is a write: it is sent once, and an unknown outcome is the caller's to
+     * resolve by reading the balance. The reply does not say whether the device is new, so [newDevice] is the last
+     * known value.
+     */
+    suspend fun debit(credentials: Credentials, seconds: Int, newDevice: Boolean): Quota {
+        if (seconds < 1) throw XmlyException("invalid_duration", definitive = true)
+        return decodeQuota(http.call(Endpoints.Report, credentials, body = signedBody(credentials, seconds)), clock, newDevice)
+    }
+
+    // Dart creates the signed body once; the transport repeats that same body on a retry.
+    private fun signedBody(credentials: Credentials, duration: Int?): JsonObject {
         val timestamp = clock().toString()
-        val signature = XmlyCrypto.activitySignature(
-            linkedMapOf("deviceId" to credentials.deviceId, "timestamp" to timestamp, "uid" to credentials.uid))
-        val body = buildJsonObject {
+        val params = linkedMapOf("deviceId" to credentials.deviceId, "timestamp" to timestamp, "uid" to credentials.uid)
+        if (duration != null) params["duration"] = duration.toString()
+        val signature = XmlyCrypto.activitySignature(params)
+        return buildJsonObject {
             put("deviceId", credentials.deviceId)
             put("timestamp", timestamp)
+            if (duration != null) put("duration", duration.toString())
             put("signature", signature)
         }
-        return decodeQuota(http.call(Endpoints.Config, credentials, body = body), clock)
     }
 
     companion object {
-        internal fun decodeQuota(payload: JsonObject, clock: () -> Long): Quota {
+        /** [knownNewDevice] is set for replies that omit the flag (report); config always carries it. */
+        internal fun decodeQuota(payload: JsonObject, clock: () -> Long, knownNewDevice: Boolean? = null): Quota {
             val data = payload["data"] as? JsonObject ?: fail("invalid_quota")
             fun decode(name: String): String = try {
                 val field = data[name] as? JsonPrimitive ?: fail("invalid_quota")
@@ -42,7 +57,7 @@ class XmlyQuotaClient(
                 require(BigInteger.valueOf(clock()).subtract(BigInteger.valueOf(timestamp)).abs() < BigInteger.valueOf(180_000))
                 text.substring(0, divider)
             } catch (_: Exception) { fail("invalid_quota") }
-            val newDevice = when (decode("newDevice")) {
+            val newDevice = knownNewDevice ?: when (decode("newDevice")) {
                 "true" -> true
                 "false" -> false
                 else -> fail("invalid_quota")

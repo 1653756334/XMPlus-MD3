@@ -13,6 +13,7 @@ data class AccountRecord(
     val quota: Quota,
     /** Set when a claim's outcome is unknown or it failed; claiming stays off until the user has checked the official app. */
     val rewardPaused: Boolean = false,
+    val usage: UsageState = UsageState(),
     val retained: JsonObject = JsonObject(emptyMap()),
 )
 
