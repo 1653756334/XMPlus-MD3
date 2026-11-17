@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.core.designsystem.XmPreview
+import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 
 /** Idle placeholder; the real queue-driven player arrives with phase 3. */
 @Composable
@@ -73,3 +75,7 @@ fun MiniPlayer(modifier: Modifier = Modifier) {
         }
     }
 }
+
+@XmPreviews
+@Composable
+private fun MiniPlayerPreview() = XmPreview { MiniPlayer() }

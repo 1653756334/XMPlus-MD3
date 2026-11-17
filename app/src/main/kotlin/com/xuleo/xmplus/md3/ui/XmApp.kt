@@ -20,6 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.xuleo.xmplus.md3.core.designsystem.XmDevicePreviews
+import com.xuleo.xmplus.md3.core.designsystem.XmPreview
+import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 import com.xuleo.xmplus.md3.ui.screens.DiscoverScreen
 import com.xuleo.xmplus.md3.ui.screens.DownloadsScreen
 import com.xuleo.xmplus.md3.ui.screens.LibraryScreen
@@ -28,13 +31,19 @@ import com.xuleo.xmplus.md3.ui.screens.MeScreen
 @Composable
 fun XmApp() {
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    val stateHolder = rememberSaveableStateHolder()
-    val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
 
     // Back from any other tab returns to Discover; back on Discover leaves the app.
     BackHandler(enabled = selected != Destination.Discover) {
         selected = Destination.Discover
     }
+
+    XmAppContent(selected = selected, onSelect = { selected = it })
+}
+
+@Composable
+internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit) {
+    val stateHolder = rememberSaveableStateHolder()
+    val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
 
     NavigationSuiteScaffold(
         navigationSuiteType = navigationType,
@@ -43,7 +52,7 @@ fun XmApp() {
                 val isSelected = destination == selected
                 NavigationSuiteItem(
                     selected = isSelected,
-                    onClick = { selected = destination },
+                    onClick = { onSelect(destination) },
                     icon = {
                         Icon(
                             imageVector = if (isSelected) destination.selectedIcon else destination.icon,
@@ -82,3 +91,11 @@ private fun TabContent(destination: Destination, stateHolder: SaveableStateHolde
         }
     }
 }
+
+@XmDevicePreviews
+@Composable
+private fun XmAppPreview() = XmPreview { XmAppContent(selected = Destination.Discover, onSelect = {}) }
+
+@XmPreviews
+@Composable
+private fun XmAppMePreview() = XmPreview { XmAppContent(selected = Destination.Me, onSelect = {}) }

@@ -248,12 +248,12 @@ Rules:
 
 Each phase ends with a side-by-side check against XMPlus on the same account.
 
-0. Skeleton: Gradle setup, modules, design system, translation lint, CI (reusing the FFmpeg workflow; release signing with this project's own keystore).
+0. Skeleton: Gradle setup, modules, design system, translation lint, CI (checks and debug build; release signing with this project's own keystore).
 1. Protocol and accounts: API layer port; SMS / Geetest / Cookie login; quota, rewards, usage ledger; XMPlus backup import so testers can bring their accounts.
 2. Browsing: discover, categories, rankings, search, album, anchor, reading reviews and comments.
 3. Playback: Media3 service, mini and full player, queue, settings, sleep timer, bookmarks, progress, 听时 metering.
 4. Library and interactions: the 6 tabs; like, favorite, subscribe, follow; posting, liking and deleting comments.
-5. Downloads: shared cache, billing receipts, FFmpeg, background work, auto-download, offline library.
+5. Downloads: shared cache, billing receipts, FFmpeg (source-built in CI, reusing `tool/build_android_media.sh` and the XMPlus workflow), background work, auto-download, offline library.
 6. System: settings, backup export and restore, in-app update, logs and feedback, about.
 7. Polish: motion pass, tablets and foldables, TalkBack, startup performance, translation review, full comparison against XMPlus.
 

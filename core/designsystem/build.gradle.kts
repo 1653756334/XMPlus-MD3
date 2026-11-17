@@ -23,4 +23,6 @@ dependencies {
     api(libs.compose.foundation)
     api(libs.compose.material3)
     api(libs.material.kolor)
+    api(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
 }

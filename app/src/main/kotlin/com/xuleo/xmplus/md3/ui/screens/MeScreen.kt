@@ -28,8 +28,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.core.designsystem.XmPreview
+import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 import com.xuleo.xmplus.md3.settings.AppLanguage
 import com.xuleo.xmplus.md3.settings.setAppLanguage
+import com.xuleo.xmplus.md3.ui.Destination
 
 @StringRes
 private fun AppLanguage.label(): Int = when (this) {
@@ -41,9 +44,20 @@ private fun AppLanguage.label(): Int = when (this) {
 @Composable
 fun MeScreen() {
     var language by remember { mutableStateOf(AppLanguage.current()) }
+    MeContent(
+        language = language,
+        onLanguageSelected = {
+            language = it
+            setAppLanguage(it)
+        },
+    )
+}
+
+@Composable
+internal fun MeContent(language: AppLanguage, onLanguageSelected: (AppLanguage) -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
 
-    TabScaffold(com.xuleo.xmplus.md3.ui.Destination.Me.label) { padding ->
+    TabScaffold(Destination.Me.label) { padding ->
         Column(Modifier.padding(padding)) {
             ListItem(
                 onClick = { showDialog = true },
@@ -56,40 +70,64 @@ fun MeScreen() {
     }
 
     if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(stringResource(R.string.setting_language)) },
-            text = {
-                Column(Modifier.selectableGroup()) {
-                    AppLanguage.entries.forEach { option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = option == language,
-                                    role = Role.RadioButton,
-                                    onClick = {
-                                        showDialog = false
-                                        language = option
-                                        setAppLanguage(option)
-                                    },
-                                )
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = option == language, onClick = null)
-                            Spacer(Modifier.width(16.dp))
-                            Text(stringResource(option.label()))
-                        }
-                    }
-                }
+        LanguageDialog(
+            selected = language,
+            onSelect = {
+                showDialog = false
+                onLanguageSelected(it)
             },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            onDismiss = { showDialog = false },
         )
     }
+}
+
+@Composable
+private fun LanguageDialog(
+    selected: AppLanguage,
+    onSelect: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.setting_language)) },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                AppLanguage.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = option == selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(option) },
+                            )
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == selected, onClick = null)
+                        Spacer(Modifier.width(16.dp))
+                        Text(stringResource(option.label()))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@XmPreviews
+@Composable
+private fun MeContentPreview() = XmPreview {
+    MeContent(language = AppLanguage.System, onLanguageSelected = {})
+}
+
+@XmPreviews
+@Composable
+private fun LanguageDialogPreview() = XmPreview {
+    LanguageDialog(selected = AppLanguage.Chinese, onSelect = {}, onDismiss = {})
 }
