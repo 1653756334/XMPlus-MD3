@@ -5,6 +5,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ShortNavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.SaveableStateHolder
@@ -63,21 +65,24 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
             shortNavigationBarContainerColor = MaterialTheme.colorScheme.surface,
         ),
         navigationItems = {
-            Destination.entries.forEach { destination ->
-                val isSelected = destination == selected
-                NavigationSuiteItem(
-                    selected = isSelected,
-                    onClick = { onSelect(destination) },
-                    icon = {
-                        Icon(
-                            imageVector = if (isSelected) destination.selectedIcon else destination.icon,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(destination.label)) },
-                    colors = itemColors,
-                    navigationSuiteType = navigationType,
-                )
+            // The bar shapes its tap ripple like the indicator pill, so with no pill the ripple goes too.
+            CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                Destination.entries.forEach { destination ->
+                    val isSelected = destination == selected
+                    NavigationSuiteItem(
+                        selected = isSelected,
+                        onClick = { onSelect(destination) },
+                        icon = {
+                            Icon(
+                                imageVector = if (isSelected) destination.selectedIcon else destination.icon,
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(destination.label)) },
+                        colors = itemColors,
+                        navigationSuiteType = navigationType,
+                    )
+                }
             }
         },
     ) {
