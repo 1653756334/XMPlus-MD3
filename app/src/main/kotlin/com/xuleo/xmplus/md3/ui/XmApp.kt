@@ -11,6 +11,7 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +44,14 @@ fun XmApp() {
 @Composable
 internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit) {
     val stateHolder = rememberSaveableStateHolder()
-    val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
+    val defaultType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
+    // The compact bar draws the label under the icon, outside the indicator. The medium bar puts
+    // icon and label together inside it, so phones use that one too.
+    val navigationType = if (defaultType == NavigationSuiteType.ShortNavigationBarCompact) {
+        NavigationSuiteType.ShortNavigationBarMedium
+    } else {
+        defaultType
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteType = navigationType,
