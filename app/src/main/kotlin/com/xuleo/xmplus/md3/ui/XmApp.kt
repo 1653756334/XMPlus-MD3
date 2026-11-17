@@ -6,12 +6,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ShortNavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.xuleo.xmplus.md3.core.designsystem.XmDevicePreviews
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
@@ -44,17 +46,22 @@ fun XmApp() {
 @Composable
 internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit) {
     val stateHolder = rememberSaveableStateHolder()
-    val defaultType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
-    // The compact bar draws the label under the icon, outside the indicator. The medium bar puts
-    // icon and label together inside it, so phones use that one too.
-    val navigationType = if (defaultType == NavigationSuiteType.ShortNavigationBarCompact) {
-        NavigationSuiteType.ShortNavigationBarMedium
-    } else {
-        defaultType
-    }
+    val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
+    // Icon over label with no indicator pill: the selected tab only turns primary and gets the filled icon.
+    val itemColors = ShortNavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.primary,
+        selectedTextColorTopIconPosition = MaterialTheme.colorScheme.primary,
+        selectedTextColorStartIconPosition = MaterialTheme.colorScheme.primary,
+        selectedIndicatorColor = Color.Transparent,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
     NavigationSuiteScaffold(
         navigationSuiteType = navigationType,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            shortNavigationBarContainerColor = MaterialTheme.colorScheme.surface,
+        ),
         navigationItems = {
             Destination.entries.forEach { destination ->
                 val isSelected = destination == selected
@@ -68,6 +75,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                         )
                     },
                     label = { Text(stringResource(destination.label)) },
+                    colors = itemColors,
                     navigationSuiteType = navigationType,
                 )
             }
