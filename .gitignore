@@ -1,5 +1,6 @@
 # Gradle / build
 .gradle/
+.kotlin/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 local.properties
@@ -23,3 +24,14 @@ app/src/main/jniLibs/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local references, scratch work and installable build artifacts
+/Temp/
+/temp/
+*.apk
+*.aab
+*.apks
+
+# Project policy: verification sources are temporary and never committed
+**/src/test/
+**/src/androidTest/

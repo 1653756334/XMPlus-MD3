@@ -46,7 +46,7 @@ Status: Draft · 2026-11-17
 - P0-09 Switching tabs fades through; each tab keeps its own state and scroll position.
 - P0-10 Back on 听过, 下载 or 我的 goes to 发现; back on 发现 leaves the app.
 - P0-11 The idle mini player floats above the bottom bar (or at the bottom of the content beside the rail) and never covers the last list item.
-- P0-12 Default theme uses seed color #245C56 (松绿); dark mode follows the system.
+- P0-12 Default theme uses neutral white surfaces and readable green emphasis (#007F57); dark mode follows the system.
 - P0-13 Language switch in 我的 behaves as STD-03.
 - P0-14 After process death (Don't keep activities), the selected tab is restored.
 
@@ -119,6 +119,12 @@ Source: XMPlus `lib/pages/account_page.dart`, `lib/api/xmly_login.dart`, `lib/ap
 - AC-08 Auto-claim: balance under 2 h (7,200 s) → claim until at least 4 h (14,400 s) or 64 claims; at 2 h or more → no claim.
 - AC-09 A claim with an unknown result pauses auto-claim for that account until the user confirms they checked the official app.
 - AC-10 Logins are stored encrypted with the Android Keystore and are not included in Android's system backup.
+- AC-11 Import is verified with a listening-time query before saving. Failed verification leaves the previous accounts, balance and primary selection unchanged; no claim or debit is sent.
+- AC-12 Reimporting the same account/device updates the login without duplicating the account. Updating from an account's menu requires that original identity and preserves the primary selection, including after process recreation.
+- AC-13 Read failure, corrupted ciphertext or missing encryption key preserves the original file and blocks account mutations; Retry never resets the saved data. A write failure is not published as success.
+- AC-14 Import text is masked and absent from restored UI state. Returning cancels verification and clears the text; rotation preserves it in memory, while process death requires pasting again.
+- AC-15 Refresh failure retains the last successful balance and update time. An expired login is identified and can be updated. A missing result is never displayed as zero.
+- AC-16 Account screens in both languages, light/dark mode and at 200% font remain scrollable; the checkbox exposes its state, errors are announced, and menus have account-specific labels.
 
 ### XMPlus backup import
 

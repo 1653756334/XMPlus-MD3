@@ -106,7 +106,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 ### 账号 Accounts
 
 - [ ] SMS login with Geetest verification
-- [ ] Cookie / request-header import
+- [x] Cookie / request-header import (verified by a listening-time query before saving)
 - [ ] Multiple accounts, primary account, restore and remove
 - [ ] 听时 balance, claim once
 - [ ] Auto-claim: top up to 4 h when below 2 h; pauses after an uncertain result until confirmed manually
@@ -174,6 +174,17 @@ Rules:
 
 ### Shell
 
+#### Visual and layout baseline
+
+- Reference QQ Music's clear content hierarchy, not its promotional features or player skins; use official Material 3 components.
+- Neutral white surfaces in light mode, restrained green accents. Readable light-mode primary is `#007F57`; `#0E9F6E` remains a decorative brand color.
+- Use Material 3 typography roles consistently. Page gutters 16dp, related-item gaps 8–12dp, section gaps 24dp; shared corner radii 4 / 8 / 12 / 16 / 24dp.
+- Content is centered and limited to 640dp; account forms to 560dp. Text and controls wrap at large font sizes; no fixed-height text rows.
+- Show one prominent primary action per section. Hide operations that are not connected yet; use text and icons, not color alone, to convey state.
+- Verify Chinese/English, light/dark, 200% font, keyboard, empty/loading/error states and accessibility as each screen is built, not only in phase 7.
+
+#### Navigation
+
 - Bottom navigation bar: 发现 · 听过 · 下载 · 我的.
 - Navigation rail at 600dp and up; two panes at 840dp and up.
 - Floating mini player above the navigation bar: rounded card with cover, progress ring around the play button, swipe left/right to change episode. Tap or drag up to open the full player.
@@ -197,7 +208,7 @@ Rules:
 - Swipeable pages: 播放 / 文稿 / 评论.
 - The cover shrinks slightly with a spring when paused.
 - Progress bar is wavy while playing and flat when paused.
-- Main controls: previous · −15s · play/pause (shape-morph button) · +15s · next.
+- Main controls: previous · seek back · play/pause (shape-morph button) · seek forward · next. Labels follow the configured intervals (defaults: back 15s, forward 30s).
 - Second row: 倍速, 定时, 列表, 下载, 更多.
 - Queue sheet: play mode, reverse, drag handles, 回到当前.
 - Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; countdown chip on the player.
@@ -217,7 +228,12 @@ Rules:
 
 ### 我的 Me
 
-- Account cards first: avatar, 听时 balance ring, 领取 button.
+- One primary-account summary first: identity, last verified listening-time balance and its update time; manage accounts and refresh balance. Unknown balances are never shown as zero. No fabricated nickname or avatar.
+- Before an account is added, show a short welcome and one Add account action. Read failures preserve the saved data and offer Retry.
+- Account management is a separate, scrollable list. Mark the primary account; keep refresh, update login and confirmed removal in each account's menu. Removing a login retains its account records.
+- Import is a separate page with a masked, pasteable field, a primary-account checkbox and one Import action. Verify online before saving; on update require the original account/device and preserve the primary selection. Show errors inline; never save the pasted text in restored UI state.
+- Login information is saved encrypted with Android Keystore, outside system backup. Storage failure never resets the account list. Queries do not claim or spend listening time.
+- Claim actions are added when rewards are implemented, not as inactive placeholders.
 - Then grouped settings: playback, downloads, media processing, appearance, language, backup, updates, developer, about.
 - Appearance page with a live preview.
 

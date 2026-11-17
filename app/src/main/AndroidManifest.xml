@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- MainActivity handles locale changes itself: the in-app language switch re-reads resources in place instead of recreating the window, which flashes. -->
     <!-- allowBackup is off: logins and library data never leave the device through system backup. -->
     <application
+        android:name=".XmApplication"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"

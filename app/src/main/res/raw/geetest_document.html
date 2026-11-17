@@ -1,0 +1,35 @@
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; connect-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; img-src data: blob: https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; style-src 'unsafe-inline' https://*.geetest.com; font-src data: https://*.geetest.com; frame-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<style>html,body{margin:0;background:transparent}</style>
+</head><body>
+<script>
+(() => {
+  const nonce = %NONCE%, id = %CAPTCHA_ID%, language = %LANGUAGE%;
+  const emit = (kind, value) => {
+    if (window === window.top) xmplusCaptcha.postMessage(JSON.stringify({nonce, kind, value}));
+  };
+  const fail = () => emit('error', null);
+  const start = () => {
+    if (typeof initGeetest4 !== 'function') return fail();
+    initGeetest4({captchaId: id, product: 'bind', language, protocol: 'https://', onError: fail, offlineCb: fail}, captcha => {
+      captcha.onReady(() => { emit('ready', null); captcha.showCaptcha(); })
+        .onSuccess(() => {
+          const v = captcha.getValidate();
+          if (!v) return fail();
+          const out = {captcha_id: id};
+          ['lot_number', 'pass_token', 'gen_time', 'captcha_output'].forEach(k => out[k] = v[k]);
+          emit('success', out);
+        })
+        .onError(fail)
+        .onClose(() => emit('close', null));
+    });
+  };
+  const script = document.createElement('script');
+  script.src = 'https://static.geetest.com/v4/gt4.js';
+  script.onload = start;
+  script.onerror = fail;
+  document.head.appendChild(script);
+})();
+</script></body></html>

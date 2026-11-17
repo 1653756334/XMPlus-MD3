@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
 
 // UI text belongs in string resources (values/ and values-zh/). Fail on string literals
@@ -13,6 +14,8 @@ tasks.register("checkUiText") {
     val sources = fileTree(rootDir) {
         include("**/src/**/*.kt")
         exclude("**/build/**")
+        exclude("Temp/**", "temp/**")
+        exclude("**/Temp/**")
     }
     inputs.files(sources)
     doLast {
@@ -21,14 +24,20 @@ tasks.register("checkUiText") {
         val problems = mutableListOf<String>()
         sources.forEach { file ->
             file.readLines().forEachIndexed { index, line ->
-                if (line.trimStart().startsWith("//") || line.trimStart().startsWith("*")) return@forEachIndexed
+                if (line.trimStart().startsWith("//") || line.trimStart()
+                        .startsWith("*")
+                ) return@forEachIndexed
                 if (han.containsMatchIn(line) || uiLiteral.containsMatchIn(line)) {
                     problems += "${file.relativeTo(rootDir)}:${index + 1}: ${line.trim()}"
                 }
             }
         }
         if (problems.isNotEmpty()) {
-            throw GradleException("Hard-coded UI text found, move it to string resources:\n" + problems.joinToString("\n"))
+            throw GradleException(
+                "Hard-coded UI text found, move it to string resources:\n" + problems.joinToString(
+                    "\n"
+                )
+            )
         }
     }
 }

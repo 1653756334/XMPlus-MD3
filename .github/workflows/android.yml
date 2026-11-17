@@ -27,4 +27,4 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v6
       - name: Check UI text, lint and build
-        run: ./gradlew checkUiText lint assembleDebug
+        run: ./gradlew checkUiText lint assembleDebug :core:model:build :core:protocol:build :core:account:build

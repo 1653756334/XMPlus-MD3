@@ -5,6 +5,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -17,7 +20,7 @@ object XmColors {
     val Brand = Color(0xFF0E9F6E)
 
     val Light: ColorScheme = lightColorScheme(
-        primary = Brand,
+        primary = Color(0xFF007F57),
         onPrimary = Color.White,
         primaryContainer = Color(0xFFDDF5EA),
         onPrimaryContainer = Color(0xFF00382A),
@@ -122,6 +125,11 @@ fun XmTheme(
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
+        shapes = Shapes(
+            extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(8.dp),
+            medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp),
+            extraLarge = RoundedCornerShape(24.dp),
+        ),
         content = content,
     )
 }

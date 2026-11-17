@@ -27,7 +27,7 @@ fun XmPreview(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable (
     uiMode = Configuration.UI_MODE_NIGHT_YES,
     showBackground = true,
 )
-@Preview(name = "Font 1.5x zh", group = "appearance", locale = "zh-rCN", fontScale = 1.5f, showBackground = true)
+@Preview(name = "Font 2x zh", group = "appearance", locale = "zh-rCN", fontScale = 2f, showBackground = true)
 annotation class XmPreviews
 
 /** Window sizes that switch the navigation between the bar and the rail. */
