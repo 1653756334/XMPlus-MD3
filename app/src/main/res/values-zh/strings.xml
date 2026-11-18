@@ -26,6 +26,15 @@
     <string name="player_sleep_episode_end">本集播完后</string>
     <string name="player_sleep_off">关闭定时</string>
     <string name="player_sleep_episode_end_short">本集</string>
+    <string name="player_page_playing">播放</string>
+    <string name="player_page_transcript">文稿</string>
+    <string name="player_page_comments">评论</string>
+    <string name="player_like">点赞</string>
+    <string name="player_favorite">收藏</string>
+    <string name="player_bookmark">添加书签</string>
+    <string name="player_download">下载</string>
+    <string name="player_mode_sequential">顺序播放</string>
+    <string name="player_coming_soon">即将推出</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>
     <string name="player_go_to_start">回到开头</string>

@@ -205,13 +205,19 @@ Rules:
 ### Full player
 
 - Color scheme taken from the cover, changing smoothly between episodes.
-- Swipeable pages: 播放 / 文稿 / 评论.
-- The cover shrinks slightly with a spring when paused.
-- Progress bar is wavy while playing and flat when paused.
-- Seek back and seek forward sit on either side of the progress bar, labelled with the configured interval (default 15 s each way). Controls under the bar, left to right: queue · previous · play/pause (shape-morph button) · next · sleep timer. 更多 is at the top right.
-- 倍速 sits in the 更多 sheet for now, because the control row is fixed at five buttons. 下载 arrives with downloads.
+- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings), 更多 on the right. 文稿 and 评论 become swipeable pages when they are built.
+- The cover takes the largest square left above the controls and shrinks slightly with a spring when paused.
+- Under the cover, top to bottom:
+  - Episode title (two lines), then the album name, which opens the album.
+  - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载, with counts once they are connected.
+  - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
+  - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the configured interval (default 15 s each way).
+  - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 for now; 列表循环 and 单集循环 join when they are built.
+- 更多 sheet: view album, view anchor, go to start. Volume and intro/outro skip join it in Phase 6.
+- Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
+- Speed sheet: 0.5× to 3×; picking one applies it and closes the sheet.
 - Queue sheet: play mode, reverse, drag handles, 回到当前.
-- Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; countdown chip on the player.
+- Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; the countdown replaces the 定时关闭 label.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
 
 ### 听过 Library

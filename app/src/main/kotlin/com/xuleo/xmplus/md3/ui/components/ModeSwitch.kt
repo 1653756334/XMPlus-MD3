@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,7 +29,14 @@ import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
  * no track or outline, so it reads as a page heading above the channel tabs.
  */
 @Composable
-fun <T> ModeSwitch(items: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+fun <T> ModeSwitch(
+    items: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    textStyle: TextStyle = MaterialTheme.typography.titleLarge,
+) {
     Row(modifier.padding(horizontal = XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
         items.forEach { item ->
             val active = item == selected
@@ -44,7 +52,7 @@ fun <T> ModeSwitch(items: List<T>, selected: T, label: @Composable (T) -> String
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    label(item), color = color, style = MaterialTheme.typography.titleLarge,
+                    label(item), color = color, style = textStyle,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )

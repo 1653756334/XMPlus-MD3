@@ -28,6 +28,15 @@
     <string name="player_sleep_episode_end">End of this episode</string>
     <string name="player_sleep_off">Turn off timer</string>
     <string name="player_sleep_episode_end_short">This episode</string>
+    <string name="player_page_playing">Playing</string>
+    <string name="player_page_transcript">Transcript</string>
+    <string name="player_page_comments">Comments</string>
+    <string name="player_like">Like</string>
+    <string name="player_favorite">Favorite</string>
+    <string name="player_bookmark">Add bookmark</string>
+    <string name="player_download">Download</string>
+    <string name="player_mode_sequential">In order</string>
+    <string name="player_coming_soon">Coming soon</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>
     <string name="player_go_to_start">Go to start</string>
