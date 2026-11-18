@@ -472,8 +472,8 @@ private fun SeekButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) 
 }
 
 /**
- * A thin ring open at the top, with an arrowhead at the gap and the interval centred inside.
- * Forward mirrors the arc only, so the number still reads normally.
+ * A thin ring open on the side it seeks toward (left for back, right for forward), with an arrowhead pointing into the
+ * gap and the interval centred inside. Forward mirrors the arc only, so the number still reads normally.
  */
 @Composable
 private fun SeekGlyph(seconds: Int, forward: Boolean, color: Color) {
@@ -495,7 +495,7 @@ private fun SeekGlyph(seconds: Int, forward: Boolean, color: Color) {
             }
             drawPath(arc, color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
-            // The arc ends at the upper right of the gap; the arrowhead points along the direction of travel.
+            // The arc ends at the upper edge of the gap; the arrowhead points along the direction of travel, into the gap.
             val endRad = Math.toRadians((SeekArcStart + SeekArcSweep).toDouble())
             val tip = ring(SeekArcStart + SeekArcSweep)
             val dir = Offset(mirror * sin(endRad).toFloat(), -cos(endRad).toFloat())
@@ -595,7 +595,8 @@ private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit, onSkip
 }
 private val SeekButtonSize = 48.dp
 private val SeekGlyphSize = 36.dp
-private const val SeekArcStart = -120f
+// The gap is centred on 180 degrees (left) for back; forward mirrors it to the right.
+private const val SeekArcStart = 150f
 private const val SeekArcSweep = -300f
 
 private val AccountErrors = setOf("login_required", "login_expired", "insufficient_quota", "usage_uncertain", "uncertain")
