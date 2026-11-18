@@ -66,6 +66,17 @@
     <string name="reward_paused">领取已暂停</string>
     <string name="reward_paused_error">该账号的领取已暂停，请在官方 App 核对后恢复。</string>
     <string name="reward_rejected_error">领取未被接受，请在官方 App 检查。</string>
+    <string name="archive_import">导入 XMPlus 备份</string>
+    <string name="archive_title">导入此备份？</string>
+    <string name="archive_accounts">合并 %1$d 个账号及账本，其中 %2$d 个含登录信息。</string>
+    <string name="archive_keep">现有账本、未确认扣时和已确认收据不会被删除或覆盖。</string>
+    <string name="archive_history">备份中的下载收据仅作历史，不抵扣新下载。</string>
+    <string name="archive_no_login">备份不含登录信息，这些账号需要重新登录。</string>
+    <string name="archive_skipped">设置、书签和下载记录暂不导入。</string>
+    <string name="archive_auto_claim">自动领取在本应用保持关闭，需要时请重新开启。</string>
+    <string name="archive_empty">此备份不包含账号。</string>
+    <string name="archive_confirm">导入</string>
+    <string name="archive_invalid_error">备份无效、已损坏，或超过 64 MiB；仅支持 XMPlus 备份。</string>
     <string name="account_operation_error">操作未完成，请重试。</string>
     <string name="action_close">关闭</string>
     <string name="action_send">发送</string>

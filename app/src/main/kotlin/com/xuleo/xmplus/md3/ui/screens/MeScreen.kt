@@ -28,12 +28,12 @@ import com.xuleo.xmplus.md3.settings.setAppLanguage
 import com.xuleo.xmplus.md3.ui.Destination
 
 @Composable
-fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit) {
+fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     val configuration = LocalConfiguration.current
     val language = remember(configuration) { AppLanguage.current() }
     val state = viewModel?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
     MeContent(language, ::setAppLanguage, state, viewModel?.busy == true, viewModel?.errorCode,
-        onManage = onManage, onImport = onLogin,
+        onManage = onManage, onImport = onLogin, onImportBackup = onImportBackup,
         onRefresh = { viewModel?.refreshQuota(it) }, onRetry = { viewModel?.retryLoad() })
 }
 
@@ -46,6 +46,7 @@ internal fun MeContent(
     errorCode: String? = null,
     onManage: () -> Unit = {},
     onImport: () -> Unit = {},
+    onImportBackup: () -> Unit = {},
     onRefresh: (String) -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
@@ -85,6 +86,8 @@ internal fun MeContent(
                                     }
                                     if (primary != null) OutlinedButton(onClick = { onRefresh(primary.identity) }, enabled = !busy) {
                                         Text(stringResource(R.string.account_refresh))
+                                    } else OutlinedButton(onClick = onImportBackup, enabled = !busy) {
+                                        Text(stringResource(R.string.archive_import))
                                     }
                                 }
                             }

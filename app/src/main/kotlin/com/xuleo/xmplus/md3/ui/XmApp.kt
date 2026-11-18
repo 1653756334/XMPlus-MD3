@@ -73,6 +73,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
         navigator.push(AppRoute.ImportLogin(identity))
     }
 
+    val importArchive = rememberArchiveImport { read -> accounts?.previewArchive(read) }
     val colors = ShortNavigationBarItemDefaults.colors(
         selectedIconColor = MaterialTheme.colorScheme.primary,
         selectedTextColorTopIconPosition = MaterialTheme.colorScheme.primary,
@@ -127,7 +128,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts,
-                                    { navigator.push(AppRoute.Accounts) }, ::openPhone)
+                                    { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
                     }
@@ -136,7 +137,8 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                             AccountsContent(accountState, accounts?.busy == true, accounts?.errorCode,
                                 { navigator.pop() }, ::openPhone, { accounts?.setPrimary(it) }, { accounts?.remove(it) },
                                 { accounts?.refreshQuota(it) }, { accounts?.retryLoad() }, { openImport(it) },
-                                { accounts?.claim(it) }, { accounts?.resumeRewards(it) }, { accounts?.setAutoClaim(it) })
+                                { accounts?.claim(it) }, { accounts?.resumeRewards(it) }, { accounts?.setAutoClaim(it) },
+                                importArchive)
                         }
                     }
                     entry<AppRoute.PhoneLogin> {
@@ -163,17 +165,20 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
             MiniPlayer()
         }
     }
+    accounts?.archive?.let {
+        ArchiveDialog(it, accounts.busy, accounts.errorCode, accounts::confirmArchive, accounts::dismissArchive)
+    }
 }
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?,
-    onAccounts: () -> Unit, onLogin: () -> Unit) {
+    onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> DiscoverScreen()
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
-            Destination.Me -> MeScreen(accounts, onAccounts, onLogin)
+            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)
         }
     }
 }

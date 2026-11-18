@@ -9,7 +9,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xuleo.xmplus.md3.core.account.AccountRepository
+import com.xuleo.xmplus.md3.core.account.ArchiveContents
+import com.xuleo.xmplus.md3.core.account.XmplusArchive
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AccountViewModel(private val repository: AccountRepository, login: XmlyLogin) : ViewModel() {
     val accounts = repository.state
@@ -19,6 +23,10 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
     var importCompleted by mutableStateOf(false)
         private set
     val phone = PhoneLoginSession(login, repository, viewModelScope) { importCompleted = true }
+
+    /** A parsed backup waiting for the user's yes. It holds logins, so it stays in memory and never in saved state. */
+    var archive by mutableStateOf<ArchiveContents?>(null)
+        private set
 
     // Kept in memory only: credentials never enter SavedStateHandle or a Bundle.
     var draft by mutableStateOf("")
@@ -51,6 +59,21 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
     fun claim(identity: String) = operations.launch { repository.claimOnce(identity) }
     fun resumeRewards(identity: String) = operations.launch { repository.resumeRewards(identity) }
     fun setAutoClaim(enabled: Boolean) = operations.launch { repository.setAutoClaim(enabled) }
+    /** Reads and checks a backup. Nothing changes until [confirmArchive]. */
+    fun previewArchive(read: suspend () -> ByteArray) = operations.launch {
+        archive = withContext(Dispatchers.Default) { XmplusArchive.read(read()) }
+    }
+
+    fun confirmArchive() = operations.launch {
+        val contents = archive ?: return@launch
+        repository.restoreArchive(contents)
+        archive = null
+    }
+
+    fun dismissArchive() {
+        if (!busy) archive = null
+    }
+
     fun clearError() = operations.clearError()
     fun consumeImport() {
         importCompleted = false
@@ -71,6 +94,7 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
 
     override fun onCleared() {
         draft = ""
+        archive = null
         phone.close()
     }
 

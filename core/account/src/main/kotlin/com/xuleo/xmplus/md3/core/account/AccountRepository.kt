@@ -129,6 +129,31 @@ class AccountRepository(
         }
     }
 
+    /**
+     * Merges an XMPlus backup into the accounts. Every login in it is verified with a balance read first, and one that
+     * fails stops the whole import with nothing changed. What the device already has wins; the backup only adds.
+     * Returns the number of accounts the backup carried.
+     */
+    suspend fun restoreArchive(contents: ArchiveContents): Int {
+        val verified = HashMap<String, Quota>()
+        for (archived in contents.accounts) {
+            val credentials = archived.credentials ?: continue
+            verified[archived.identity] = quotaReader.query(credentials)
+        }
+        mutex.withLock {
+            val before = loaded()
+            val records = before.records.toMutableList()
+            for (archived in contents.accounts) {
+                val index = records.indexOfFirst { it.identity == archived.identity }
+                val merged = mergeArchivedAccount(archived, records.getOrNull(index), verified[archived.identity])
+                if (index < 0) records.add(merged) else records[index] = merged
+            }
+            val primary = contents.primaryIdentity?.takeIf { id -> records.any { it.identity == id && it.credentials != null } }
+            commit(before.copy(records = records, primaryIdentity = primary ?: before.primaryIdentity), clearExpiry = verified.keys)
+        }
+        return contents.accounts.size
+    }
+
     suspend fun setAutoClaim(enabled: Boolean) = mutex.withLock {
         val before = loaded()
         if (before.autoClaim != enabled) commit(before.copy(autoClaim = enabled))
@@ -237,14 +262,16 @@ class AccountRepository(
         it.identity == identity && it.credentials != null
     } ?: throw XmlyException("missing_account", definitive = true)
 
-    private suspend fun commit(next: AccountSnapshot, clearExpiry: String? = null) {
+    private suspend fun commit(next: AccountSnapshot, clearExpiry: String?) = commit(next, listOfNotNull(clearExpiry))
+
+    private suspend fun commit(next: AccountSnapshot, clearExpiry: Collection<String> = emptyList()) {
         AccountSnapshotCodec.validate(next)
         currentCoroutineContext().ensureActive()
         // Cancellation may stop verification, but cannot split the short durable local commit.
         withContext(NonCancellable) {
             store.write(next)
             snapshot = next
-            clearExpiry?.let(expired::remove)
+            expired.removeAll(clearExpiry.toSet())
             publish(next)
         }
     }

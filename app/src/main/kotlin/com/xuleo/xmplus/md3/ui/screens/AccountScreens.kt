@@ -49,7 +49,7 @@ internal fun AccountsContent(
     state: AccountsState, busy: Boolean, errorCode: String?, onBack: () -> Unit, onImport: () -> Unit,
     onPrimary: (String) -> Unit, onRemove: (String) -> Unit, onRefresh: (String) -> Unit, onRetry: () -> Unit,
     onReimport: (String) -> Unit = {}, onClaim: (String) -> Unit = {}, onResume: (String) -> Unit = {},
-    onAutoClaim: (Boolean) -> Unit = {},
+    onAutoClaim: (Boolean) -> Unit = {}, onImportBackup: () -> Unit = {},
 ) {
     var removing by rememberSaveable { mutableStateOf<String?>(null) }
     var rewardPrompt by rememberSaveable { mutableStateOf<RewardPrompt?>(null) }
@@ -83,11 +83,20 @@ internal fun AccountsContent(
                                 { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Claim },
                                 { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Resume })
                         }
-                        item { Button(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Outlined.Add, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.account_add))
-                        } }
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Outlined.Add, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.account_add))
+                                }
+                                OutlinedButton(onClick = onImportBackup, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Outlined.FileOpen, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.archive_import))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -212,6 +221,29 @@ internal fun ImportAccountContent(
     }
 }
 
+/** What importing a backup will do, shown before anything changes. */
+@Composable
+internal fun ArchiveDialog(contents: ArchiveContents, busy: Boolean, errorCode: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.archive_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (contents.accounts.isEmpty()) {
+                    Text(stringResource(R.string.archive_empty))
+                } else {
+                    Text(stringResource(R.string.archive_accounts, contents.accounts.size, contents.loginCount))
+                    Text(stringResource(R.string.archive_keep))
+                    Text(stringResource(R.string.archive_history))
+                    if (contents.loginCount == 0) Text(stringResource(R.string.archive_no_login))
+                }
+                if (contents.hasSettings || contents.hasLibrary || contents.hasDownloads) Text(stringResource(R.string.archive_skipped))
+                if (contents.hasSettings && contents.accounts.isNotEmpty()) Text(stringResource(R.string.archive_auto_claim))
+                AccountOperationFeedback(busy, errorCode)
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm, enabled = !busy && contents.accounts.isNotEmpty()) { Text(stringResource(R.string.archive_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(R.string.action_cancel)) } })
+}
+
 private enum class RewardPrompt { Claim, Resume, AutoClaim }
 
 @Composable
@@ -279,6 +311,7 @@ private fun errorMessage(code: String): Int = when (code) {
     "input_too_long" -> R.string.account_input_too_long
     "login_expired", "login_required" -> R.string.account_expired
     "network", "network_error", "http_error" -> R.string.account_network_error
+    "archive_invalid" -> R.string.archive_invalid_error
     "uncertain" -> R.string.account_uncertain
     "reward_paused" -> R.string.reward_paused_error
     "reward_rejected" -> R.string.reward_rejected_error
