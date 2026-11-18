@@ -276,7 +276,7 @@ class AlbumViewModel(
     fun setNewestReviews(newest: Boolean) {
         if (mutable.value.newestReviews == newest) return
         mutable.update {
-            it.copy(newestReviews = newest, score = null, reviews = emptyList(), reviewPage = 0, reviewsHasMore = false, reviewsErrorCode = null)
+            it.copy(newestReviews = newest, reviews = emptyList(), reviewPage = 0, reviewsHasMore = false, reviewsErrorCode = null)
         }
         loadReviews(1)
     }
@@ -297,7 +297,20 @@ class AlbumViewModel(
         mutable.update { it.copy(reviewsLoading = true, reviewsErrorCode = null) }
         reviewsJob = viewModelScope.launch {
             try {
-                val read = withContext(Dispatchers.Default) { album.reviews(albumId, page, newest) }
+                val read = withContext(Dispatchers.Default) {
+                    val first = album.reviews(albumId, page, newest)
+                    // Ordered by score the server sends no summary. It belongs to the album, so take it from the newest order.
+                    if (page == 1 && !newest && first.score.isEmpty) {
+                        val score = try {
+                            album.reviews(albumId, 1, true).score
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            first.score
+                        }
+                        first.copy(score = score)
+                    } else first
+                }
                 mutable.update { now ->
                     val known = if (page == 1) HashSet() else now.reviews.mapTo(HashSet()) { it.id }
                     now.copy(
