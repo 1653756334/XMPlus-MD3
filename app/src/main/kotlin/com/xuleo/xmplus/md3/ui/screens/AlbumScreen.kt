@@ -1,7 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package com.xuleo.xmplus.md3.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +34,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -41,12 +49,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,8 +64,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -92,10 +104,14 @@ private object AlbumTab {
 private val RevealStart = 24.dp
 private val RevealSpan = 72.dp
 
+/** The toolbar over the episodes, and the search field that takes its place. */
+private val ToolbarHeight = 48.dp
+private val SearchHeight = 44.dp
+
 /**
- * One album: a full-bleed header that scrolls away over its blurred cover, then the tabs and their pages. The top bar stays
- * clear until the header has gone, so the top of the page reads as one piece with the status bar. Playback, subscription
- * and download controls are not offered yet.
+ * One album: a header that scrolls away over its blurred cover, then the tabs and their pages. The header comes back only
+ * when its page is at the top, and the top bar stays clear until the header has gone. Playback, subscription and download
+ * controls are not offered yet.
  */
 @Composable
 internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAlbum: (String) -> Unit) {
@@ -104,20 +120,37 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
     val density = LocalDensity.current
     val statusBar = WindowInsets.statusBars.getTop(density).toFloat()
     val barHeight = with(density) { AlbumTopBarHeight.toPx() }
-    // The header keeps the status bar and the top bar when fully scrolled away, so the tabs settle just below them.
-    val chrome = remember(statusBar, barHeight) { CollapsingChrome(minHeight = statusBar + barHeight) }
+    val chrome = remember(statusBar, barHeight) {
+        CollapsingChrome(minHeight = statusBar + barHeight, expandOnlyAtTop = true)
+    }
     val revealStart = with(density) { RevealStart.toPx() }
     val revealSpan = with(density) { RevealSpan.toPx() }
     val reveal = { ((-chrome.offset - revealStart) / revealSpan).coerceIn(0f, 1f) }
+    val motion = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val pager = rememberPagerState(pageCount = { AlbumTab.Count })
     val scope = rememberCoroutineScope()
+    // The lists live here rather than in their pages, so each keeps its place and scroll to top can reach the one on show.
+    val introList = rememberLazyListState()
+    val episodesList = rememberLazyListState()
+    val reviewsList = rememberLazyListState()
+    fun listFor(page: Int): LazyListState = when (page) {
+        AlbumTab.Episodes -> episodesList
+        AlbumTab.Reviews -> reviewsList
+        else -> introList
+    }
+    val scrollToTop: () -> Unit = {
+        scope.launch {
+            launch { listFor(pager.currentPage).animateScrollToItem(0) }
+            launch { chrome.animateExpand(motion) }
+        }
+    }
     var showRange by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(pager.currentPage) { if (pager.currentPage == AlbumTab.Reviews) viewModel.ensureReviews() }
     val detail = state.detail
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         if (detail == null) {
             Column(Modifier.fillMaxSize()) {
-                AlbumTopBar(title = "", progress = { 1f }, onBack = onBack)
+                AlbumTopBar(title = "", progress = { 0f }, onBack = onBack, onScrollToTop = {})
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (state.headerLoading) ListSkeleton(Modifier.fillMaxSize())
                     else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
@@ -131,13 +164,19 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
                 AlbumTabRow(pager.currentPage) { index -> scope.launch { pager.animateScrollToPage(index) } }
                 HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                     when (page) {
-                        AlbumTab.Episodes -> EpisodesPage(state, detail, viewModel) { showRange = true }
-                        AlbumTab.Reviews -> ReviewsPage(state, viewModel)
-                        else -> IntroductionPage(state, viewModel, onOpenAlbum)
+                        AlbumTab.Episodes -> EpisodesPage(state, detail, viewModel, episodesList) { showRange = true }
+                        AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
+                        else -> IntroductionPage(state, viewModel, onOpenAlbum, introList)
                     }
                 }
             }
-            AlbumTopBar(title = detail.album.title, progress = reveal, onBack = onBack, modifier = Modifier.align(Alignment.TopCenter))
+            AlbumTopBar(
+                title = detail.album.title,
+                progress = reveal,
+                onBack = onBack,
+                onScrollToTop = scrollToTop,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
     if (showRange && detail != null) {
@@ -161,25 +200,27 @@ private fun AlbumTabRow(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-/** A list that fills its tab and keeps to the content column on wide windows. */
+/** A page's list, kept to the content column on wide windows. */
 @Composable
 private fun AlbumListPage(list: LazyListState, content: LazyListScope.() -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(
-            Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), list,
-            contentPadding = PaddingValues(bottom = XmLayout.SectionGap), content = content,
-        )
+    // Overscroll would take the upward drag at the top before the header can come back, so the lists do without it.
+    CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), list,
+                contentPadding = PaddingValues(bottom = XmLayout.SectionGap), content = content,
+            )
+        }
     }
 }
 
 @Composable
-private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpenAlbum: (String) -> Unit) {
-    AlbumListPage(rememberLazyListState()) { introduction(state, viewModel, onOpenAlbum) }
+private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpenAlbum: (String) -> Unit, list: LazyListState) {
+    AlbumListPage(list) { introduction(state, viewModel, onOpenAlbum) }
 }
 
 @Composable
-private fun EpisodesPage(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, onRange: () -> Unit) {
-    val list = rememberLazyListState()
+private fun EpisodesPage(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState, onRange: () -> Unit) {
     // Search hits page on demand; the effect asks for the next page when the end is near.
     LoadMoreEffect(
         { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
@@ -189,8 +230,7 @@ private fun EpisodesPage(state: AlbumState, detail: AlbumDetail, viewModel: Albu
 }
 
 @Composable
-private fun ReviewsPage(state: AlbumState, viewModel: AlbumViewModel) {
-    val list = rememberLazyListState()
+private fun ReviewsPage(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState) {
     LoadMoreEffect(
         { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
         state.reviewPage, state.reviewsLoading, state.newestReviews, onLoadMore = viewModel::loadMoreReviews,
@@ -233,19 +273,9 @@ private fun AlbumShelf(albums: List<Album>, onOpenAlbum: (String) -> Unit) {
 }
 
 private fun LazyListScope.episodes(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, onRange: () -> Unit) {
-    item(key = "episode-toolbar") {
-        EpisodeToolbar(
-            ascending = state.ascending,
-            total = detail.album.trackCount,
-            onOrder = { viewModel.selectOrder(!state.ascending) },
-            onSearch = viewModel::openSearch,
-            onRange = onRange,
-        )
-    }
-    if (state.searchOpen) {
-        item(key = "episode-search") {
-            SearchField(state.query, viewModel::setQuery, viewModel::submitSearch, viewModel::closeSearch)
-        }
+    // The toolbar sticks under the tabs while the rows scroll beneath it.
+    stickyHeader(key = "episode-toolbar") {
+        EpisodeToolbar(state, detail.album.trackCount, viewModel, onRange)
     }
     val searching = state.searchOpen && (state.hitPage > 0 || state.hitsLoading || state.hitsErrorCode != null)
     if (searching) {
@@ -289,9 +319,33 @@ private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) 
     }
 }
 
+/** The sort, search and chunk controls. Search opens in place of them, so the same strip stays pinned as the list scrolls. */
 @Composable
-private fun EpisodeToolbar(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit, onRange: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel, onRange: () -> Unit) {
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    AnimatedContent(
+        targetState = state.searchOpen,
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp),
+        transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
+        label = "episodeToolbar",
+    ) { searching ->
+        if (searching) {
+            SearchRow(state.query, viewModel)
+        } else {
+            ToolbarRow(
+                ascending = state.ascending,
+                total = total,
+                onOrder = { viewModel.selectOrder(!state.ascending) },
+                onSearch = viewModel::openSearch,
+                onRange = onRange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit, onRange: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onOrder) {
             Icon(Icons.Filled.Sort, contentDescription = null, Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
@@ -307,18 +361,47 @@ private fun EpisodeToolbar(ascending: Boolean, total: Int, onOrder: () -> Unit, 
 }
 
 @Composable
-private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -> Unit, onClose: () -> Unit) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQuery,
-        singleLine = true,
-        placeholder = { Text(stringResource(R.string.album_search_hint)) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        trailingIcon = { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, stringResource(R.string.action_close)) } },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 4.dp),
-    )
+private fun SearchRow(query: String, viewModel: AlbumViewModel) {
+    Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
+        SearchField(query, viewModel::setQuery, viewModel::submitSearch, Modifier.weight(1f))
+        TextButton(onClick = viewModel::closeSearch) { Text(stringResource(R.string.action_cancel)) }
+    }
+}
+
+/** A filled pill with no outline, as the search bar on 发现 is: the query, a clear button, and the hint when empty. */
+@Composable
+private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier = Modifier) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier.height(SearchHeight).clip(CircleShape).background(colors.surfaceContainerHigh).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+        Spacer(Modifier.width(8.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = onQuery,
+            modifier = Modifier.weight(1f).focusRequester(focus),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+            cursorBrush = SolidColor(colors.primary),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
+                    Text(stringResource(R.string.album_search_hint), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                }
+                inner()
+            },
+        )
+        if (query.isNotEmpty()) {
+            IconButton(onClick = { onQuery("") }, Modifier.size(40.dp)) {
+                Icon(Icons.Filled.Close, stringResource(R.string.search_clear), Modifier.size(18.dp))
+            }
+        }
+    }
 }
 
 @Composable

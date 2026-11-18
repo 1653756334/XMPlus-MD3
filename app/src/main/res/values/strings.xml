@@ -197,4 +197,5 @@
     <string name="album_ratio_not">Not recommended</string>
     <string name="album_replies_title">Replies</string>
     <string name="album_unavailable">This album isn\'t available right now.</string>
+    <string name="album_scroll_to_top">Back to top</string>
 </resources>

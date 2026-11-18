@@ -189,4 +189,5 @@
     <string name="album_ratio_not">不行</string>
     <string name="album_replies_title">评价回复</string>
     <string name="album_unavailable">专辑暂时无法收听</string>
+    <string name="album_scroll_to_top">回到顶部</string>
 </resources>
