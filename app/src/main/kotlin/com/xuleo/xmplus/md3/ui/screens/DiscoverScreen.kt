@@ -117,9 +117,18 @@ internal fun DiscoverContent(
         Box(Modifier.collapsing(chrome)) {
             Column(Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) {
                 SearchEntry(hotWords, actions.onSearch)
-                PrimaryTabRow(selectedTabIndex = mode.ordinal, containerColor = MaterialTheme.colorScheme.surface, divider = {}) {
-                    DiscoverMode.entries.forEach { entry ->
-                        Tab(selected = entry == mode, onClick = { mode = entry }, text = { Text(stringResource(entry.label), maxLines = 1) })
+                // A segmented control, not tabs: the channel tabs below are the second level and must read differently.
+                Box(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 4.dp), contentAlignment = Alignment.Center) {
+                    SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = XmLayout.FormWidth).fillMaxWidth()) {
+                        DiscoverMode.entries.forEachIndexed { index, entry ->
+                            SegmentedButton(
+                                selected = entry == mode,
+                                onClick = { mode = entry },
+                                shape = SegmentedButtonDefaults.itemShape(index, DiscoverMode.entries.size),
+                                icon = {},
+                                label = { Text(stringResource(entry.label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            )
+                        }
                     }
                 }
             }
