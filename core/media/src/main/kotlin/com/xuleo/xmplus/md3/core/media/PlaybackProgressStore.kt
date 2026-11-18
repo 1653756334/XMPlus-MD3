@@ -12,7 +12,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-internal data class PlaybackProgress(val positionMs: Long, val observedAtMs: Long)
+/** [finished] marks an episode that played to its end; its position is then the end and opening it starts over. */
+internal data class PlaybackProgress(val positionMs: Long, val observedAtMs: Long, val finished: Boolean = false)
 
 /** Device-local progress, isolated from credentials, quota and the usage journal. */
 class PlaybackProgressStore(context: Context) {
@@ -22,13 +23,13 @@ class PlaybackProgressStore(context: Context) {
 
     internal suspend fun latest(account: String, track: String): PlaybackProgress? = onDisk(null) {
         helper.readableDatabase.rawQuery(
-            "SELECT position_ms, observed_at_ms FROM progress WHERE account = ? AND track = ?",
+            "SELECT position_ms, observed_at_ms, finished FROM progress WHERE account = ? AND track = ?",
             arrayOf(account, track),
         ).use { cursor ->
             if (!cursor.moveToFirst()) return@use null
             val position = cursor.getLong(0)
             val observedAt = cursor.getLong(1)
-            if (position in 0..MaxPositionMs && observedAt >= 0) PlaybackProgress(position, observedAt) else null
+            if (position in 0..MaxPositionMs && observedAt >= 0) PlaybackProgress(position, observedAt, cursor.getInt(2) != 0) else null
         }
     }
 
@@ -43,6 +44,7 @@ class PlaybackProgressStore(context: Context) {
                     put("track", track)
                     put("position_ms", progress.positionMs)
                     put("observed_at_ms", progress.observedAtMs)
+                    put("finished", if (progress.finished) 1 else 0)
                 }
                 // REPLACE moves the entry to the end of the per-account insertion order.
                 db.insertWithOnConflict("progress", null, values, SQLiteDatabase.CONFLICT_REPLACE)
@@ -76,7 +78,7 @@ class PlaybackProgressStore(context: Context) {
     }
 
     private class Database(context: Context) : SQLiteOpenHelper(
-        context, File(context.noBackupFilesDir, "playback-progress.db").absolutePath, null, 1,
+        context, File(context.noBackupFilesDir, "playback-progress.db").absolutePath, null, 2,
     ) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
@@ -86,6 +88,7 @@ class PlaybackProgressStore(context: Context) {
                     track TEXT NOT NULL,
                     position_ms INTEGER NOT NULL,
                     observed_at_ms INTEGER NOT NULL,
+                    finished INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (account, track)
                 )
                 """.trimIndent(),
@@ -93,7 +96,9 @@ class PlaybackProgressStore(context: Context) {
             db.execSQL("CREATE INDEX progress_by_account ON progress(account)")
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) db.execSQL("ALTER TABLE progress ADD COLUMN finished INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     private companion object {

@@ -348,7 +348,7 @@ class PlaybackController(
         val selection = current.selection ?: return
         if (current.wantsToPlay) return
         // A finished episode replays from the beginning. The play button hands it over to the next one when there is one.
-        val restart = if (explicitPosition == null && isFinished(current)) {
+        val restart = if (explicitPosition == null && current.phase == PlaybackPhase.Ended) {
             if (advanceFinished && albumQueue?.hasNext(selection.track.id) == true) {
                 moveEpisode(forward = true)
                 return
@@ -583,10 +583,10 @@ class PlaybackController(
             ) throw XmlyException("id_mismatch", definitive = true)
             val duration = mutableState.value.durationMs
             val local = if (position == null) progress.latest(resolved.accountIdentity, resolved.track.id) else null
-            // A finished episode replays from the beginning, the same threshold the cloud restore uses.
-            val start = position ?: local?.positionMs?.let {
+            // An episode that played to its end starts over, whether it was recorded as finished or saved at the end.
+            val start = position ?: local?.takeUnless { it.finished || (duration > 0 && it.positionMs >= duration) }?.positionMs?.let {
                 if (duration > 0) it.coerceAtMost(duration) else it
-            }?.takeUnless { duration > 0 && it >= finishedThreshold(duration) } ?: 0L
+            } ?: 0L
             verifyAccount(resolved)
             currentCoroutineContext().ensureActive()
             startMeter(resolved)
@@ -650,8 +650,7 @@ class PlaybackController(
                 if (!active() || !player.isCurrentMediaItemSeekable) return@launch
                 val duration = player.duration.takeIf { it > 0 } ?: mutableState.value.durationMs
                 if (duration <= 0) return@launch
-                val threshold = finishedThreshold(duration)
-                val target = if (cloud.positionMs > threshold) 0L else cloud.positionMs
+                val target = if (cloud.positionMs >= duration) 0L else cloud.positionMs
                 if (player.currentPosition == target) return@launch
 
                 // Only playback observed after the seek may replace the saved progress.
@@ -751,20 +750,13 @@ class PlaybackController(
         wasPlaying = playing
     }
 
-    private fun isFinished(state: PlaybackState): Boolean =
-        state.phase == PlaybackPhase.Ended || (state.durationMs > 0 && state.positionMs >= finishedThreshold(state.durationMs))
-
-    /** Floor of 95% in milliseconds, without overflowing or rounding a position at exactly 95%. */
-    private fun finishedThreshold(duration: Long): Long = duration - (duration / 20 + if (duration % 20 == 0L) 0 else 1)
-
     private fun observeProgress(player: Player, source: OpenSource) {
         if (player.playerError != null || player.playbackState == Player.STATE_IDLE) return
         val position = player.currentPosition.takeIf { it >= 0 } ?: return
         val duration = player.duration
         val bounded = if (duration > 0) position.coerceAtMost(duration) else position
-        // A source that starts in the finished zone is a restored episode, not a listen. Recording it would let the
-        // natural end advance the queue, so it is only recorded after playback moves below the finished threshold.
-        if (source.observation == null && duration > 0 && maxOf(bounded, source.startPositionMs) >= finishedThreshold(duration)) return
+        // Media3 can clamp a start at the exact end to just before it and briefly report isPlaying.
+        if (source.observation == null && duration > 0 && maxOf(bounded, source.startPositionMs) >= duration) return
         if (source.observation?.positionMs != bounded) {
             source.observation = PlaybackProgress(bounded, System.currentTimeMillis())
         }
@@ -802,6 +794,16 @@ class PlaybackController(
         }
     }
 
+    /** A finished episode is saved as finished, so that opening it again starts over instead of resuming at the end. */
+    private fun recordFinished(source: OpenSource) {
+        val finished = PlaybackProgress(mutableState.value.durationMs, System.currentTimeMillis(), finished = true)
+        source.checkpoint = finished
+        scope.launch {
+            val saved = progress.save(source.authorization.accountIdentity, source.authorization.track.id, finished)
+            if (!saved && source.checkpoint == finished) source.checkpoint = null
+        }
+    }
+
     private fun finishEpisode() {
         val advanceIntent = queueIntent
         // Restoring a position at the exact end can report ENDED before any audio plays.
@@ -809,6 +811,7 @@ class PlaybackController(
         val sleepAtEnd = played && mutableSleep.value.atEpisodeEnd
         if (sleepAtEnd) cancelSleepTimer()
         val shouldAdvance = played && queueWork == null && !sleepAtEnd
+        if (played) opened?.let(::recordFinished)
         val request = supersede()
         val current = mutableState.value
         mutableState.value = current.copy(
