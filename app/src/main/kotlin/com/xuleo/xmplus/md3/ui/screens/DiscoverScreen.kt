@@ -117,21 +117,9 @@ internal fun DiscoverContent(
         Box(Modifier.collapsing(chrome)) {
             Column(Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) {
                 SearchEntry(hotWords, actions.onSearch)
-                // A segmented control, not tabs: the channel tabs below are the second level and must read differently.
                 Box(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 4.dp), contentAlignment = Alignment.Center) {
-                    SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = XmLayout.FormWidth).fillMaxWidth()) {
-                        DiscoverMode.entries.forEachIndexed { index, entry ->
-                            SegmentedButton(
-                                selected = entry == mode,
-                                onClick = { mode = entry },
-                                shape = SegmentedButtonDefaults.itemShape(index, DiscoverMode.entries.size),
-                                icon = {},
-                                label = { Text(stringResource(entry.label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            )
-                        }
-                    }
-                }
-            }
+                    ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.widthIn(max = XmLayout.FormWidth).fillMaxWidth())
+                }            }
         }
         Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
             holder.SaveableStateProvider(current.name) {
