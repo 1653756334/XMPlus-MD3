@@ -40,24 +40,40 @@ import com.xuleo.xmplus.md3.core.model.HotRanking
 import com.xuleo.xmplus.md3.ui.components.*
 import kotlinx.coroutines.launch
 
+/** What the screen can ask for beyond its own state: loading, and opening other pages. */
+internal class DiscoverActions(
+    val onSearch: () -> Unit = {},
+    val onReload: () -> Unit = {},
+    val onLoad: (pageId: Int, refresh: Boolean) -> Unit = { _, _ -> },
+    val onSelectTab: (pageId: Int, tabId: Int) -> Unit = { _, _ -> },
+    val onRetryRanking: (pageId: Int) -> Unit = {},
+    val onAllAlbums: (categoryId: Int) -> Unit = {},
+    val onFullRanking: (pageId: Int) -> Unit = {},
+)
+
 @Composable
-fun DiscoverScreen(viewModel: DiscoverViewModel, hotWords: List<HotWord>, onSearch: () -> Unit) {
+fun DiscoverScreen(
+    viewModel: DiscoverViewModel,
+    hotWords: List<HotWord>,
+    onSearch: () -> Unit,
+    onAllAlbums: (categoryId: Int) -> Unit,
+    onFullRanking: (pageId: Int) -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    DiscoverContent(state, hotWords, onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking)
+    val actions = remember(viewModel, onSearch, onAllAlbums, onFullRanking) {
+        DiscoverActions(onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, onAllAlbums, onFullRanking)
+    }
+    DiscoverContent(state, hotWords, actions)
 }
 
 @Composable
 internal fun DiscoverContent(
     state: DiscoverState,
     hotWords: List<HotWord>,
-    onSearch: () -> Unit,
-    onReload: () -> Unit,
-    onLoad: (pageId: Int, refresh: Boolean) -> Unit,
-    onSelectTab: (pageId: Int, tabId: Int) -> Unit,
-    onRetryRanking: (pageId: Int) -> Unit,
+    actions: DiscoverActions,
 ) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
-        SearchEntry(hotWords, onSearch)
+        SearchEntry(hotWords, actions.onSearch)
         when (val channels = state.channels) {
             ChannelsState.Loading -> {
                 Row(Modifier.fillMaxWidth().padding(XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
@@ -65,8 +81,8 @@ internal fun DiscoverContent(
                 }
                 PageSkeleton(Modifier.weight(1f))
             }
-            is ChannelsState.Failed -> ErrorState(channels.code, onReload, Modifier.weight(1f))
-            is ChannelsState.Ready -> ChannelPager(channels.channels, state.pages, onLoad, onSelectTab, onRetryRanking)
+            is ChannelsState.Failed -> ErrorState(channels.code, actions.onReload, Modifier.weight(1f))
+            is ChannelsState.Ready -> ChannelPager(channels.channels, state.pages, actions)
         }
     }
 }
@@ -75,9 +91,7 @@ internal fun DiscoverContent(
 private fun ColumnScope.ChannelPager(
     channels: List<HomeChannel>,
     pages: Map<Int, ChannelState>,
-    onLoad: (Int, Boolean) -> Unit,
-    onSelectTab: (Int, Int) -> Unit,
-    onRetryRanking: (Int) -> Unit,
+    actions: DiscoverActions,
 ) {
     val pager = rememberPagerState { channels.size }
     val scope = rememberCoroutineScope()
@@ -95,10 +109,10 @@ private fun ColumnScope.ChannelPager(
             )
         }
     }
-    LaunchedEffect(pager.currentPage, channels) { channels.getOrNull(pager.currentPage)?.let { onLoad(it.pageId, false) } }
+    LaunchedEffect(pager.currentPage, channels) { channels.getOrNull(pager.currentPage)?.let { actions.onLoad(it.pageId, false) } }
     HorizontalPager(pager, Modifier.weight(1f), key = { channels[it].pageId }) { index ->
         val channel = channels[index]
-        ChannelPage(channel, pages[channel.pageId], onLoad, onSelectTab, onRetryRanking)
+        ChannelPage(channel, pages[channel.pageId], actions)
     }
 }
 
@@ -106,19 +120,17 @@ private fun ColumnScope.ChannelPager(
 private fun ChannelPage(
     channel: HomeChannel,
     state: ChannelState?,
-    onLoad: (Int, Boolean) -> Unit,
-    onSelectTab: (Int, Int) -> Unit,
-    onRetryRanking: (Int) -> Unit,
+    actions: DiscoverActions,
 ) {
     Column(Modifier.fillMaxSize()) {
-        if (state != null && state.tabs.isNotEmpty()) SubTabs(state.tabs, state.tabId) { onSelectTab(channel.pageId, it) }
+        if (state != null && state.tabs.isNotEmpty()) SubTabs(state.tabs, state.tabId) { actions.onSelectTab(channel.pageId, it) }
         val content = state?.content
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                content != null -> PullToRefreshBox(state.loading, { onLoad(channel.pageId, true) }) {
-                    Feed(content, state.ranking, state.rankingFailed) { onRetryRanking(channel.pageId) }
+                content != null -> PullToRefreshBox(state.loading, { actions.onLoad(channel.pageId, true) }) {
+                    Feed(content, state.ranking, state.rankingFailed, actions, channel.pageId)
                 }
-                state?.errorCode != null -> ErrorState(state.errorCode, { onLoad(channel.pageId, true) })
+                state?.errorCode != null -> ErrorState(state.errorCode, { actions.onLoad(channel.pageId, true) })
                 else -> PageSkeleton()
             }
         }
@@ -138,7 +150,7 @@ private fun SubTabs(tabs: List<HomeTab>, selected: Int?, onSelect: (Int) -> Unit
 }
 
 @Composable
-private fun Feed(content: HomeContent, ranking: HotRanking?, rankingFailed: Boolean, onRetryRanking: () -> Unit) {
+private fun Feed(content: HomeContent, ranking: HotRanking?, rankingFailed: Boolean, actions: DiscoverActions, pageId: Int) {
     val sections = content.sections.filter { !it.ranking && it.albums.isNotEmpty() }
     val featured = sections.firstOrNull()?.takeIf { it.albums.size >= 3 }
     val shelves = if (featured != null) sections.drop(1) else sections
@@ -148,15 +160,15 @@ private fun Feed(content: HomeContent, ranking: HotRanking?, rankingFailed: Bool
             contentPadding = PaddingValues(top = 4.dp, bottom = XmLayout.SectionGap),
             verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap),
         ) {
-            if (featured != null) item(key = "featured") { Featured(featured) }
+            if (featured != null) item(key = "featured") { Featured(featured, actions.onAllAlbums) }
             if (ranking != null && ranking.section.albums.isNotEmpty()) {
-                item(key = "ranking") { RankingCard(ranking) }
+                item(key = "ranking") { RankingCard(ranking) { actions.onFullRanking(pageId) } }
             } else if (rankingFailed) {
                 item(key = "ranking-retry") {
-                    TextButton(onRetryRanking, Modifier.padding(horizontal = XmLayout.PagePadding)) { Text(stringResource(R.string.action_retry)) }
+                    TextButton({ actions.onRetryRanking(pageId) }, Modifier.padding(horizontal = XmLayout.PagePadding)) { Text(stringResource(R.string.action_retry)) }
                 }
             }
-            items(shelves, key = { it.title + it.albums.first().id }) { Shelf(it) }
+            items(shelves, key = { it.title + it.albums.first().id }) { Shelf(it, actions.onAllAlbums) }
             if (sections.isEmpty() && ranking == null) {
                 item(key = "empty") {
                     Text(stringResource(R.string.discover_empty), Modifier.fillMaxWidth().padding(XmLayout.FormPadding),
@@ -167,10 +179,20 @@ private fun Feed(content: HomeContent, ranking: HotRanking?, rankingFailed: Bool
     }
 }
 
+/** A heading that offers 全部专辑 when the server names a category for the section. */
 @Composable
-private fun Featured(section: AlbumSection) {
+private fun SectionHeader(title: String, section: AlbumSection, onAllAlbums: (Int) -> Unit) {
+    val category = section.moreCategoryId
+    SectionHeader(
+        title, actionLabel = category?.let { stringResource(R.string.browse_all_albums) },
+        onAction = category?.let { { onAllAlbums(it) } },
+    )
+}
+
+@Composable
+private fun Featured(section: AlbumSection, onAllAlbums: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-        SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) })
+        SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) }, section = section, onAllAlbums = onAllAlbums)
         FeaturedCarousel(section)
     }
 }
@@ -204,9 +226,9 @@ private fun FeaturedCarousel(section: AlbumSection) {
 }
 
 @Composable
-private fun Shelf(section: AlbumSection) {
+private fun Shelf(section: AlbumSection, onAllAlbums: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-        SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) })
+        SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) }, section = section, onAllAlbums = onAllAlbums)
         LazyRow(
             contentPadding = PaddingValues(horizontal = XmLayout.PagePadding),
             horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
@@ -217,7 +239,7 @@ private fun Shelf(section: AlbumSection) {
 }
 
 @Composable
-private fun RankingCard(ranking: HotRanking) {
+private fun RankingCard(ranking: HotRanking, onFullRanking: () -> Unit) {
     val section = ranking.section
     Surface(
         Modifier.padding(horizontal = XmLayout.PagePadding).fillMaxWidth(),
@@ -228,6 +250,7 @@ private fun RankingCard(ranking: HotRanking) {
             SectionHeader(
                 if (ranking.wholeSite) stringResource(R.string.discover_ranking_whole)
                 else section.title.ifEmpty { stringResource(R.string.discover_ranking_default) },
+                actionLabel = stringResource(R.string.ranking_full), onAction = onFullRanking,
             )
             section.albums.take(5).forEachIndexed { index, album ->
                 RankRow(index + 1, album, section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding))
@@ -278,10 +301,10 @@ private val samplePage = ChannelState(
 private fun DiscoverPreview() = XmPreview {
     DiscoverContent(
         DiscoverState(ChannelsState.Ready(listOf(HomeChannel(1, "Recommended", null), HomeChannel(2, "Novels", 3))), mapOf(1 to samplePage)),
-        emptyList(), {}, {}, { _, _ -> }, { _, _ -> }, {},
+        emptyList(), DiscoverActions(),
     )
 }
 
 @XmPreviews
 @Composable
-private fun DiscoverLoadingPreview() = XmPreview { DiscoverContent(DiscoverState(), emptyList(), {}, {}, { _, _ -> }, { _, _ -> }, {}) }
+private fun DiscoverLoadingPreview() = XmPreview { DiscoverContent(DiscoverState(), emptyList(), DiscoverActions()) }

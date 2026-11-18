@@ -197,10 +197,8 @@ private fun ResultList(kind: SearchKind, result: SearchResult, onMore: (SearchKi
     val listState = rememberLazyListState()
     if (kind != SearchKind.All) {
         // Ask for the next page when the end is a few rows away; runs again whenever a page lands.
-        LaunchedEffect(listState, result.page, result.loading) {
-            snapshotFlow { listState.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index to it.totalItemsCount } }
-                .collect { (last, total) -> if (last != null && last >= total - 5) onLoadMore() }
-        }
+        LoadMoreEffect({ listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { listState.layoutInfo.totalItemsCount },
+            listState, result.page, result.loading, onLoadMore = onLoadMore)
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), listState, contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
@@ -212,7 +210,7 @@ private fun ResultList(kind: SearchKind, result: SearchResult, onMore: (SearchKi
                 items(result.anchors, key = { "anchor-" + it.uid }) { AnchorRow(it) }
                 items(result.albums, key = { "album-" + it.id }) { AlbumRow(it) }
                 items(result.tracks, key = { "track-" + it.id }) { TrackRow(it) }
-                item(key = "footer") { Footer(result, onRetry) }
+                item(key = "footer") { PagingFooter(result.loading, result.errorCode != null, result.hasMore, onRetry) }
             }
         }
     }
@@ -245,35 +243,9 @@ private fun ResultHeader(@StringRes title: Int, hasMore: Boolean, onMore: () -> 
 }
 
 @Composable
-private fun Footer(result: SearchResult, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(XmLayout.PagePadding), contentAlignment = Alignment.Center) {
-        when {
-            result.errorCode != null -> TextButton(onRetry) { Text(stringResource(R.string.action_retry)) }
-            result.loading -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            !result.hasMore -> Text(stringResource(R.string.search_end), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun Message(@StringRes text: Int) {
     Box(Modifier.fillMaxSize().padding(XmLayout.FormPadding), contentAlignment = Alignment.Center) {
         Text(stringResource(text), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun ListSkeleton() {
-    Column(Modifier.fillMaxSize().padding(XmLayout.PagePadding), verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-        repeat(7) {
-            Row(horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(56.dp).skeleton(MaterialTheme.shapes.medium))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(width = 200.dp, height = 14.dp).skeleton())
-                    Box(Modifier.size(width = 120.dp, height = 12.dp).skeleton())
-                }
-            }
-        }
     }
 }
 

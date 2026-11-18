@@ -122,7 +122,7 @@
     <string name="search_empty">没有找到相关内容</string>
     <string name="search_invalid">请输入 1～200 字的关键词</string>
     <string name="search_more">更多</string>
-    <string name="search_end">没有更多了</string>
+    <string name="list_end">没有更多了</string>
     <string name="search_kind_all">全部</string>
     <string name="search_kind_album">专辑</string>
     <string name="search_kind_track">声音</string>
@@ -140,4 +140,11 @@
     <plurals name="anchor_follower_count">
         <item quantity="other">%s 粉丝</item>
     </plurals>
+    <string name="browse_all_albums">全部专辑</string>
+    <string name="browse_category_all">全部</string>
+    <string name="browse_empty">这个分类暂时没有专辑</string>
+    <string name="sort_default">综合</string>
+    <string name="sort_recent">最近更新</string>
+    <string name="sort_plays">最多播放</string>
+    <string name="ranking_full">完整榜单</string>
 </resources>

@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,11 +34,20 @@ import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AlbumStats
 
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier) {
-    Text(
-        title, modifier.padding(horizontal = XmLayout.PagePadding), style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
-    )
+fun SectionHeader(title: String, modifier: Modifier = Modifier, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
+    Row(modifier.fillMaxWidth().padding(start = XmLayout.PagePadding, end = if (onAction != null) 4.dp else XmLayout.PagePadding),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+        if (actionLabel != null && onAction != null) {
+            TextButton(onAction, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                Text(actionLabel, maxLines = 1)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, Modifier.size(18.dp))
+            }
+        }
+    }
 }
 
 /** Play count over a soft shade, for the corner of a cover. */
@@ -54,8 +66,8 @@ fun PlayCountBadge(playCount: Long, modifier: Modifier = Modifier) {
 
 /** A cover with its title and anchor beneath, sized for a horizontal shelf. */
 @Composable
-fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier, width: androidx.compose.ui.unit.Dp = 128.dp) {
-    Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.width(128.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
             Cover(album.coverUrl, Modifier.matchParentSize())
             stats?.playCount?.let { PlayCountBadge(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }

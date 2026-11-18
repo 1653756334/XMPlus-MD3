@@ -126,7 +126,7 @@
     <string name="search_empty">No results found</string>
     <string name="search_invalid">Enter 1 to 200 characters</string>
     <string name="search_more">More</string>
-    <string name="search_end">That\'s all</string>
+    <string name="list_end">That\'s all</string>
     <string name="search_kind_all">All</string>
     <string name="search_kind_album">Albums</string>
     <string name="search_kind_track">Sounds</string>
@@ -148,4 +148,11 @@
         <item quantity="one">%s follower</item>
         <item quantity="other">%s followers</item>
     </plurals>
+    <string name="browse_all_albums">All albums</string>
+    <string name="browse_category_all">All</string>
+    <string name="browse_empty">No albums here yet</string>
+    <string name="sort_default">Featured</string>
+    <string name="sort_recent">Recently updated</string>
+    <string name="sort_plays">Most played</string>
+    <string name="ranking_full">Full chart</string>
 </resources>

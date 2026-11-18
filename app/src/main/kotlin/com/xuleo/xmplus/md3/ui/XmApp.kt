@@ -25,6 +25,7 @@ import androidx.navigation3.runtime.*
 import androidx.navigation3.ui.NavDisplay
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
+import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
 import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
@@ -38,8 +39,9 @@ fun XmApp() {
     val accounts: AccountViewModel = viewModel(factory = AccountViewModel.factory(application.accounts, application.login))
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
     val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
+    val allAlbums: AllAlbumsViewModel = viewModel(factory = AllAlbumsViewModel.factory(application.browse))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts, discover, search)
+    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums)
 }
 
 @Composable
@@ -49,6 +51,7 @@ internal fun XmAppContent(
     accounts: AccountViewModel? = null,
     discover: DiscoverViewModel? = null,
     search: SearchViewModel? = null,
+    allAlbums: AllAlbumsViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -56,7 +59,7 @@ internal fun XmAppContent(
             when (removed) {
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
-                AppRoute.Search -> Unit
+                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.HotRanking -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -84,6 +87,10 @@ internal fun XmAppContent(
     fun openSearch() {
         search?.clear()
         navigator.push(AppRoute.Search)
+    }
+    fun openAllAlbums(categoryId: Int) {
+        allAlbums?.start(categoryId)
+        navigator.push(AppRoute.AllAlbums(categoryId))
     }
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
@@ -144,13 +151,19 @@ internal fun XmAppContent(
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
-                                TabContent(tab, stateHolder, accounts, discover, hotWords, ::openSearch,
+                                TabContent(tab, stateHolder, accounts, discover, hotWords, ::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) },
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
                     }
                     entry<AppRoute.Search> {
                         Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search) { navigator.pop() } }
+                    }
+                    entry<AppRoute.AllAlbums> { route ->
+                        Surface(Modifier.fillMaxSize()) { if (allAlbums != null) AllAlbumsScreen(allAlbums, route.categoryId) { navigator.pop() } }
+                    }
+                    entry<AppRoute.HotRanking> { route ->
+                        Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId) { navigator.pop() } }
                     }
                     entry<AppRoute.Accounts> {
                         Surface(Modifier.fillMaxSize()) {
@@ -192,10 +205,10 @@ internal fun XmAppContent(
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
-    hotWords: List<HotWord>, onSearch: () -> Unit, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+    hotWords: List<HotWord>, onSearch: () -> Unit, onAllAlbums: (Int) -> Unit, onFullRanking: (Int) -> Unit, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
-            Destination.Discover -> if (discover != null) DiscoverScreen(discover, hotWords, onSearch) else EmptyTab(destination.label, destination.icon)
+            Destination.Discover -> if (discover != null) DiscoverScreen(discover, hotWords, onSearch, onAllAlbums, onFullRanking) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)
