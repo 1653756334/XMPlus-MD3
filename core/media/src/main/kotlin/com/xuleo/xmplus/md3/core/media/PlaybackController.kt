@@ -185,7 +185,7 @@ class PlaybackController(
         // With a failed queue, tapping the loaded episode rebuilds the queue and keeps it playing.
         if (loaded && mutableQueue.value.errorCode == null) {
             cancelQueueWork()
-            if (!current.wantsToPlay) resume()
+            resumeAt()
             return
         }
         // Resolve the official page before replacing the queue or stopping current audio.
@@ -206,7 +206,7 @@ class PlaybackController(
         val target = snapshot.items.firstOrNull { it.id == trackId } ?: return
         cancelQueueWork()
         if (mutableState.value.selection?.track?.id == trackId) {
-            if (!mutableState.value.wantsToPlay) resume()
+            resumeAt()
         } else {
             applyQueueChoice(QueueChoice(snapshot, target))
         }
@@ -310,7 +310,7 @@ class PlaybackController(
         val album = choice.queue.detail.album
         val loaded = mutableState.value.selection?.takeIf { it.track.id == target.id && it.album.id == album.id }
         if (choice.keepLoaded && loaded != null) {
-            if (!mutableState.value.wantsToPlay) resume()
+            resumeAt()
         } else {
             open(PlaybackSelection(target, album), position = choice.positionMs)
         }
@@ -340,18 +340,26 @@ class PlaybackController(
         if (current.wantsToPlay || queueWork != null) pause() else resume()
     }
 
-    fun resume() = resumeAt()
+    fun resume() = resumeAt(advanceFinished = true)
 
-    private fun resumeAt(explicitPosition: Long? = null) {
+    private fun resumeAt(explicitPosition: Long? = null, advanceFinished: Boolean = false) {
         if (accountChanges > 0) return
         val current = mutableState.value
         val selection = current.selection ?: return
         if (current.wantsToPlay) return
+        // A finished episode replays from the beginning. The play button hands it over to the next one when there is one.
+        val restart = if (explicitPosition == null && isFinished(current)) {
+            if (advanceFinished && albumQueue?.hasNext(selection.track.id) == true) {
+                moveEpisode(forward = true)
+                return
+            }
+            0L
+        } else explicitPosition
         cancelQueueWork()
         val player = engine.value
         val source = opened
         if (player == null || source == null || player.playbackState == Player.STATE_IDLE || current.phase == PlaybackPhase.Failed) {
-            val position = explicitPosition ?: when {
+            val position = restart ?: when {
                 current.phase == PlaybackPhase.Ended -> 0L
                 restoreProgressOnRetry -> null
                 else -> current.positionMs
@@ -366,7 +374,7 @@ class PlaybackController(
             settleCurrent(keepUnsettled = true)
             startMeter(source.authorization)
             currentCoroutineContext().ensureActive()
-            val restartAt = explicitPosition ?: if (current.phase == PlaybackPhase.Ended) 0L else null
+            val restartAt = restart ?: if (current.phase == PlaybackPhase.Ended) 0L else null
             if (restartAt != null) {
                 source.observation = null
                 source.startPositionMs = restartAt
@@ -575,9 +583,10 @@ class PlaybackController(
             ) throw XmlyException("id_mismatch", definitive = true)
             val duration = mutableState.value.durationMs
             val local = if (position == null) progress.latest(resolved.accountIdentity, resolved.track.id) else null
+            // A finished episode replays from the beginning, the same threshold the cloud restore uses.
             val start = position ?: local?.positionMs?.let {
                 if (duration > 0) it.coerceAtMost(duration) else it
-            } ?: 0L
+            }?.takeUnless { duration > 0 && it >= finishedThreshold(duration) } ?: 0L
             verifyAccount(resolved)
             currentCoroutineContext().ensureActive()
             startMeter(resolved)
@@ -641,8 +650,7 @@ class PlaybackController(
                 if (!active() || !player.isCurrentMediaItemSeekable) return@launch
                 val duration = player.duration.takeIf { it > 0 } ?: mutableState.value.durationMs
                 if (duration <= 0) return@launch
-                // Floor of 95% in milliseconds, without overflowing or rounding a position at exactly 95%.
-                val threshold = duration - (duration / 20 + if (duration % 20 == 0L) 0 else 1)
+                val threshold = finishedThreshold(duration)
                 val target = if (cloud.positionMs > threshold) 0L else cloud.positionMs
                 if (player.currentPosition == target) return@launch
 
@@ -743,13 +751,20 @@ class PlaybackController(
         wasPlaying = playing
     }
 
+    private fun isFinished(state: PlaybackState): Boolean =
+        state.phase == PlaybackPhase.Ended || (state.durationMs > 0 && state.positionMs >= finishedThreshold(state.durationMs))
+
+    /** Floor of 95% in milliseconds, without overflowing or rounding a position at exactly 95%. */
+    private fun finishedThreshold(duration: Long): Long = duration - (duration / 20 + if (duration % 20 == 0L) 0 else 1)
+
     private fun observeProgress(player: Player, source: OpenSource) {
         if (player.playerError != null || player.playbackState == Player.STATE_IDLE) return
         val position = player.currentPosition.takeIf { it >= 0 } ?: return
         val duration = player.duration
         val bounded = if (duration > 0) position.coerceAtMost(duration) else position
-        // Media3 can clamp a start at the exact end to just before it and briefly report isPlaying.
-        if (source.observation == null && duration > 0 && maxOf(bounded, source.startPositionMs) >= duration) return
+        // A source that starts in the finished zone is a restored episode, not a listen. Recording it would let the
+        // natural end advance the queue, so it is only recorded after playback moves below the finished threshold.
+        if (source.observation == null && duration > 0 && maxOf(bounded, source.startPositionMs) >= finishedThreshold(duration)) return
         if (source.observation?.positionMs != bounded) {
             source.observation = PlaybackProgress(bounded, System.currentTimeMillis())
         }
