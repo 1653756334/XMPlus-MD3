@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -59,7 +58,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -761,69 +759,58 @@ private fun PlayerActionsSheet(
                 Modifier.padding(horizontal = 8.dp).semantics { heading() },
                 style = MaterialTheme.typography.titleMedium,
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PlayerActionButton(R.string.player_view_album, Icons.Outlined.Album, Modifier.weight(1f)) {
-                    select(onOpenAlbum)
-                }
-                PlayerActionButton(R.string.player_view_anchor, Icons.Outlined.Person, Modifier.weight(1f)) {
-                    select(onOpenAnchor)
-                }
-                PlayerActionButton(
-                    R.string.player_go_to_start, Icons.Filled.Replay, Modifier.weight(1f), enabled = canGoToStart,
-                ) {
-                    select(onGoToStart)
-                }
-            }
-            val colors = MaterialTheme.colorScheme
-            Row(
-                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
-                    .clickable(role = Role.Button) { select(onOpenSkip) }
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Box(Modifier.size(40.dp).background(colors.surfaceContainerHighest, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.ContentCut, contentDescription = null)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.player_skip_title), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        if (skip.isOff) stringResource(R.string.player_skip_off)
-                        else stringResource(R.string.player_skip_value, skip.introSeconds, skip.outroSeconds),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (skip.isOff) colors.onSurfaceVariant else colors.primary,
-                    )
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
-            }        }
-    }
-}
-
-@Composable
-private fun PlayerActionButton(
-    @StringRes label: Int,
-    icon: ImageVector,
-    modifier: Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    TextButton(
-        onClick, modifier, enabled = enabled,
-        shape = MaterialTheme.shapes.large,
-        colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurface),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val iconBackground = colors.surfaceContainerHighest.let { if (enabled) it else it.copy(alpha = 0.5f) }
-            Box(Modifier.size(48.dp).background(iconBackground, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null)
-            }
-            Text(stringResource(label), textAlign = TextAlign.Center)
+            MoreRow(Icons.Outlined.Album, R.string.player_view_album, { select(onOpenAlbum) })
+            MoreRow(Icons.Outlined.Person, R.string.player_view_anchor, { select(onOpenAnchor) })
+            MoreRow(
+                Icons.Outlined.ContentCut, R.string.player_skip_title, { select(onOpenSkip) },
+                supporting = if (skip.isOff) stringResource(R.string.player_skip_off)
+                else stringResource(R.string.player_skip_value, skip.introSeconds, skip.outroSeconds),
+                highlighted = !skip.isOff,
+            )
+            MoreRow(
+                Icons.Filled.Replay, R.string.player_go_to_start, { select(onGoToStart) },
+                enabled = canGoToStart, chevron = false,
+            )
         }
     }
 }
 
+/** One entry of the 更多 sheet: a round icon, the title, an optional line under it, and a chevron when it opens something. */
+@Composable
+private fun MoreRow(
+    icon: ImageVector,
+    @StringRes title: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    supporting: String? = null,
+    highlighted: Boolean = false,
+    chevron: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    val faded = if (enabled) 1f else 0.38f
+    Row(
+        modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(Modifier.size(40.dp).background(colors.surfaceContainerHighest, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = colors.onSurface.copy(alpha = faded))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = MaterialTheme.typography.bodyLarge, color = colors.onSurface.copy(alpha = faded))
+            if (supporting != null) {
+                Text(
+                    supporting, style = MaterialTheme.typography.bodyMedium,
+                    color = if (highlighted) colors.primary else colors.onSurfaceVariant,
+                )
+            }
+        }
+        if (chevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+    }
+}
 @Composable
 private fun SeekButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val description = stringResource(
