@@ -250,7 +250,7 @@ internal fun PlayerSheet(
             )
         }
         if (showQueue && episode != null) {
-            PlayerQueueSheet(queue, onSelect = playback::playQueued, onShuffle = playback::setShuffle, onDismiss = { showQueue = false })
+            PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
         }
         if (showSpeed && episode != null) {
             PlayerSpeedSheet(speed, onSpeed = playback::setSpeed, onDismiss = { showSpeed = false })

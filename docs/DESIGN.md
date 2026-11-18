@@ -215,9 +215,9 @@ Rules:
   - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 for now; 列表循环 and 单集循环 join when they are built.
 - 更多 sheet: view album, view anchor, go to start. Volume and intro/outro skip join it in Phase 6.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
-- Speed sheet: 0.5× to 3×; picking one applies it and closes the sheet.
-- Queue sheet: play mode, reverse, drag handles, 回到当前.
-- Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; the countdown replaces the 定时关闭 label.
+- Queue sheet: reverse, drag handles, 回到当前.
+- Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
+- Sleep timer sheet: the same slider for 1–120 minutes in whole minutes, with 15 / 30 / 60 / 90 / 120 as snap points; 开始计时 starts it. Episode end and 关闭定时 act at once. The countdown replaces the 定时关闭 label.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
 
 ### 听过 Library

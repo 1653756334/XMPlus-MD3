@@ -35,6 +35,8 @@
     <string name="player_download">下载</string>
     <string name="player_mode_sequential">顺序播放</string>
     <string name="player_coming_soon">即将推出</string>
+    <string name="player_speed_reset">恢复 1×</string>
+    <string name="player_sleep_start">开始计时</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>
     <string name="player_go_to_start">回到开头</string>
