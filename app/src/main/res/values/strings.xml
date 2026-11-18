@@ -12,7 +12,6 @@
     <string name="player_minimize">Minimize player</string>
     <string name="player_seek_back">Back %1$d seconds</string>
     <string name="player_seek_forward">Forward %1$d seconds</string>
-    <string name="player_skip_interval">%1$d s</string>
     <string name="player_previous_episode">Previous episode</string>
     <string name="player_next_episode">Next episode</string>
     <string name="player_queue">Play queue</string>

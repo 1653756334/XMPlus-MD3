@@ -29,8 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -67,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -78,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
@@ -156,11 +156,6 @@ internal fun PlayerSheet(
                             Icons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp),
                         )
                     }
-                    if (episode != null) {
-                        IconButton(onClick = { showActions = true }) {
-                            Icon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more))
-                        }
-                    }
                 }
                 if (episode == null) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -174,6 +169,7 @@ internal fun PlayerSheet(
                             queue = queue,
                             playback = playback,
                             onOpenQueue = { showQueue = true },
+                            onOpenActions = { showActions = true },
                             onAccounts = { closeThen(onAccounts) },
                         )
                     }
@@ -239,6 +235,7 @@ private fun PlayerControls(
     queue: PlaybackQueueState,
     playback: PlaybackController,
     onOpenQueue: () -> Unit,
+    onOpenActions: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -255,7 +252,8 @@ private fun PlayerControls(
             }
         }
         PositionControl(state, playback::seekTo)
-        PlaybackControls(state, queue, playback, onOpenQueue)
+        TransportControls(state, queue, playback)
+        UtilityControls(queue.items.isNotEmpty(), onOpenQueue, onOpenActions)
         queue.errorCode?.let { error ->
             Text(
                 stringResource(playbackMessage(error)),
@@ -277,48 +275,60 @@ private fun PlayerControls(
     }
 }
 
+/** One row for the transport: previous episode, 15-second seeks around play/pause, and next episode. */
 @Composable
-private fun PlaybackControls(
-    state: PlaybackState,
-    queue: PlaybackQueueState,
-    playback: PlaybackController,
-    onOpenQueue: () -> Unit,
-) {
+private fun TransportControls(state: PlaybackState, queue: PlaybackQueueState, playback: PlaybackController) {
     val canChange = queue.currentTrackId != null && !queue.isLoading
-    val canNext = canChange && queue.hasNext
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.TopCenter) {
-        val inlineChapters = maxWidth >= 288.dp
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                Modifier.widthIn(max = if (inlineChapters) 320.dp else 264.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(if (inlineChapters) 4.dp else 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (inlineChapters) EpisodeButton(false, canChange, playback::previousEpisode)
-                SkipButton(false, state.canSeek, Modifier.weight(1f), playback::skipBack)
-                MainPlaybackButton(state, queue.isLoading, playback::toggle)
-                SkipButton(true, state.canSeek, Modifier.weight(1f), playback::skipForward)
-                if (inlineChapters) EpisodeButton(true, canNext, playback::nextEpisode)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!inlineChapters) EpisodeButton(false, canChange, playback::previousEpisode)
-                TextButton(onOpenQueue, enabled = queue.items.isNotEmpty()) {
-                    Icon(Icons.Filled.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(stringResource(R.string.player_queue), Modifier.padding(start = 6.dp))
-                }
-                if (!inlineChapters) EpisodeButton(true, canNext, playback::nextEpisode)
-            }
+    Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier.widthIn(max = 360.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EpisodeButton(forward = false, enabled = canChange, onClick = playback::previousEpisode)
+            SeekButton(forward = false, enabled = state.canSeek, onClick = playback::skipBack)
+            MainPlaybackButton(state, queue.isLoading, playback::toggle)
+            SeekButton(forward = true, enabled = state.canSeek, onClick = playback::skipForward)
+            EpisodeButton(forward = true, enabled = canChange && queue.hasNext, onClick = playback::nextEpisode)
         }
     }
 }
 
 @Composable
 private fun EpisodeButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(onClick, enabled = enabled) {
+    IconButton(onClick, Modifier.size(48.dp), enabled = enabled) {
         Icon(
             if (forward) Icons.Filled.SkipNext else Icons.Filled.SkipPrevious,
             stringResource(if (forward) R.string.player_next_episode else R.string.player_previous_episode),
+            Modifier.size(32.dp),
         )
+    }
+}
+
+/** The second row: the play queue and more actions, icon above label, spread evenly under the transport. */
+@Composable
+private fun UtilityControls(queueEnabled: Boolean, onOpenQueue: () -> Unit, onOpenActions: () -> Unit) {
+    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+        Row(Modifier.widthIn(max = 360.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            UtilityButton(Icons.Filled.QueueMusic, R.string.player_queue, queueEnabled, onOpenQueue)
+            UtilityButton(Icons.Filled.MoreHoriz, R.string.player_more, true, onOpenActions)
+        }
+    }
+}
+
+@Composable
+private fun UtilityButton(icon: ImageVector, @StringRes label: Int, enabled: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick,
+        enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
@@ -412,25 +422,20 @@ private fun PlayerActionButton(
 }
 
 @Composable
-private fun SkipButton(forward: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun SeekButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val description = stringResource(
         if (forward) R.string.player_seek_forward else R.string.player_seek_back, PlaybackSkipSeconds,
     )
-    TextButton(
-        onClick,
-        modifier.heightIn(min = 56.dp).semantics { contentDescription = description },
-        enabled = enabled,
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    IconButton(onClick, Modifier.size(48.dp).semantics { contentDescription = description }, enabled = enabled) {
+        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+            // The forward arrow is the back arrow mirrored, so the two seeks read as one pair.
             Icon(
-                if (forward) Icons.Filled.FastForward else Icons.Filled.FastRewind,
-                contentDescription = null, modifier = Modifier.size(24.dp),
+                Icons.Filled.Replay, contentDescription = null,
+                modifier = Modifier.size(36.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
             )
             Text(
-                stringResource(R.string.player_skip_interval, PlaybackSkipSeconds), Modifier.clearAndSetSemantics {},
-                style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,
+                "$PlaybackSkipSeconds", Modifier.clearAndSetSemantics {},
+                style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -447,10 +452,10 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
         state.wantsToPlay -> R.string.action_pause
         else -> R.string.action_play
     })
-    FilledIconButton(onClick, Modifier.size(68.dp).semantics { contentDescription = label }, shape = CircleShape) {
+    FilledIconButton(onClick, Modifier.size(72.dp).semantics { contentDescription = label }, shape = CircleShape) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp,
+                modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp,
             )
         } else {
             val icon = when {
@@ -458,7 +463,7 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
                 state.wantsToPlay -> Icons.Filled.Pause
                 else -> Icons.Filled.PlayArrow
             }
-            Icon(icon, contentDescription = null, modifier = Modifier.size(34.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(36.dp))
         }
     }
 }

@@ -191,7 +191,7 @@ Album playback queue
 - PB-04 Select an episode from a descending album or its search results. The queue starts at that exact episode and follows ascending official episode numbers.
 - PB-05 From the first or last episode of a page, Previous or Next reads the adjacent page without duplicating rows. Next is disabled on the album's last episode. Natural completion still re-reads the last page, so an episode appended since the queue was built plays on.
 - PB-06 Reject a moved catalogue anchor or a repeated episode ID. A failed page read leaves the current episode and queue intact; selecting a different episode or changing the primary account cancels a pending read. After a failed read, tapping the loaded episode rebuilds the queue without restarting playback.
-- PB-07 Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The two 15-second controls seek within the current episode; the adjacent episode buttons change episodes.
+- PB-07 Open the play queue from the second row, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The two 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode.
 - PB-08 Let a metered episode end at the page boundary; the next episode opens through normal authorization, and a free next episode does not start a meter. Pause while the page or settlement is pending; the next episode must not start.
 
 Settings
