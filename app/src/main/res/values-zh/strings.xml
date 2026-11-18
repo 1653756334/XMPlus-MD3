@@ -18,6 +18,9 @@
     <string name="player_queue_changed">专辑节目有变动，请刷新后重试。</string>
     <string name="player_queue_limit">播放队列最多支持 5000 集。</string>
     <string name="player_more">更多</string>
+    <string name="player_speed">倍速</string>
+    <string name="player_speed_value">%1$s×</string>
+    <string name="player_shuffle">随机播放</string>
     <string name="player_sleep">定时关闭</string>
     <string name="player_sleep_minutes">%1$d 分钟后</string>
     <string name="player_sleep_episode_end">本集播完后</string>

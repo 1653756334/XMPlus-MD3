@@ -209,7 +209,7 @@ Rules:
 - The cover shrinks slightly with a spring when paused.
 - Progress bar is wavy while playing and flat when paused.
 - Seek back and seek forward sit on either side of the progress bar, labelled with the configured interval (default 15 s each way). Controls under the bar, left to right: queue · previous · play/pause (shape-morph button) · next · sleep timer. 更多 is at the top right.
-- 倍速 and 下载 join the control row when playback settings and downloads arrive.
+- 倍速 sits in the 更多 sheet for now, because the control row is fixed at five buttons. 下载 arrives with downloads.
 - Queue sheet: play mode, reverse, drag handles, 回到当前.
 - Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; countdown chip on the player.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.

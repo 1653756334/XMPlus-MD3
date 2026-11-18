@@ -4,6 +4,8 @@ import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.Track
 
 const val PlaybackSkipSeconds = 15
+const val PlaybackMinSpeed = 0.5f
+const val PlaybackMaxSpeed = 3.0f
 internal const val PlaybackSkipMillis = PlaybackSkipSeconds * 1_000L
 
 data class PlaybackSelection(val track: Track, val album: Album) {

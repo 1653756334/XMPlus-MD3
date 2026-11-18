@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +49,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -117,6 +119,7 @@ internal fun PlayerSheet(
 ) {
     val state by playback.state.collectAsStateWithLifecycle()
     val queue by playback.queue.collectAsStateWithLifecycle()
+    val speed by playback.speed.collectAsStateWithLifecycle()
     val sleep by playback.sleepTimer.collectAsStateWithLifecycle()
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -198,6 +201,8 @@ internal fun PlayerSheet(
         if (showActions && episode != null) {
             PlayerActionsSheet(
                 onDismiss = { showActions = false },
+                speed = speed,
+                onSpeed = playback::setSpeed,
                 onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
                 onOpenAnchor = { closeThen { onOpenAnchor(episode.album.id, episode.album.anchorUid) } },
                 canGoToStart = state.canSeek && state.positionMs > 0,
@@ -208,7 +213,7 @@ internal fun PlayerSheet(
             )
         }
         if (showQueue && episode != null) {
-            PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
+            PlayerQueueSheet(queue, onSelect = playback::playQueued, onShuffle = playback::setShuffle, onDismiss = { showQueue = false })
         }
         if (showSleep && episode != null) {
             PlayerSleepSheet(
@@ -221,6 +226,8 @@ internal fun PlayerSheet(
         }
     }
 }
+
+private fun speedLabel(value: Float) = if (value % 1f == 0f) value.toInt().toString() else value.toString()
 
 /** Fit portrait controls near the bottom without sacrificing a scrollable layout for large text or short screens. */
 @Composable
@@ -321,7 +328,7 @@ private fun TransportControls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SideButton(Icons.Filled.QueueMusic, R.string.player_queue, queue.items.isNotEmpty(), onOpenQueue)
-            EpisodeButton(forward = false, enabled = canChange, onClick = playback::previousEpisode)
+            EpisodeButton(forward = false, enabled = canChange && queue.hasPrevious, onClick = playback::previousEpisode)
             MainPlaybackButton(state, queue.isLoading, playback::toggle)
             EpisodeButton(forward = true, enabled = canChange && queue.hasNext, onClick = playback::nextEpisode)
             SleepButton(sleep, onOpenSleep)
@@ -379,6 +386,8 @@ private fun PlayerActionsSheet(
     onOpenAnchor: () -> Unit,
     canGoToStart: Boolean,
     onGoToStart: () -> Unit,
+    speed: Float,
+    onSpeed: (Float) -> Unit,
 ) {
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -432,7 +441,24 @@ private fun PlayerActionsSheet(
                     select(onGoToStart)
                 }
             }
-        }
+            Text(
+                stringResource(R.string.player_speed),
+                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            FlowRow(
+                Modifier.padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PlaybackSpeeds.forEach { value ->
+                    FilterChip(
+                        selected = speed == value,
+                        onClick = { onSpeed(value) },
+                        label = { Text(stringResource(R.string.player_speed_value, speedLabel(value))) },
+                    )
+                }
+            }        }
     }
 }
 
@@ -594,6 +620,7 @@ private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit, onSkip
     }
 }
 private val SeekButtonSize = 48.dp
+private val PlaybackSpeeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 2.5f, 3f)
 private val SeekGlyphSize = 36.dp
 // The gap is centred on 180 degrees (left) for back; forward mirrors it to the right.
 private const val SeekArcStart = 150f

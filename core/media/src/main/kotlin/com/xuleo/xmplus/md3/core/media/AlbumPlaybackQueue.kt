@@ -10,6 +10,8 @@ data class PlaybackQueueState(
     val items: List<Track> = emptyList(),
     val currentTrackId: String? = null,
     val hasNext: Boolean = false,
+    val hasPrevious: Boolean = true,
+    val shuffle: Boolean = false,
     val isLoading: Boolean = false,
     val errorCode: String? = null,
 )

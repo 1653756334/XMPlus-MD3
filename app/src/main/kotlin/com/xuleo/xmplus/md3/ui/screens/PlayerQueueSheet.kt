@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -44,7 +47,12 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerQueueSheet(queue: PlaybackQueueState, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
+internal fun PlayerQueueSheet(
+    queue: PlaybackQueueState,
+    onSelect: (String) -> Unit,
+    onShuffle: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val current = queue.items.indexOfFirst { it.id == queue.currentTrackId }
     val list = rememberLazyListState(initialFirstVisibleItemIndex = current.coerceAtLeast(0))
     val scope = rememberCoroutineScope()
@@ -73,6 +81,14 @@ internal fun PlayerQueueSheet(queue: PlaybackQueueState, onSelect: (String) -> U
                     Text(stringResource(R.string.player_queue_locate))
                 }
             }
+            FilterChip(
+                selected = queue.shuffle,
+                onClick = { onShuffle(!queue.shuffle) },
+                label = { Text(stringResource(R.string.player_shuffle)) },
+                leadingIcon = { Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp)) },
+                enabled = queue.items.isNotEmpty() && !queue.isLoading,
+                modifier = Modifier.padding(start = XmLayout.PagePadding, bottom = 8.dp),
+            )
             if (queue.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
             queue.errorCode?.let { code ->
                 Text(

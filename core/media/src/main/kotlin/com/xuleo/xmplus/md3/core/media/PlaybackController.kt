@@ -57,7 +57,12 @@ class PlaybackController(
         var refreshes: Int,
     )
 
-    private data class QueueChoice(val queue: AlbumPlaybackQueue, val target: Track?, val keepLoaded: Boolean = false)
+    private data class QueueChoice(
+        val queue: AlbumPlaybackQueue,
+        val target: Track?,
+        val keepLoaded: Boolean = false,
+        val enableShuffle: Boolean = false,
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val ordered = Mutex()
@@ -66,6 +71,8 @@ class PlaybackController(
     val state = mutableState.asStateFlow()
     private val mutableQueue = MutableStateFlow(PlaybackQueueState())
     val queue = mutableQueue.asStateFlow()
+    private val mutableSpeed = MutableStateFlow(1f)
+    val speed = mutableSpeed.asStateFlow()
     private val mutableSleep = MutableStateFlow(SleepTimerState())
     val sleepTimer = mutableSleep.asStateFlow()
 
@@ -81,6 +88,10 @@ class PlaybackController(
     private var admitted = false
     private var wasPlaying = false
     private var accountChanges = 0
+    private var shuffleOn = false
+    private var shuffleIndex = -1
+    private val shuffleHistory = mutableListOf<String>()
+    private val shuffleBag = mutableListOf<String>()
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -151,7 +162,8 @@ class PlaybackController(
             } else track
             val page = AlbumPlaybackQueue.pageFor(hint)
             val result = readAlbumPage(detail, page, credentials)
-            val queue = AlbumPlaybackQueue.start(detail, hint, page, result)
+            val started = AlbumPlaybackQueue.start(detail, hint, page, result)
+            val queue = if (shuffleOn) completeWindow(started, credentials) else started
             QueueChoice(queue, queue.items.first { it.id == track.id }, keepLoaded = loaded)
         }
     }
@@ -176,6 +188,14 @@ class PlaybackController(
         if (accountChanges > 0 || queueWork != null) return
         val snapshot = albumQueue ?: return
         val current = mutableState.value.selection?.track ?: return
+        if (shuffleOn) {
+            val target = if (forward) shuffledNext(current.id, snapshot.items) else shuffledPrevious(snapshot.items)
+            if (target != null) {
+                cancelQueueWork()
+                applyQueueChoice(QueueChoice(snapshot, target))
+            }
+            return
+        }
         snapshot.neighbor(current.id, forward)?.let { next ->
             cancelQueueWork()
             applyQueueChoice(QueueChoice(snapshot, next))
@@ -203,6 +223,20 @@ class PlaybackController(
             }
             QueueChoice(window, if (forward) target else target ?: current)
         }
+    }
+
+    /** Loads every page on both sides of the window, so shuffle can pick from the whole album. */
+    private suspend fun completeWindow(start: AlbumPlaybackQueue, credentials: Credentials?): AlbumPlaybackQueue {
+        var window = start
+        while (window.hasLaterPage) {
+            val page = window.lastPage + 1
+            window = window.merge(page, readAlbumPage(window.detail, page, credentials))
+        }
+        while (window.hasEarlierPage) {
+            val page = window.firstPage - 1
+            window = window.merge(page, readAlbumPage(window.detail, page, credentials))
+        }
+        return window
     }
 
     private suspend fun readAlbumPage(detail: AlbumDetail, page: Int, credentials: Credentials?) =
@@ -250,18 +284,25 @@ class PlaybackController(
     private fun clearQueue() {
         cancelQueueWork()
         albumQueue = null
-        mutableQueue.value = PlaybackQueueState()
+        resetShuffle(null)
+        mutableQueue.value = PlaybackQueueState(shuffle = shuffleOn)
     }
 
     private fun applyQueueChoice(choice: QueueChoice) {
+        val previousAlbum = albumQueue?.detail?.album?.id
         albumQueue = choice.queue
         val target = choice.target
         val currentId = target?.id ?: mutableState.value.selection?.track?.id
-        mutableQueue.value = PlaybackQueueState(
-            items = choice.queue.items,
-            currentTrackId = currentId,
-            hasNext = currentId != null && choice.queue.hasNext(currentId),
-        )
+        // A different album starts with an empty shuffle history (PB-32).
+        if (choice.enableShuffle) {
+            shuffleOn = true
+            resetShuffle(currentId)
+        } else if (previousAlbum != choice.queue.detail.album.id) {
+            resetShuffle(currentId)
+        }
+        if (shuffleOn && target != null) recordShuffled(target.id)
+        mutableQueue.value = PlaybackQueueState(items = choice.queue.items, currentTrackId = currentId)
+        publishFlags()
         if (target == null) return
         val album = choice.queue.detail.album
         val loaded = mutableState.value.selection?.takeIf { it.track.id == target.id && it.album.id == album.id }
@@ -272,6 +313,104 @@ class PlaybackController(
         }
     }
 
+    /** Refreshes the Next, Previous and shuffle flags from the current queue and shuffle history. */
+    private fun publishFlags() {
+        val queue = albumQueue ?: return
+        val state = mutableQueue.value
+        val currentId = state.currentTrackId
+        mutableQueue.value = state.copy(
+            hasNext = currentId != null && (shuffleOn || queue.hasNext(currentId)),
+            hasPrevious = !shuffleOn || shuffleIndex > 0,
+            shuffle = shuffleOn,
+        )
+    }
+
+    /** Turning shuffle on loads the whole album first, so every episode can come up once per round. */
+    fun setShuffle(enabled: Boolean) {
+        if (accountChanges > 0) return
+        if (!enabled) {
+            shuffleOn = false
+            resetShuffle(null)
+            publishFlags()
+            return
+        }
+        val snapshot = albumQueue ?: return
+        if (!snapshot.hasLaterPage && !snapshot.hasEarlierPage) {
+            shuffleOn = true
+            resetShuffle(mutableState.value.selection?.track?.id)
+            publishFlags()
+            return
+        }
+        readQueue { credentials ->
+            QueueChoice(completeWindow(snapshot, credentials), target = null, enableShuffle = true)
+        }
+    }
+
+    /** Next in shuffle: forward through the history first, then a new pick from the rest of this round. */
+    private fun shuffledNext(currentId: String, items: List<Track>): Track? {
+        val ahead = shuffleHistory.getOrNull(shuffleIndex + 1)
+        if (ahead != null) return items.firstOrNull { it.id == ahead }
+        if (shuffleBag.isEmpty()) shuffleBag += items.map(Track::id).filter { it != currentId }.shuffled()
+        // A single-episode album keeps playing its only episode (PB-32).
+        if (shuffleBag.isEmpty()) return items.firstOrNull { it.id == currentId }
+        val id = shuffleBag.removeAt(shuffleBag.lastIndex)
+        return items.firstOrNull { it.id == id }
+    }
+
+    /** Previous in shuffle returns to the episode actually played before (PB-31). */
+    private fun shuffledPrevious(items: List<Track>): Track? {
+        if (shuffleIndex <= 0) return null
+        val track = items.firstOrNull { it.id == shuffleHistory[shuffleIndex - 1] } ?: return null
+        shuffleIndex--
+        return track
+    }
+
+    private fun resetShuffle(currentId: String?) {
+        shuffleBag.clear()
+        shuffleHistory.clear()
+        shuffleIndex = -1
+        if (currentId != null) {
+            shuffleHistory += currentId
+            shuffleIndex = 0
+        }
+    }
+
+    /** Records an episode that started playing, dropping any forward history it replaces. */
+    private fun recordShuffled(id: String) {
+        shuffleBag.remove(id)
+        if (shuffleHistory.getOrNull(shuffleIndex + 1) == id) {
+            shuffleIndex++
+            return
+        }
+        if (shuffleHistory.getOrNull(shuffleIndex) == id) return
+        shuffleHistory.subList(shuffleIndex + 1, shuffleHistory.size).clear()
+        shuffleHistory += id
+        shuffleIndex = shuffleHistory.lastIndex
+        if (shuffleHistory.size > MaxShuffleHistory) {
+            shuffleHistory.removeAt(0)
+            shuffleIndex--
+        }
+    }
+
+    /** Speed is kept for this session. Listening time before a change is billed at the old speed. */
+    fun setSpeed(value: Float) {
+        if (!value.isFinite() || value < PlaybackMinSpeed || value > PlaybackMaxSpeed) return
+        mutableSpeed.value = value
+        engine.value?.setPlaybackSpeed(value)
+        if (!admitted) return
+        val request = revision
+        scope.launch(Dispatchers.Main) {
+            ordered.withLock {
+                if (admitted && request == revision) try {
+                    ledger.sampleCurrentState(speed = value.toDouble())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (request == revision) fail(request, failure)
+                }
+            }
+        }
+    }
     fun toggle() {
         val current = mutableState.value
         if (current.wantsToPlay || queueWork != null) pause() else resume()
@@ -439,6 +578,7 @@ class PlaybackController(
                 .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
             opened = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0)
             player.setMediaItem(item, position)
+            player.setPlaybackSpeed(mutableSpeed.value)
             mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering)
             admitted = true
             player.prepare()
@@ -456,7 +596,7 @@ class PlaybackController(
     }
 
     private suspend fun startMeter(source: PlaybackAuthorization) {
-        ledger.startWatch(source.accountIdentity, source.track.id, source.requiresListeningTime)
+        ledger.startWatch(source.accountIdentity, source.track.id, source.requiresListeningTime, speed = mutableSpeed.value.toDouble())
     }
 
     private suspend fun settleCurrent(keepUnsettled: Boolean = false) = withContext(NonCancellable) {
@@ -613,6 +753,7 @@ class PlaybackController(
 
     private companion object {
         const val MaxAuthorizationRefreshes = 3
+        const val MaxShuffleHistory = 5_000
         val AccountSettlementErrors = setOf("login_required", "login_expired", "insufficient_quota")
     }
 }
