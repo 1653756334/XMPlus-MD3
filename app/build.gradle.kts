@@ -25,10 +25,25 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // The release key lives outside the repository: keystore.properties on a developer machine, or the XM_* variables in CI.
+    // Without either, assembleRelease still builds, but the APK is unsigned and cannot be installed.
+    val keyFile = rootProject.file("keystore.properties")
+    val keyProperties = java.util.Properties().apply { if (keyFile.exists()) keyFile.inputStream().use(::load) }
+    fun releaseKey(property: String, variable: String): String? = keyProperties.getProperty(property) ?: System.getenv(variable)
+    signingConfigs {
+        val store = releaseKey("storeFile", "XM_KEYSTORE_FILE")
+        if (store != null) create("release") {
+            storeFile = rootProject.file(store)
+            storePassword = releaseKey("storePassword", "XM_STORE_PASSWORD")
+            keyAlias = releaseKey("keyAlias", "XM_KEY_ALIAS")
+            keyPassword = releaseKey("keyPassword", "XM_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
