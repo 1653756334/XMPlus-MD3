@@ -69,7 +69,7 @@ class PlaybackController(
         var observation: PlaybackProgress? = null
         var checkpoint: PlaybackProgress? = null
         var checkpointAt = SystemClock.elapsedRealtime()
-        /** Set once the listener chose a position: from then on this episode keeps both ends. */
+        /** Set once the listener chose to hear the outro, by seeking into it or by starting inside it. */
         var skipOff = false
     }
 
@@ -414,8 +414,10 @@ class PlaybackController(
         if (current.canSeek) {
             cancelCloudRestore()
             if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
-            opened?.skipOff = true
-            engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
+            val target = positionMs.coerceIn(0, current.durationMs)
+            // Only a seek into the outro keeps it. Anywhere earlier, the outro still ends the episode.
+            opened?.skipOff = target >= current.durationMs - mutableSkip.value.outroSeconds * 1_000L
+            engine.value?.seekTo(target)
         }
     }
 
