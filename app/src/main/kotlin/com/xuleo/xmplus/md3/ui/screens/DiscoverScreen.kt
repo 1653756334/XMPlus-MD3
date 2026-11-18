@@ -117,9 +117,7 @@ internal fun DiscoverContent(
         Box(Modifier.collapsing(chrome)) {
             Column(Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) {
                 SearchEntry(hotWords, actions.onSearch)
-                Box(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 4.dp), contentAlignment = Alignment.Center) {
-                    ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.widthIn(max = XmLayout.FormWidth).fillMaxWidth())
-                }            }
+                ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.fillMaxWidth().padding(top = 4.dp))            }
         }
         Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
             holder.SaveableStateProvider(current.name) {
