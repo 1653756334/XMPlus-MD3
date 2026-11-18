@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
+import com.xuleo.xmplus.md3.core.model.AlbumSkip
 import com.xuleo.xmplus.md3.core.model.Credentials
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
@@ -20,6 +21,7 @@ import com.xuleo.xmplus.md3.core.protocol.PlaybackAuthorization
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyHistory
 import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
+import com.xuleo.xmplus.md3.core.protocol.XmlySkip
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +56,8 @@ class PlaybackController(
     private val history: XmlyHistory,
     val historyUpload: HistoryUploader,
     private val bookmarks: PlaybackBookmarkStore,
+    private val skips: AlbumSkipStore,
+    private val skipSource: XmlySkip,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -65,6 +69,8 @@ class PlaybackController(
         var observation: PlaybackProgress? = null
         var checkpoint: PlaybackProgress? = null
         var checkpointAt = SystemClock.elapsedRealtime()
+        /** Set once the listener chose a position: from then on this episode keeps both ends. */
+        var skipOff = false
     }
 
     private data class QueueChoice(
@@ -85,6 +91,9 @@ class PlaybackController(
     val speed = mutableSpeed.asStateFlow()
     private val mutableSleep = MutableStateFlow(SleepTimerState())
     val sleepTimer = mutableSleep.asStateFlow()
+    private val mutableSkip = MutableStateFlow(AlbumSkip())
+    /** The intro and outro skipped for the album that is loaded. */
+    val skip = mutableSkip.asStateFlow()
 
     private var revision = 0L
     private var command: Job? = null
@@ -145,6 +154,7 @@ class PlaybackController(
                     if (admitted && player.isPlaying) opened?.let { source ->
                         observeProgress(player, source)
                         checkpointProgress(source)
+                        skipOutro(player, source)
                         if (cloudRestore == null && player.playbackState == Player.STATE_READY) {
                             val selection = mutableState.value.selection
                             val position = source.observation?.positionMs
@@ -374,11 +384,13 @@ class PlaybackController(
             settleCurrent(keepUnsettled = true)
             startMeter(source.authorization)
             currentCoroutineContext().ensureActive()
-            val restartAt = restart ?: if (current.phase == PlaybackPhase.Ended) 0L else null
-            if (restartAt != null) {
+            val target = restart ?: if (current.phase == PlaybackPhase.Ended) 0L else null
+            if (target != null) {
+                val begin = if (target == 0L) introStart(0L, current.durationMs) else target
                 source.observation = null
-                source.startPositionMs = restartAt
-                player.seekTo(restartAt)
+                source.startPositionMs = begin
+                source.skipOff = target != 0L
+                player.seekTo(begin)
             }
             admitted = true
             mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering)
@@ -402,6 +414,7 @@ class PlaybackController(
         if (current.canSeek) {
             cancelCloudRestore()
             if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
+            opened?.skipOff = true
             engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
         }
     }
@@ -475,6 +488,46 @@ class PlaybackController(
         seekTo(player.currentPosition + deltaMs)
     }
 
+    private fun skipApplies(durationMs: Long, skip: AlbumSkip = mutableSkip.value) =
+        durationMs > 0 && (skip.introSeconds + skip.outroSeconds) * 1_000L < durationMs
+
+    /** Where an episode that begins at [positionMs] starts: not before the end of the intro. */
+    private fun introStart(positionMs: Long, durationMs: Long): Long {
+        val intro = mutableSkip.value.introSeconds * 1_000L
+        return if (skipApplies(durationMs) && positionMs < intro) intro else positionMs
+    }
+
+    /** Reaching the outro ends the episode the way its last frame would. */
+    private fun skipOutro(player: ExoPlayer, source: OpenSource) {
+        val skip = mutableSkip.value
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
+        if (source.skipOff || skip.outroSeconds == 0 || cloudRestore != null || !skipApplies(duration, skip)) return
+        if (player.currentPosition < duration - skip.outroSeconds * 1_000L) return
+        source.skipOff = true
+        player.seekTo(duration)
+    }
+
+    /** Sets the intro and outro of an album. For the loaded album a listener still inside a new intro moves past it. */
+    fun setSkip(albumId: String, value: AlbumSkip) {
+        val skip = value.coerced()
+        skips.set(albumId, skip)
+        if (mutableState.value.selection?.album?.id != albumId) return
+        mutableSkip.value = skip
+        val player = engine.value ?: return
+        val source = opened ?: return
+        if (!admitted || source.skipOff || !isCurrent(player) || player.playbackState == Player.STATE_ENDED) return
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
+        if (skipApplies(duration, skip) && player.currentPosition < skip.introSeconds * 1_000L) {
+            player.seekTo(skip.introSeconds * 1_000L)
+        }
+    }
+
+    /** Ximalaya's suggestion for the loaded album; null when the server has none. */
+    suspend fun skipRecommendation(): AlbumSkip? {
+        val album = mutableState.value.selection?.album?.id ?: throw XmlyException("playback_unavailable")
+        val credentials = accounts.primaryCredentials() ?: throw XmlyException("login_required", definitive = true)
+        return withContext(Dispatchers.Default) { skipSource.recommendation(credentials, album) }
+    }
     /** Pause after [minutes] of wall-clock time, whether or not the audio is running. */
     fun startSleepTimer(minutes: Int) {
         if (mutableState.value.selection == null) return
@@ -559,6 +612,7 @@ class PlaybackController(
     ) {
         val request = supersede()
         val restoreIntent = cloudIntent
+        mutableSkip.value = skips.get(selection.album.id)
         restoreProgressOnRetry = position == null
         clearSource()
         mutableState.value = PlaybackState(
@@ -584,9 +638,11 @@ class PlaybackController(
             val duration = mutableState.value.durationMs
             val local = if (position == null) progress.latest(resolved.accountIdentity, resolved.track.id) else null
             // An episode that played to its end starts over, whether it was recorded as finished or saved at the end.
-            val start = position ?: local?.takeUnless { it.finished || (duration > 0 && it.positionMs >= duration) }?.positionMs?.let {
+            val resume = position ?: local?.takeUnless { it.finished || (duration > 0 && it.positionMs >= duration) }?.positionMs?.let {
                 if (duration > 0) it.coerceAtMost(duration) else it
             } ?: 0L
+            // Only an episode that begins skips its intro; a position the listener picked is kept.
+            val start = if (position == null || position == 0L) introStart(resume, duration) else resume
             verifyAccount(resolved)
             currentCoroutineContext().ensureActive()
             startMeter(resolved)
@@ -601,6 +657,7 @@ class PlaybackController(
             val item = MediaItem.Builder().setMediaId(mediaId)
                 .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
             val source = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
+            source.skipOff = refreshing?.skipOff ?: (position != null && position != 0L)
             opened = source
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
@@ -650,7 +707,7 @@ class PlaybackController(
                 if (!active() || !player.isCurrentMediaItemSeekable) return@launch
                 val duration = player.duration.takeIf { it > 0 } ?: mutableState.value.durationMs
                 if (duration <= 0) return@launch
-                val target = if (cloud.positionMs >= duration) 0L else cloud.positionMs
+                val target = introStart(if (cloud.positionMs >= duration) 0L else cloud.positionMs, duration)
                 if (player.currentPosition == target) return@launch
 
                 // Only playback observed after the seek may replace the saved progress.

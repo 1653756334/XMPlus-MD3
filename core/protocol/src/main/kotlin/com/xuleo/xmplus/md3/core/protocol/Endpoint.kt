@@ -100,6 +100,7 @@ internal object Endpoints {
     val AlbumSimilar = read(Host.Mobile, "/album-mobile/album/similar/querySimilarAlbumList/ts-{ts}")
     val AlbumReviews = read(Host.Mobile, "/album-comment-mobile/album/comment/list/query/{ts}")
     val AlbumReviewReplies = read(Host.Mobile, "/album-comment-mobile/ipad/album/comment/reply/list/query/{ts}")
+    val AlbumSkipRecommendation = read(Host.Mobile, "/mobile-settings/v1/skipsegment/get/{ts}", Login.Required)
     val AlbumSearch = Endpoint(Host.Search, "POST", "/front-vertical", Login.Never, idempotent = true)
     val AnchorProfile = web("/revision/user/basic")
     val AnchorAlbumInfo = web("/revision/album/v1/simple")
