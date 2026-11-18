@@ -10,10 +10,12 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -42,16 +44,28 @@ class XmlyHttp internal constructor(
         body: JsonObject? = null,
         query: Map<String, String> = emptyMap(),
         trackId: String? = null,
+        historyForm: Map<String, String>? = null,
     ): JsonObject {
+        val historyMerge = endpoint === Endpoints.HistoryMerge
+        require((historyForm != null) == historyMerge && (historyForm == null || body == null))
         if (endpoint.login == Login.Required && credentials == null) throw XmlyException("login_required", definitive = true)
         val account = credentials.takeIf { endpoint.login != Login.Never }
         // The body is stable across attempts; an authorization read gets a fresh ticket header each time.
         val url = (endpoint.host.origin + endpoint.resolve(timestamp, trackId)).toHttpUrl().newBuilder()
             .apply { for ((name, value) in query) addQueryParameter(name, value) }.build()
+        val requestBody = when {
+            historyForm != null -> FormBody.Builder().apply {
+                for ((name, value) in historyForm) add(name, value)
+            }.build()
+            else -> body?.toString()?.toRequestBody(JsonMediaType)
+        }
         val request = Request.Builder().url(url)
-            .header("Accept", "application/json")
-            .apply { if (account != null) header("Cookie", account.cookie) }
-            .method(endpoint.method, body?.toString()?.toRequestBody(JsonMediaType)).build()
+            .header("Accept", if (historyMerge) "*/*" else "application/json")
+            .apply {
+                if (historyMerge) header("User-Agent", "ting_3.4.10.3(Android,30)")
+                if (account != null) header("Cookie", account.cookie)
+            }
+            .method(endpoint.method, requestBody).build()
         val key = "${account?.identity.orEmpty()}@${endpoint.host.origin}"
         val context = currentCoroutineContext()
         val external = context[ExternalRetry] != null
@@ -66,6 +80,7 @@ class XmlyHttp internal constructor(
                 wait(cooling)
             }
             try {
+                context.ensureActive()
                 val attemptRequest = if (endpoint.playbackTicket && account != null) {
                     request.newBuilder().header("x-tk", XmlyCrypto.freshTicket(account, nowMillis = clock())).build()
                 } else request

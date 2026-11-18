@@ -52,6 +52,7 @@ class PlaybackController(
     private val catalogue: XmlyAlbum,
     private val progress: PlaybackProgressStore,
     private val history: XmlyHistory,
+    val historyUpload: HistoryUploader,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -107,8 +108,9 @@ class PlaybackController(
 
     private val listener = object : Player.Listener {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
-            if (reason != Player.DISCONTINUITY_REASON_SEEK) return
             val source = opened?.takeIf { it.mediaId == newPosition.mediaItem?.mediaId } ?: return
+            historyUpload.resetPositionAnchor()
+            if (reason != Player.DISCONTINUITY_REASON_SEEK) return
             // Seeks from system controls can arrive here without going through seekTo().
             cancelCloudRestore()
             if (source.observation == null) source.startPositionMs = newPosition.positionMs
@@ -147,6 +149,13 @@ class PlaybackController(
                     if (admitted && player.isPlaying) opened?.let { source ->
                         observeProgress(player, source)
                         checkpointProgress(source)
+                        if (cloudRestore == null && player.playbackState == Player.STATE_READY) {
+                            val selection = mutableState.value.selection
+                            val position = source.observation?.positionMs
+                            if (selection != null && position != null) historyUpload.observe(
+                                source.authorization, selection.album.id, selection.track.historyDirection, position,
+                            )
+                        }
                     }
                     publishPlayer(player)
                 }
@@ -553,6 +562,7 @@ class PlaybackController(
     suspend fun <T> changeAccount(preserveJournal: Boolean = false, change: suspend () -> T): T =
         withContext(Dispatchers.Main.immediate) {
             accountChanges++
+            historyUpload.beginAccountChange()
             try {
                 clearQueue()
                 cancelSleepTimer()
@@ -579,6 +589,7 @@ class PlaybackController(
                     change()
                 }
             } finally {
+                historyUpload.endAccountChange()
                 accountChanges--
             }
         }
@@ -737,6 +748,7 @@ class PlaybackController(
         wasPlaying = false
         ledger.recordPlaybackState(playing = false, buffering = false)
         cancelCloudRestore()
+        historyUpload.finishPlayback()
         engine.value?.takeIf(::isCurrent)?.let { player ->
             opened?.takeIf { it.observation != null }?.let { source ->
                 if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_ENDED) {

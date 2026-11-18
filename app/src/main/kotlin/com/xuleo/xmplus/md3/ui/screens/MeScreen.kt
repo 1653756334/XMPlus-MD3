@@ -23,18 +23,20 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.core.account.*
 import com.xuleo.xmplus.md3.core.designsystem.*
+import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.settings.AppLanguage
 import com.xuleo.xmplus.md3.settings.setAppLanguage
 import com.xuleo.xmplus.md3.ui.Destination
 
 @Composable
-fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?) {
     val configuration = LocalConfiguration.current
     val language = remember(configuration) { AppLanguage.current() }
     val state = viewModel?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
     MeContent(language, ::setAppLanguage, state, viewModel?.busy == true, viewModel?.errorCode,
         onManage = onManage, onImport = onLogin, onImportBackup = onImportBackup,
-        onRefresh = { viewModel?.refreshQuota(it) }, onRetry = { viewModel?.retryLoad() })
+        onRefresh = { viewModel?.refreshQuota(it) }, onRetry = { viewModel?.retryLoad() },
+        generalExtras = { if (historyUpload != null) HistoryUploadSettings(historyUpload) })
 }
 
 @Composable
@@ -49,6 +51,7 @@ internal fun MeContent(
     onImportBackup: () -> Unit = {},
     onRefresh: (String) -> Unit = {},
     onRetry: () -> Unit = {},
+    generalExtras: @Composable () -> Unit = {},
 ) {
     var showLanguage by rememberSaveable { mutableStateOf(false) }
     TabScaffold(Destination.Me.label) { padding ->
@@ -104,6 +107,7 @@ internal fun MeContent(
                         leadingContent = { Icon(Icons.Outlined.Language, contentDescription = null) },
                         trailingContent = { Icon(Icons.Outlined.ChevronRight, contentDescription = null) },
                     ) { Text(stringResource(R.string.setting_language)) }
+                    generalExtras()
                 }
             }
         }

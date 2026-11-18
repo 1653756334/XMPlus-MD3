@@ -78,7 +78,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Comments: replies, likes, posting, deleting your own
 - [ ] Transcript (文稿)
 - [ ] Bookmarks with notes
-- [ ] Resume from local and cloud progress; optional upload with consent; start over above 95%
+- [x] Resume from local and cloud progress; optional upload with consent; start over above 95%
 - [ ] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
 - [ ] System controls: notification, lock screen, Bluetooth, headset

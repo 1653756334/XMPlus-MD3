@@ -37,6 +37,7 @@ import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
 import com.xuleo.xmplus.md3.core.media.PlaybackController
+import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.model.CategoryChannel
 import com.xuleo.xmplus.md3.core.model.CategoryGroup
 import com.xuleo.xmplus.md3.core.model.HotWord
@@ -209,7 +210,7 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
-                                    { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
+                                    { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload)
                             }
                         }
                     }
@@ -294,13 +295,14 @@ internal fun XmAppContent(
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
-    categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+    categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks,
+    onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
-            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)
+            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload)
         }
     }
 }

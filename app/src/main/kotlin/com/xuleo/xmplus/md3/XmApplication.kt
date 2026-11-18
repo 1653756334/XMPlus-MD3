@@ -7,6 +7,7 @@ import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
+import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
@@ -61,7 +62,8 @@ class XmApplication : Application(), PlaybackOwner {
         }
     }
     override val playback by lazy {
-        PlaybackController(accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this), XmlyHistory(http)) {
+        val history = XmlyHistory(http)
+        PlaybackController(accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this), history, HistoryUploader(this, accounts, history)) {
             usageReady.await()
         }
     }

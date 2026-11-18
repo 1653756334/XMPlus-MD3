@@ -49,6 +49,8 @@ data class Track(
     val publishedAtMillis: Long? = null,
     val commentCount: Int? = null,
     val officialPosition: Int? = null,
+    /** Cloud history uses the episode row's direction, not the player's queue order; null means an invalid value. */
+    val historyDirection: Int? = 0,
 ) {
     /** The id as XMPlus stores it in queues, libraries and backups. */
     val key: String get() = "xmly:$id"

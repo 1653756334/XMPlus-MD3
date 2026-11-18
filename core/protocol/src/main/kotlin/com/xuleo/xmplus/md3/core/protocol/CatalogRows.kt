@@ -78,6 +78,11 @@ internal fun Reader.trackOf(row: JsonObject, album: Album? = null, position: Int
         publishedAtMillis = count(row["date"]) ?: count(first(row, "createdAt", "created_at"))?.takeIf { it > 0 },
         commentCount = countInt(row["count_comment"]),
         officialPosition = position,
+        historyDirection = when (val direction = row["direction"]) {
+            null, JsonNull -> 0
+            is JsonPrimitive -> direction.content.takeUnless { direction.isString }?.toIntOrNull()?.takeIf { it in 0..1 }
+            else -> null
+        },
     )
 }
 
