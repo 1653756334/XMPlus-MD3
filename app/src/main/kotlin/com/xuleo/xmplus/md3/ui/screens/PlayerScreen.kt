@@ -218,7 +218,6 @@ internal fun PlayerSheet(
                                 queue = queue,
                                 speed = speed,
                                 sleep = sleep,
-                                skip = skip,
                                 playback = playback,
                                 onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
                                 onOpenQueue = { showQueue = true },
@@ -411,7 +410,6 @@ private fun PlayerControls(
     queue: PlaybackQueueState,
     speed: Float,
     sleep: SleepTimerState,
-    skip: AlbumSkip,
     playback: PlaybackController,
     onOpenAlbum: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -424,7 +422,7 @@ private fun PlayerControls(
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
         EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, Modifier.padding(top = 4.dp))
-        SeekBar(state, skip, playback::seekTo, Modifier.padding(top = 4.dp))
+        SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
         ListeningTools(
@@ -500,7 +498,7 @@ private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onC
  * the pill shows where a drag will land.
  */
 @Composable
-private fun SeekBar(state: PlaybackState, skip: AlbumSkip, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
     val trackId = state.selection?.track?.id
     val enabled = state.canSeek
     val duration = state.durationMs.coerceAtLeast(0L)
@@ -508,10 +506,6 @@ private fun SeekBar(state: PlaybackState, skip: AlbumSkip, onSeek: (Long) -> Uni
     var barWidth by remember { mutableIntStateOf(0) }
     var pillWidth by remember { mutableIntStateOf(0) }
     val played = if (duration > 0) state.positionMs.toFloat() / duration else 0f
-    // The ends that will be skipped, as shares of the bar; none when they would swallow the episode.
-    val skipping = duration > 0 && (skip.introSeconds + skip.outroSeconds) * 1_000L < duration
-    val introShare = if (skipping) skip.introSeconds * 1_000f / duration else 0f
-    val outroShare = if (skipping) skip.outroSeconds * 1_000f / duration else 0f
     val fraction = (dragging ?: played).coerceIn(0f, 1f)
     val shownMs = dragging?.let { (it * duration).toLong() } ?: state.positionMs
     val time = "${formatDuration(shownMs / 1000.0)} / ${formatDuration(duration / 1000.0)}"
@@ -526,7 +520,6 @@ private fun SeekBar(state: PlaybackState, skip: AlbumSkip, onSeek: (Long) -> Uni
     val scheme = MaterialTheme.colorScheme
     val activeColor = if (enabled) scheme.primary else scheme.outline
     val inactiveColor = scheme.outlineVariant
-    val skippedColor = scheme.tertiary.copy(alpha = 0.6f)
     val pillColor = if (enabled) scheme.primary else scheme.surfaceContainerHighest
     val pillTextColor = if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
     val label = stringResource(R.string.player_progress)
@@ -573,9 +566,6 @@ private fun SeekBar(state: PlaybackState, skip: AlbumSkip, onSeek: (Long) -> Uni
             val head = pillWidth / 2f + (size.width - pillWidth).coerceAtLeast(0f) * fraction
             drawLine(inactiveColor, Offset(head, y), Offset(size.width - stroke / 2f, y), stroke, StrokeCap.Round)
             drawLine(activeColor, Offset(stroke / 2f, y), Offset(head, y), stroke, StrokeCap.Round)
-            fun at(share: Float) = pillWidth / 2f + (size.width - pillWidth).coerceAtLeast(0f) * share
-            if (introShare > 0f) drawLine(skippedColor, Offset(stroke / 2f, y), Offset(at(introShare), y), stroke, StrokeCap.Round)
-            if (outroShare > 0f) drawLine(skippedColor, Offset(at(1f - outroShare), y), Offset(size.width - stroke / 2f, y), stroke, StrokeCap.Round)
         }
         Text(
             time,
