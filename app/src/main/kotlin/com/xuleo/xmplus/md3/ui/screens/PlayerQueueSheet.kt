@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
 internal fun PlayerQueueSheet(
     queue: PlaybackQueueState,
     onSelect: (String) -> Unit,
+    onCheckNew: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val current = queue.items.indexOfFirst { it.id == queue.currentTrackId }
@@ -75,6 +76,20 @@ internal fun PlayerQueueSheet(
                 )
                 if (current >= 0) TextButton(onClick = { scope.launch { list.scrollToItem(current) } }) {
                     Text(stringResource(R.string.player_queue_locate))
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onCheckNew, enabled = !queue.isLoading) { Text(stringResource(R.string.player_queue_check)) }
+                queue.addedCount?.let { added ->
+                    Text(
+                        if (added > 0) stringResource(R.string.player_queue_check_added, added) else stringResource(R.string.player_queue_check_none),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             if (queue.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())

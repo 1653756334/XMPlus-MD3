@@ -7,6 +7,7 @@ import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
+import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.media.PlaybackBookmarkStore
@@ -69,7 +70,7 @@ class XmApplication : Application(), PlaybackOwner {
         PlaybackController(
             accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this), history,
             HistoryUploader(this, accounts, history), PlaybackBookmarkStore(this),
-            AlbumSkipStore(this), XmlySkip(http),
+            AlbumSkipStore(this), AlbumAudioStore(this), XmlySkip(http),
         ) { usageReady.await() }
     }
 

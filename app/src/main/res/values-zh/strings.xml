@@ -45,6 +45,16 @@
     <string name="player_download">下载</string>
     <string name="player_coming_soon">即将推出</string>
     <string name="player_speed_reset">恢复 1×</string>
+    <string name="player_speed_scope">倍速记在本专辑上；没调过的专辑沿用上次的倍速。</string>
+    <string name="player_volume">音量</string>
+    <string name="player_volume_value">%1$d%%</string>
+    <string name="player_volume_reset">恢复 100%%</string>
+    <string name="player_volume_scope">音量记在本专辑上；手机的音量键仍决定整体大小。</string>
+    <string name="player_volume_mute">全部专辑静音</string>
+    <string name="player_volume_muted">已静音</string>
+    <string name="player_queue_check">检查新节目</string>
+    <string name="player_queue_check_none">没有新节目</string>
+    <string name="player_queue_check_added">新增 %1$d 集</string>
     <string name="player_sleep_start">开始计时</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>

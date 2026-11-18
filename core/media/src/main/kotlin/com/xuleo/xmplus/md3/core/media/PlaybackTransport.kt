@@ -40,7 +40,8 @@ internal fun createPlayer(context: Context): ExoPlayer {
         },
     )
     return ExoPlayer.Builder(context, sources)
-        .setAudioAttributes(AudioAttributes.DEFAULT, true)
+        // Spoken audio: another app's short sound pauses the story instead of talking over it.
+        .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
         .setHandleAudioBecomingNoisy(true)
         .setWakeMode(C.WAKE_MODE_NETWORK)
         .setSeekBackIncrementMs(PlaybackSkipMillis)

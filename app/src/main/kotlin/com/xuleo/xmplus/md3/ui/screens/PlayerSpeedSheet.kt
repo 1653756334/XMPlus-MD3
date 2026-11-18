@@ -96,6 +96,11 @@ internal fun PlayerSpeedSheet(speed: Float, onSpeed: (Float) -> Unit, onDismiss:
                 markers = SpeedMarkers,
                 markerLabel = { stringResource(R.string.player_speed_value, speedLabel(it)) },
             )
+            Text(
+                stringResource(R.string.player_speed_scope),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -69,9 +69,9 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 ### 播放 Player
 
 - [ ] Queue built from an album or the updates feed, continuing across album pages
-- [ ] Queue editing: drag to reorder, reverse, remove, clear, check the album for new episodes
-- [ ] Modes: sequential, list loop, single loop, shuffle without repeats
-- [ ] Speed (global and per album), master volume and mute, per-album volume, seek intervals
+- [ ] Queue: check the album for new episodes. No drag to reorder, reverse, remove or clear: the app is for novels, which play in order
+- [ ] Modes: sequential and shuffle without repeats. No list loop or single loop, for the same reason
+- [ ] Speed and volume remembered per album, a mute switch, the phone's keys as master volume; the skip interval stays 15 s with no setting
 - [ ] Intro/outro skip, per album only and never global, seeded from the server's suggestion (see Intro and outro skip)
 - [ ] Sleep timer: after a duration or at the end of the episode; then pause or exit; optionally keep downloading
 - [ ] Like, favorite, with counts
@@ -81,7 +81,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [x] Resume from local and cloud progress; optional upload with consent; an episode that played to its end is recorded as finished (see Episode end)
 - [ ] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
-- [ ] System controls: notification, lock screen, Bluetooth, headset
+- [ ] System controls: notification, lock screen, Bluetooth, headset (see Full player)
 
 ### 听过 Library
 
@@ -212,11 +212,13 @@ Rules:
   - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载, with counts once they are connected.
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
   - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the configured interval (default 15 s each way).
-  - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 for now; 列表循环 and 单集循环 join when they are built.
-- 更多 sheet: one list of rows, each a round icon, a title and, where it helps, a line under it: 查看专辑, 查看主播, 跳过片头片尾 (showing its current setting, see Intro and outro skip) and 回到开头 (dimmed when already at the start). Rows that open something end in a chevron. Volume joins the list in Phase 6.
+  - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 only. 列表循环 and 单集循环 are left out on purpose: this is for listening to novels, not music.
+- 更多 sheet: one list of rows, each a round icon, a title and, where it helps, a line under it: 查看专辑, 查看主播, 跳过片头片尾 (showing its current setting, see Intro and outro skip) 音量 (the album's volume, or 已静音) and 回到开头 (dimmed when already at the start). Rows that open something end in a chevron. Volume joins the list in Phase 6.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
 - Queue sheet: reverse, drag handles, 回到当前.
-- Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
+- Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×. The speed is remembered for the album; an album that was never adjusted starts at the speed used last, so a listener who hears every novel at 1.5× sets it once.
+  - Volume sheet: the album's volume from 0 to 100% in 5% steps, applied when the finger lifts, remembered per album, plus a switch that mutes every album until the app is closed. The phone's volume keys stay the master volume, so there is no second master slider; there is no boost above 100%.
+  - Playlist sheet: 检查新节目 re-reads the end of the album and adds episodes published since the queue was built, then says 新增 N 集 or 没有新节目. Playing continues undisturbed.
 - Sleep timer sheet: the same slider for 1–120 minutes in whole minutes, with 15 / 30 / 60 / 90 / 120 as snap points; 开始计时 starts it. Below the slider, 本集播完后 is a chip that acts at once; 关闭定时 and 开始计时 sit side by side, 关闭定时 enabled only while a timer is running. The countdown replaces the 定时关闭 label.
 - Episode end. One rule decides what happens when an episode finishes, and the same rule serves the sleep timer, the next episode and progress:
   - An episode is finished when playback reaches its end, or reaches the outro skip point when the album has one. A position the user only seeks to never finishes it.
@@ -230,6 +232,10 @@ Rules:
   - Playback rules, from XMPlus: an episode that starts at the beginning, or resumes before the intro skip point, starts at the skip point; a resumed position past it is kept. At or after `duration − outro` the episode counts as finished by the rule above. If intro + outro is not shorter than the episode, skipping is off for that episode and the sheet says so. A deliberate seek into the outro, or a start inside it such as a bookmark, keeps the outro for that episode until it is opened again; a seek anywhere earlier leaves the outro skip on. Changing the intro while listening never overrides a position the user chose.
   - UI, in the 更多 sheet: a 跳过片头片尾 row, icon on the left, the current setting under it (片头 30 秒 · 片尾 15 秒, or 未设置) and in the accent color when set. It opens a sheet in the style of the speed and sleep sheets: two sliders, 片头 and 片尾, from 0 to 180 s in 1 s steps with 0 / 15 / 30 / 60 / 90 as snap points and the value above each, applied when the finger lifts. Above them, when the server has a suggestion that differs from the current values, a card reads 喜马拉雅建议 片头 X 秒 · 片尾 Y 秒 with a 使用建议 button; with no suggestion the card is absent, and a failed lookup shows a short retry line without blocking the sliders. 恢复为不跳过 sets both to 0. The sheet applies to every episode of the album and says so.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
+- System controls:
+  - The playback notification, lock screen, Bluetooth and headset controls all come from the one media session and offer play / pause, previous, next and 15 s back and forward. Next is offered only while the album has a later episode. Previous restarts an episode that is more than 3 s in and goes to the earlier episode otherwise.
+  - Audio is declared as speech, so a notification sound or a navigation prompt from another app pauses the story and playback resumes afterwards instead of talking over it. Unplugging the headset or losing Bluetooth pauses.
+  - Android 13 and later hide the notification until it is allowed, so the permission is requested once, the first time something plays.
 
 ### 听过 Library
 

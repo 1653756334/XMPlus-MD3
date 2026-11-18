@@ -58,11 +58,29 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
             val command = current.availableCommands[index]
             if (command in SystemCommands) commands.add(command)
         }
+        // The player holds one episode; the album decides what comes before and after it.
+        commands.add(Player.COMMAND_SEEK_TO_PREVIOUS)
+        commands.add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+        if (playback.queue.value.hasNext) {
+            commands.add(Player.COMMAND_SEEK_TO_NEXT)
+            commands.add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+        }
         return current.buildUpon().setAvailableCommands(commands.build()).build()
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         if (playWhenReady) playback.resume() else playback.pause()
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
+        when (seekCommand) {
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> playback.nextEpisode()
+            // Like a player's previous key: restart an episode that is under way, go back from its beginning.
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ->
+                if (playback.state.value.positionMs > RestartThresholdMs) playback.seekTo(0) else playback.previousEpisode()
+            else -> return super.handleSeek(mediaItemIndex, positionMs, seekCommand)
+        }
         return Futures.immediateVoidFuture()
     }
 
@@ -72,6 +90,7 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
     }
 
     private companion object {
+        const val RestartThresholdMs = 3_000L
         val SystemCommands = setOf(
             Player.COMMAND_PLAY_PAUSE, Player.COMMAND_STOP, Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
             Player.COMMAND_GET_TIMELINE, Player.COMMAND_GET_METADATA, Player.COMMAND_GET_AUDIO_ATTRIBUTES,

@@ -40,6 +40,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -150,6 +152,8 @@ internal fun PlayerSheet(
     val speed by playback.speed.collectAsStateWithLifecycle()
     val sleep by playback.sleepTimer.collectAsStateWithLifecycle()
     val skip by playback.skip.collectAsStateWithLifecycle()
+    val volume by playback.volume.collectAsStateWithLifecycle()
+    val muted by playback.muted.collectAsStateWithLifecycle()
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -185,7 +189,8 @@ internal fun PlayerSheet(
         var showBookmarks by remember(bookmarkEpisode) { mutableStateOf<BookmarkEpisode?>(null) }
         var showSpeed by remember { mutableStateOf(false) }
         var showSleep by remember { mutableStateOf(false) }
-    var showSkip by remember { mutableStateOf(false) }
+        var showSkip by remember { mutableStateOf(false) }
+        var showVolume by remember { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -240,6 +245,9 @@ internal fun PlayerSheet(
                 onOpenAnchor = { closeThen { onOpenAnchor(episode.album.id, episode.album.anchorUid) } },
                 skip = skip,
                 onOpenSkip = { showSkip = true },
+                volume = volume,
+                muted = muted,
+                onOpenVolume = { showVolume = true },
                 canGoToStart = state.canSeek && state.positionMs > 0,
                 onGoToStart = {
                     // Playback may have changed while the sheet was closing.
@@ -248,7 +256,7 @@ internal fun PlayerSheet(
             )
         }
         if (showQueue && episode != null) {
-            PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
+            PlayerQueueSheet(queue, onSelect = playback::playQueued, onCheckNew = playback::checkNewEpisodes, onDismiss = { showQueue = false })
         }
         if (bookmarkEpisode != null && showBookmarks == bookmarkEpisode) {
             PlayerBookmarksSheet(playback, bookmarkEpisode, state.canSeek, onDismiss = { showBookmarks = null })
@@ -261,6 +269,9 @@ internal fun PlayerSheet(
                 onSkip = { playback.setSkip(episode.album.id, it) },
                 onDismiss = { showSkip = false },
             )
+        }
+        if (showVolume && episode != null) {
+            PlayerVolumeSheet(volume, muted, onVolume = playback::setVolume, onMuted = playback::setMuted, onDismiss = { showVolume = false })
         }
         if (showSpeed && episode != null) {
             PlayerSpeedSheet(speed, onSpeed = playback::setSpeed, onDismiss = { showSpeed = false })
@@ -707,6 +718,9 @@ private fun PlayerActionsSheet(
     onOpenAnchor: () -> Unit,
     skip: AlbumSkip,
     onOpenSkip: () -> Unit,
+    volume: Float,
+    muted: Boolean,
+    onOpenVolume: () -> Unit,
     canGoToStart: Boolean,
     onGoToStart: () -> Unit,
 ) {
@@ -756,6 +770,13 @@ private fun PlayerActionsSheet(
                 supporting = if (skip.isOff) stringResource(R.string.player_skip_off)
                 else stringResource(R.string.player_skip_value, skip.introSeconds, skip.outroSeconds),
                 highlighted = !skip.isOff,
+            )
+            MoreRow(
+                if (muted) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Outlined.VolumeUp,
+                R.string.player_volume, { select(onOpenVolume) },
+                supporting = if (muted) stringResource(R.string.player_volume_muted)
+                else stringResource(R.string.player_volume_value, volumePercent(volume)),
+                highlighted = muted || volume != 1f,
             )
             MoreRow(
                 Icons.Filled.Replay, R.string.player_go_to_start, { select(onGoToStart) },

@@ -47,6 +47,16 @@
     <string name="player_download">Download</string>
     <string name="player_coming_soon">Coming soon</string>
     <string name="player_speed_reset">Reset to 1×</string>
+    <string name="player_speed_scope">Remembered for this album. An album you haven\u2019t adjusted starts at the speed you used last.</string>
+    <string name="player_volume">Volume</string>
+    <string name="player_volume_value">%1$d%%</string>
+    <string name="player_volume_reset">Reset to 100%%</string>
+    <string name="player_volume_scope">Remembered for this album. Your phone\u2019s volume keys still set the overall level.</string>
+    <string name="player_volume_mute">Mute all albums</string>
+    <string name="player_volume_muted">Muted</string>
+    <string name="player_queue_check">Check for new episodes</string>
+    <string name="player_queue_check_none">No new episodes</string>
+    <string name="player_queue_check_added">%1$d new episodes added</string>
     <string name="player_sleep_start">Start timer</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>

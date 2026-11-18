@@ -57,6 +57,7 @@ class PlaybackController(
     val historyUpload: HistoryUploader,
     private val bookmarks: PlaybackBookmarkStore,
     private val skips: AlbumSkipStore,
+    private val audio: AlbumAudioStore,
     private val skipSource: XmlySkip,
     private val awaitLedger: suspend () -> Unit,
 ) {
@@ -78,6 +79,8 @@ class PlaybackController(
         val target: Track?,
         val keepLoaded: Boolean = false,
         val positionMs: Long? = null,
+        /** Episodes a check for new ones found; null when the queue changed for another reason. */
+        val added: Int? = null,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -88,7 +91,13 @@ class PlaybackController(
     private val mutableQueue = MutableStateFlow(PlaybackQueueState())
     val queue = mutableQueue.asStateFlow()
     private val mutableSpeed = MutableStateFlow(1f)
+    /** The speed of the album that is loaded. */
     val speed = mutableSpeed.asStateFlow()
+    private val mutableVolume = MutableStateFlow(1f)
+    /** The volume of the album that is loaded, from 0 to 1. Mute is separate and covers every album until the app closes. */
+    val volume = mutableVolume.asStateFlow()
+    private val mutableMuted = MutableStateFlow(false)
+    val muted = mutableMuted.asStateFlow()
     private val mutableSleep = MutableStateFlow(SleepTimerState())
     val sleepTimer = mutableSleep.asStateFlow()
     private val mutableSkip = MutableStateFlow(AlbumSkip())
@@ -260,6 +269,24 @@ class PlaybackController(
         }
     }
 
+    /** Looks for episodes the album gained since the queue was built. What is playing is left alone. */
+    fun checkNewEpisodes() {
+        if (accountChanges > 0 || queueWork != null) return
+        val snapshot = albumQueue ?: return
+        readQueue { credentials ->
+            var window = snapshot.recheckEdge(forward = true)
+            if (window.refreshTailFirst) {
+                val tail = window.lastPage
+                window = window.merge(tail, readAlbumPage(window.detail, tail, credentials))
+            }
+            while (window.hasLaterPage) {
+                val page = window.lastPage + 1
+                window = window.merge(page, readAlbumPage(window.detail, page, credentials))
+            }
+            QueueChoice(window, null, added = window.items.size - snapshot.items.size)
+        }
+    }
+
     private suspend fun readAlbumPage(detail: AlbumDetail, page: Int, credentials: Credentials?) =
         catalogue.episodePage(detail.album.id, page, ascending = true, recordDescending = detail.recordDescending, credentials = credentials)
 
@@ -315,6 +342,7 @@ class PlaybackController(
         mutableQueue.value = PlaybackQueueState(
             items = choice.queue.items, currentTrackId = currentId,
             hasNext = currentId != null && choice.queue.hasNext(currentId),
+            addedCount = choice.added,
         )
         if (target == null) return
         val album = choice.queue.detail.album
@@ -326,10 +354,11 @@ class PlaybackController(
         }
     }
 
-    /** Speed is kept for this session. Listening time before a change is billed at the old speed. */
+    /** Speed is remembered for the album that is loaded. Listening time before a change is billed at the old speed. */
     fun setSpeed(value: Float) {
         if (!value.isFinite() || value < PlaybackMinSpeed || value > PlaybackMaxSpeed) return
         mutableSpeed.value = value
+        mutableState.value.selection?.let { audio.setSpeed(it.album.id, value) }
         engine.value?.setPlaybackSpeed(value)
         if (!admitted) return
         val request = revision
@@ -345,6 +374,24 @@ class PlaybackController(
             }
         }
     }
+    /** Volume is remembered for the album that is loaded. */
+    fun setVolume(value: Float) {
+        if (!value.isFinite()) return
+        val level = value.coerceIn(0f, 1f)
+        mutableVolume.value = level
+        mutableState.value.selection?.let { audio.setVolume(it.album.id, level) }
+        applyVolume()
+    }
+
+    fun setMuted(muted: Boolean) {
+        mutableMuted.value = muted
+        applyVolume()
+    }
+
+    private fun applyVolume() {
+        engine.value?.volume = if (mutableMuted.value) 0f else mutableVolume.value
+    }
+
     fun toggle() {
         val current = mutableState.value
         if (current.wantsToPlay || queueWork != null) pause() else resume()
@@ -615,6 +662,10 @@ class PlaybackController(
         val request = supersede()
         val restoreIntent = cloudIntent
         mutableSkip.value = skips.get(selection.album.id)
+        audio.get(selection.album.id).let {
+            mutableSpeed.value = it.speed
+            mutableVolume.value = it.volume
+        }
         restoreProgressOnRetry = position == null
         clearSource()
         mutableState.value = PlaybackState(
@@ -663,6 +714,7 @@ class PlaybackController(
             opened = source
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
+            applyVolume()
             restoreProgressOnRetry = false
             mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering, positionMs = start)
             admitted = true
