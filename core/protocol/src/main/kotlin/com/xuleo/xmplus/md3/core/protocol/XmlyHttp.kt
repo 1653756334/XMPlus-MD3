@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -34,14 +35,23 @@ class XmlyHttp internal constructor(
     private val cooldowns = ConcurrentHashMap<String, Long>()
 
     /** Calls [endpoint] and returns its JSON object once the server reports success. */
-    internal suspend fun call(endpoint: Endpoint, credentials: Credentials?, timestamp: Long? = null, body: JsonObject? = null): JsonObject {
-        if (endpoint.authenticated && credentials == null) throw XmlyException("login_required", definitive = true)
+    internal suspend fun call(
+        endpoint: Endpoint,
+        credentials: Credentials?,
+        timestamp: Long? = null,
+        body: JsonObject? = null,
+        query: Map<String, String> = emptyMap(),
+    ): JsonObject {
+        if (endpoint.login == Login.Required && credentials == null) throw XmlyException("login_required", definitive = true)
+        val account = credentials.takeIf { endpoint.login != Login.Never }
         // The request is built once: a retry must repeat the same signed body, not sign a new one.
-        val request = Request.Builder().url(endpoint.host.origin + endpoint.resolve(timestamp))
+        val url = (endpoint.host.origin + endpoint.resolve(timestamp)).toHttpUrl().newBuilder()
+            .apply { for ((name, value) in query) addQueryParameter(name, value) }.build()
+        val request = Request.Builder().url(url)
             .header("Accept", "application/json")
-            .apply { if (endpoint.authenticated) header("Cookie", credentials!!.cookie) }
+            .apply { if (account != null) header("Cookie", account.cookie) }
             .method(endpoint.method, body?.toString()?.toRequestBody(JsonMediaType)).build()
-        val key = "${credentials?.identity.orEmpty()}@${endpoint.host.origin}"
+        val key = "${account?.identity.orEmpty()}@${endpoint.host.origin}"
         val context = currentCoroutineContext()
         val external = context[ExternalRetry] != null
         val policy = context[ReadPolicy].takeIf { endpoint.idempotent }
@@ -55,7 +65,7 @@ class XmlyHttp internal constructor(
                 wait(cooling)
             }
             try {
-                return attempt(request, endpoint, key)
+                return attempt(request, endpoint, key, account != null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: IOException) {
@@ -76,7 +86,7 @@ class XmlyHttp internal constructor(
         }
     }
 
-    private suspend fun attempt(request: Request, endpoint: Endpoint, key: String): JsonObject {
+    private suspend fun attempt(request: Request, endpoint: Endpoint, key: String, authenticated: Boolean): JsonObject {
         val reply = try {
             executor.execute(request, MaxResponseBytes)
         } catch (failure: HttpTransportException) {
@@ -86,7 +96,7 @@ class XmlyHttp internal constructor(
         }
         when {
             reply.status == 429 -> rateLimit(key, parseRetryAfter(reply.retryAfter, clock()) ?: DefaultCooldown)
-            reply.status == 401 || (reply.status == 403 && endpoint.authenticated) -> throw expired()
+            reply.status == 401 || (reply.status == 403 && authenticated) -> throw expired()
             reply.status in 500..599 -> throw ServerUnavailable()
             reply.status != 200 -> {
                 val clientError = reply.status in 400..499
