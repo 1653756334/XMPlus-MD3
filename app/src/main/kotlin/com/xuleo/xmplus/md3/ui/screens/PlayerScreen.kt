@@ -4,6 +4,7 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,6 +50,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -67,9 +69,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -96,6 +102,8 @@ import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
 import com.xuleo.xmplus.md3.ui.components.formatDuration
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.launch
 
 /** A full-height sheet so closing the player does not navigate away from the page under it. */
@@ -459,20 +467,56 @@ private fun SeekButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) 
         if (forward) R.string.player_seek_forward else R.string.player_seek_back, PlaybackSkipSeconds,
     )
     IconButton(onClick, Modifier.size(SeekButtonSize).semantics { contentDescription = description }, enabled = enabled) {
-        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-            // The forward arrow is the back arrow mirrored, so the two seeks read as one pair.
-            Icon(
-                Icons.Filled.Replay, contentDescription = null,
-                modifier = Modifier.size(36.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
-            )
-            Text(
-                "$PlaybackSkipSeconds", Modifier.clearAndSetSemantics {},
-                style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-            )
-        }
+        SeekGlyph(PlaybackSkipSeconds, forward, LocalContentColor.current)
     }
 }
 
+/**
+ * A thin ring open at the top, with an arrowhead at the gap and the interval centred inside.
+ * Forward mirrors the arc only, so the number still reads normally.
+ */
+@Composable
+private fun SeekGlyph(seconds: Int, forward: Boolean, color: Color) {
+    Box(Modifier.size(SeekGlyphSize), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val mirror = if (forward) -1f else 1f
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val radius = size.width * 0.36f
+            fun ring(deg: Float): Offset {
+                val rad = Math.toRadians(deg.toDouble())
+                return Offset(cx + mirror * radius * cos(rad).toFloat(), cy + radius * sin(rad).toFloat())
+            }
+            val steps = 48
+            val arc = Path()
+            for (i in 0..steps) {
+                val p = ring(SeekArcStart + SeekArcSweep * i / steps)
+                if (i == 0) arc.moveTo(p.x, p.y) else arc.lineTo(p.x, p.y)
+            }
+            drawPath(arc, color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+            // The arc ends at the upper right of the gap; the arrowhead points along the direction of travel.
+            val endRad = Math.toRadians((SeekArcStart + SeekArcSweep).toDouble())
+            val tip = ring(SeekArcStart + SeekArcSweep)
+            val dir = Offset(mirror * sin(endRad).toFloat(), -cos(endRad).toFloat())
+            val across = Offset(-dir.y, dir.x)
+            val length = 4.dp.toPx()
+            val half = 3.dp.toPx()
+            val head = Path().apply {
+                moveTo(tip.x + dir.x * length, tip.y + dir.y * length)
+                lineTo(tip.x + across.x * half, tip.y + across.y * half)
+                lineTo(tip.x - across.x * half, tip.y - across.y * half)
+                close()
+            }
+            drawPath(head, color)
+        }
+        Text(
+            "$seconds", Modifier.clearAndSetSemantics {},
+            color = color, style = MaterialTheme.typography.labelMedium, fontSize = 10.sp, lineHeight = 10.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
 @Composable
 private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onClick: () -> Unit) {
     val retry = state.phase == PlaybackPhase.Failed
@@ -550,6 +594,9 @@ private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit, onSkip
     }
 }
 private val SeekButtonSize = 48.dp
+private val SeekGlyphSize = 36.dp
+private const val SeekArcStart = -120f
+private const val SeekArcSweep = -300f
 
 private val AccountErrors = setOf("login_required", "login_expired", "insufficient_quota", "usage_uncertain", "uncertain")
 
