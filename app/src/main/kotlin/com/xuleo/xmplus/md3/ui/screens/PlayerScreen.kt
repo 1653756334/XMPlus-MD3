@@ -40,7 +40,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -57,7 +56,6 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.ButtonDefaults
@@ -120,6 +118,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.core.media.BookmarkEpisode
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackPhase
 import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
@@ -179,8 +178,10 @@ internal fun PlayerSheet(
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
         val episode = state.selection
+        val bookmarkEpisode = playback.bookmarkEpisode()
         var showActions by remember(episode?.album?.id, episode?.track?.id) { mutableStateOf(false) }
         var showQueue by remember(episode?.album?.id) { mutableStateOf(false) }
+        var showBookmarks by remember(bookmarkEpisode) { mutableStateOf<BookmarkEpisode?>(null) }
         var showSpeed by remember { mutableStateOf(false) }
         var showSleep by remember { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -220,6 +221,7 @@ internal fun PlayerSheet(
                                 onOpenQueue = { showQueue = true },
                                 onOpenSpeed = { showSpeed = true },
                                 onOpenSleep = { showSleep = true },
+                                onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
                                 onComingSoon = comingSoon,
                                 onAccounts = { closeThen(onAccounts) },
                             )
@@ -243,6 +245,9 @@ internal fun PlayerSheet(
         }
         if (showQueue && episode != null) {
             PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
+        }
+        if (bookmarkEpisode != null && showBookmarks == bookmarkEpisode) {
+            PlayerBookmarksSheet(playback, bookmarkEpisode, state.canSeek, onDismiss = { showBookmarks = null })
         }
         if (showSpeed && episode != null) {
             PlayerSpeedSheet(speed, onSpeed = playback::setSpeed, onDismiss = { showSpeed = false })
@@ -383,7 +388,7 @@ private fun PlayerCover(artwork: String?, playing: Boolean) {
 
 /**
  * Top to bottom: what is playing, what you can do with it, where you are in it, the transport, and how you listen
- * (queue, order, speed, sleep timer).
+ * (queue, speed, sleep timer).
  */
 @Composable
 private fun PlayerControls(
@@ -397,12 +402,13 @@ private fun PlayerControls(
     onOpenQueue: () -> Unit,
     onOpenSpeed: () -> Unit,
     onOpenSleep: () -> Unit,
+    onOpenBookmarks: () -> Unit,
     onComingSoon: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
-        EpisodeActions(onComingSoon, Modifier.padding(top = 4.dp))
+        EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, Modifier.padding(top = 4.dp))
         SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
@@ -411,7 +417,6 @@ private fun PlayerControls(
             speed = speed,
             sleep = sleep,
             onOpenQueue = onOpenQueue,
-            onToggleShuffle = { playback.setShuffle(!queue.shuffle) },
             onOpenSpeed = onOpenSpeed,
             onOpenSleep = onOpenSleep,
             modifier = Modifier.padding(top = 16.dp),
@@ -447,22 +452,27 @@ private fun EpisodeHeading(episode: PlaybackSelection, onOpenAlbum: () -> Unit) 
     }
 }
 
-/** Like, favourite, bookmark and download, icon only. None is connected yet, so each says it is coming. */
 @Composable
-private fun EpisodeActions(onComingSoon: () -> Unit, modifier: Modifier = Modifier) {
+private fun EpisodeActions(
+    onComingSoon: () -> Unit,
+    onOpenBookmarks: () -> Unit,
+    bookmarksAvailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Row(modifier.fillMaxWidth()) {
         EpisodeAction(Icons.Outlined.ThumbUp, R.string.player_like, onComingSoon)
         EpisodeAction(Icons.Outlined.FavoriteBorder, R.string.player_favorite, onComingSoon)
-        EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmark, onComingSoon)
+        EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
         EpisodeAction(Icons.Outlined.Download, R.string.player_download, onComingSoon)
     }
 }
 
 @Composable
-private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit) {
+private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onClick: () -> Unit, enabled: Boolean = true) {
     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
         IconButton(
             onClick = onClick,
+            enabled = enabled,
             colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) {
             Icon(icon, stringResource(label))
@@ -572,7 +582,7 @@ private fun TransportControls(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SeekButton(forward = false, enabled = state.canSeek, onClick = playback::skipBack)
-        EpisodeButton(forward = false, enabled = canChange && queue.hasPrevious, onClick = playback::previousEpisode)
+        EpisodeButton(forward = false, enabled = canChange, onClick = playback::previousEpisode)
         MainPlaybackButton(state, queue.isLoading, playback::toggle)
         EpisodeButton(forward = true, enabled = canChange && queue.hasNext, onClick = playback::nextEpisode)
         SeekButton(forward = true, enabled = state.canSeek, onClick = playback::skipForward)
@@ -601,8 +611,7 @@ private fun PlaybackErrors(state: PlaybackState, queue: PlaybackQueueState, onAc
 }
 
 /**
- * Queue, play order, speed and sleep timer, each an icon over its label. A setting away from its default shows its
- * value in the accent colour: shuffle, a speed such as 1.5×, or the time left on the sleep timer.
+ * Queue, speed and sleep timer, each an icon over its label. Non-default speed and active timers are highlighted.
  */
 @Composable
 private fun ListeningTools(
@@ -610,7 +619,6 @@ private fun ListeningTools(
     speed: Float,
     sleep: SleepTimerState,
     onOpenQueue: () -> Unit,
-    onToggleShuffle: () -> Unit,
     onOpenSpeed: () -> Unit,
     onOpenSleep: () -> Unit,
     modifier: Modifier = Modifier,
@@ -620,13 +628,6 @@ private fun ListeningTools(
         ?: stringResource(if (sleep.atEpisodeEnd) R.string.player_sleep_episode_end_short else R.string.player_sleep)
     Row(modifier.fillMaxWidth()) {
         ToolButton(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.player_queue), onOpenQueue, enabled = hasQueue)
-        ToolButton(
-            if (queue.shuffle) Icons.Rounded.Shuffle else Icons.AutoMirrored.Outlined.PlaylistPlay,
-            stringResource(if (queue.shuffle) R.string.player_shuffle else R.string.player_mode_sequential),
-            onToggleShuffle,
-            highlighted = queue.shuffle,
-            enabled = hasQueue && !queue.isLoading,
-        )
         ToolButton(
             Icons.Outlined.Speed,
             if (speed == 1f) stringResource(R.string.player_speed)

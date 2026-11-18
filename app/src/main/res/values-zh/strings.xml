@@ -20,7 +20,6 @@
     <string name="player_more">更多</string>
     <string name="player_speed">倍速</string>
     <string name="player_speed_value">%1$s×</string>
-    <string name="player_shuffle">随机播放</string>
     <string name="player_sleep">定时关闭</string>
     <string name="player_sleep_minutes">%1$d 分钟后</string>
     <string name="player_sleep_episode_end">本集播完后</string>
@@ -31,9 +30,17 @@
     <string name="player_page_comments">评论</string>
     <string name="player_like">点赞</string>
     <string name="player_favorite">收藏</string>
-    <string name="player_bookmark">添加书签</string>
+    <string name="player_bookmarks">书签</string>
+    <string name="bookmark_add">添加书签</string>
+    <string name="bookmark_empty">本集暂无书签</string>
+    <string name="bookmark_edit_note">编辑备注</string>
+    <string name="bookmark_note">备注（选填）</string>
+    <string name="bookmark_note_limit">备注最多 %1$d 字</string>
+    <string name="bookmark_save">保存</string>
+    <string name="bookmark_delete_title">删除此书签？</string>
+    <string name="bookmark_delete_action">删除</string>
+    <string name="bookmark_error">书签操作失败，请重试。</string>
     <string name="player_download">下载</string>
-    <string name="player_mode_sequential">顺序播放</string>
     <string name="player_coming_soon">即将推出</string>
     <string name="player_speed_reset">恢复 1×</string>
     <string name="player_sleep_start">开始计时</string>

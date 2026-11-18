@@ -22,7 +22,6 @@
     <string name="player_more">More</string>
     <string name="player_speed">Speed</string>
     <string name="player_speed_value">%1$s×</string>
-    <string name="player_shuffle">Shuffle</string>
     <string name="player_sleep">Sleep timer</string>
     <string name="player_sleep_minutes">%1$d minutes</string>
     <string name="player_sleep_episode_end">End of this episode</string>
@@ -33,9 +32,17 @@
     <string name="player_page_comments">Comments</string>
     <string name="player_like">Like</string>
     <string name="player_favorite">Favorite</string>
-    <string name="player_bookmark">Add bookmark</string>
+    <string name="player_bookmarks">Bookmarks</string>
+    <string name="bookmark_add">Add bookmark</string>
+    <string name="bookmark_empty">No bookmarks for this episode</string>
+    <string name="bookmark_edit_note">Edit note</string>
+    <string name="bookmark_note">Note (optional)</string>
+    <string name="bookmark_note_limit">Use no more than %1$d characters</string>
+    <string name="bookmark_save">Save</string>
+    <string name="bookmark_delete_title">Delete bookmark?</string>
+    <string name="bookmark_delete_action">Delete</string>
+    <string name="bookmark_error">Bookmark operation failed. Try again.</string>
     <string name="player_download">Download</string>
-    <string name="player_mode_sequential">In order</string>
     <string name="player_coming_soon">Coming soon</string>
     <string name="player_speed_reset">Reset to 1×</string>
     <string name="player_sleep_start">Start timer</string>
