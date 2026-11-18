@@ -235,12 +235,7 @@ data class AlbumScore(
     val recommended: Double?,
     val neutral: Double?,
     val notRecommended: Double?,
-) {
-    /** True when the server sent none of the summary. */
-    val isEmpty: Boolean
-        get() = albumScore == null && ratingCount == null && commentCount == null && recommendationScore == null &&
-            recommendation.isEmpty() && recommendedCount == null && recommended == null && neutral == null && notRecommended == null
-}
+)
 
 /** One page of reviews with the album's score. [hasMore] follows the server's last page number. */
 data class AlbumReviews(val score: AlbumScore, val items: List<AlbumReview>, val page: Int, val hasMore: Boolean)
