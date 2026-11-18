@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.xuleo.xmplus.md3.ui.screens
 
@@ -6,12 +6,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -129,28 +129,19 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
     val motion = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val pager = rememberPagerState(pageCount = { AlbumTab.Count })
     val scope = rememberCoroutineScope()
-    // The lists live here rather than in their pages, so each keeps its place and scroll to top can reach the one on show.
+    // The lists live here rather than in their pages, so each keeps its place while its tab is off screen or search is open.
     val introList = rememberLazyListState()
     val episodesList = rememberLazyListState()
     val reviewsList = rememberLazyListState()
-    fun listFor(page: Int): LazyListState = when (page) {
-        AlbumTab.Episodes -> episodesList
-        AlbumTab.Reviews -> reviewsList
-        else -> introList
-    }
-    val scrollToTop: () -> Unit = {
-        scope.launch {
-            launch { listFor(pager.currentPage).animateScrollToItem(0) }
-            launch { chrome.animateExpand(motion) }
-        }
-    }
+    // Brings the header back and leaves the list where it is, so the page stays put under the header.
+    val showHeader: () -> Unit = { scope.launch { chrome.animateExpand(motion) } }
     var showRange by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(pager.currentPage) { if (pager.currentPage == AlbumTab.Reviews) viewModel.ensureReviews() }
     val detail = state.detail
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         if (detail == null) {
             Column(Modifier.fillMaxSize()) {
-                AlbumTopBar(title = "", progress = { 0f }, onBack = onBack, onScrollToTop = {})
+                AlbumTopBar(title = "", progress = { 0f }, onBack = onBack, onShowHeader = {})
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (state.headerLoading) ListSkeleton(Modifier.fillMaxSize())
                     else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
@@ -174,7 +165,7 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
                 title = detail.album.title,
                 progress = reveal,
                 onBack = onBack,
-                onScrollToTop = scrollToTop,
+                onShowHeader = showHeader,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -200,12 +191,12 @@ private fun AlbumTabRow(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-/** A page's list, kept to the content column on wide windows. */
+/** A page's list, filling the space under the tab row and kept to the content column on wide windows. */
 @Composable
-private fun AlbumListPage(list: LazyListState, content: LazyListScope.() -> Unit) {
+private fun ColumnScope.AlbumListPage(list: LazyListState, content: LazyListScope.() -> Unit) {
     // Overscroll would take the upward drag at the top before the header can come back, so the lists do without it.
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), list,
                 contentPadding = PaddingValues(bottom = XmLayout.SectionGap), content = content,
@@ -216,26 +207,71 @@ private fun AlbumListPage(list: LazyListState, content: LazyListScope.() -> Unit
 
 @Composable
 private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpenAlbum: (String) -> Unit, list: LazyListState) {
-    AlbumListPage(list) { introduction(state, viewModel, onOpenAlbum) }
+    Column(Modifier.fillMaxSize()) {
+        AlbumListPage(list) { introduction(state, viewModel, onOpenAlbum) }
+    }
 }
 
 @Composable
 private fun EpisodesPage(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState, onRange: () -> Unit) {
-    // Search hits page on demand; the effect asks for the next page when the end is near.
-    LoadMoreEffect(
-        { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
-        state.searchOpen, state.hitPage, state.hitsLoading, onLoadMore = viewModel::loadMoreHits,
-    )
-    AlbumListPage(list) { episodes(state, detail, viewModel, onRange) }
+    Column(Modifier.fillMaxSize()) {
+        // The toolbar sits above the list rather than inside it. A field inside a list is scrolled into view when it takes
+        // focus, which would pull the list back to its first row every time search opens.
+        EpisodeToolbar(state, detail.album.trackCount, viewModel, onRange)
+        if (searchResultsShown(state)) SearchResults(state, viewModel) else EpisodeList(state, viewModel, list)
+    }
 }
 
 @Composable
 private fun ReviewsPage(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState) {
+    Column(Modifier.fillMaxSize()) {
+        LoadMoreEffect(
+            { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
+            state.reviewPage, state.reviewsLoading, state.newestReviews, onLoadMore = viewModel::loadMoreReviews,
+        )
+        AlbumListPage(list) { reviews(state, viewModel) }
+    }
+}
+
+private fun searchResultsShown(state: AlbumState): Boolean =
+    state.searchOpen && (state.hitPage > 0 || state.hitsLoading || state.hitsErrorCode != null)
+
+/** The episodes of the chunk on show. Its list keeps its place while search results take its space. */
+@Composable
+private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState) {
+    AlbumListPage(list) {
+        when {
+            state.episodesLoading -> item(key = "episodes-loading") { SkeletonRow() }
+            state.episodesErrorCode != null ->
+                item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryChunk) }
+            state.episodes.isEmpty() -> item(key = "episodes-empty") { EmptyText(R.string.album_episodes_empty) }
+            else -> items(state.episodes, key = { it.id }) { EpisodeRow(it) }
+        }
+    }
+}
+
+/** The search hits. A new search starts at its first hit; closing search returns to the episodes where they were. */
+@Composable
+private fun ColumnScope.SearchResults(state: AlbumState, viewModel: AlbumViewModel) {
+    val list = rememberLazyListState()
     LoadMoreEffect(
         { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
-        state.reviewPage, state.reviewsLoading, state.newestReviews, onLoadMore = viewModel::loadMoreReviews,
+        state.hitPage, state.hitsLoading, onLoadMore = viewModel::loadMoreHits,
     )
-    AlbumListPage(list) { reviews(state, viewModel) }
+    AlbumListPage(list) {
+        when {
+            state.hits.isEmpty() && state.hitsLoading -> item(key = "hits-loading") { SkeletonRow() }
+            state.hits.isEmpty() && state.hitsErrorCode != null ->
+                item(key = "hits-error") { InlineError(state.hitsErrorCode.orEmpty(), viewModel::retryHits) }
+            state.hits.isEmpty() -> item(key = "hits-empty") { EmptyText(R.string.search_empty) }
+            else -> {
+                items(state.hits, key = { "hit-" + it.id }) { TrackRow(it) }
+                item(key = "hits-footer") {
+                    PagingFooter(state.hitsLoading, state.hitsErrorCode != null, state.hitsHasMore, viewModel::retryHits)
+                }
+            }
+        }
+    }
 }
 
 private fun LazyListScope.introduction(state: AlbumState, viewModel: AlbumViewModel, onOpenAlbum: (String) -> Unit) {
@@ -272,36 +308,6 @@ private fun AlbumShelf(albums: List<Album>, onOpenAlbum: (String) -> Unit) {
     }
 }
 
-private fun LazyListScope.episodes(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, onRange: () -> Unit) {
-    // The toolbar sticks under the tabs while the rows scroll beneath it.
-    stickyHeader(key = "episode-toolbar") {
-        EpisodeToolbar(state, detail.album.trackCount, viewModel, onRange)
-    }
-    val searching = state.searchOpen && (state.hitPage > 0 || state.hitsLoading || state.hitsErrorCode != null)
-    if (searching) {
-        when {
-            state.hits.isEmpty() && state.hitsLoading -> item(key = "hits-loading") { SkeletonRow() }
-            state.hits.isEmpty() && state.hitsErrorCode != null ->
-                item(key = "hits-error") { InlineError(state.hitsErrorCode.orEmpty(), viewModel::retryHits) }
-            state.hits.isEmpty() -> item(key = "hits-empty") { EmptyText(R.string.search_empty) }
-            else -> {
-                items(state.hits, key = { "hit-" + it.id }) { TrackRow(it) }
-                item(key = "hits-footer") {
-                    PagingFooter(state.hitsLoading, state.hitsErrorCode != null, state.hitsHasMore, viewModel::retryHits)
-                }
-            }
-        }
-    } else {
-        when {
-            state.episodesLoading -> item(key = "episodes-loading") { SkeletonRow() }
-            state.episodesErrorCode != null ->
-                item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryChunk) }
-            state.episodes.isEmpty() -> item(key = "episodes-empty") { EmptyText(R.string.album_episodes_empty) }
-            else -> items(state.episodes, key = { it.id }) { EpisodeRow(it) }
-        }
-    }
-}
-
 private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) {
     state.score?.let { score -> item(key = "score") { ScoreSummary(score) } }
     item(key = "review-sort") { ReviewSort(state.newestReviews, viewModel::setNewestReviews) }
@@ -319,7 +325,7 @@ private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) 
     }
 }
 
-/** The sort, search and chunk controls. Search opens in place of them, so the same strip stays pinned as the list scrolls. */
+/** The sort, search and chunk controls. Search opens in place of them, on the same strip. */
 @Composable
 private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel, onRange: () -> Unit) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()

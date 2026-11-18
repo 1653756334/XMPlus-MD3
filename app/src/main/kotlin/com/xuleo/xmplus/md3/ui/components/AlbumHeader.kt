@@ -112,8 +112,8 @@ fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier) {
 }
 
 /**
- * The bar over an album. While the header is in view its button goes back; once the header has collapsed it scrolls the
- * page to the top. Its background and title fade in as [progress] rises from 0 to 1, and the button has no background of
+ * The bar over an album. While the header is in view its button goes back; once the header has collapsed it brings the header back
+ * without moving the list. Its background and title fade in as [progress] rises from 0 to 1, and the button has no background of
  * its own, so it reads as an icon over the cover.
  */
 @Composable
@@ -121,7 +121,7 @@ fun AlbumTopBar(
     title: String,
     progress: () -> Float,
     onBack: () -> Unit,
-    onScrollToTop: () -> Unit,
+    onShowHeader: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val surface = MaterialTheme.colorScheme.surface
@@ -135,8 +135,8 @@ fun AlbumTopBar(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
                     }
                 } else {
-                    IconButton(onScrollToTop, Modifier.padding(start = 4.dp)) {
-                        Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.album_scroll_to_top))
+                    IconButton(onShowHeader, Modifier.padding(start = 4.dp)) {
+                        Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.album_show_header))
                     }
                 }
             }

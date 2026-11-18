@@ -197,7 +197,7 @@ Rules:
 
 ### 专辑 Album
 
-- Collapsing header: blurred cover running up behind the status bar; cover on the left, title (two lines) and anchor on the right; stats and tags below. It collapses on scroll and comes back only when its list is at the top. The top-left button goes back at the top and scrolls to the top once collapsed.
+- Collapsing header: blurred cover running up behind the status bar; cover on the left, title (two lines) and anchor on the right; stats and tags below. It collapses on scroll and comes back only when its list is at the top. The top-left button goes back at the top; once collapsed it brings the header back without moving the list.
 - Main actions: 继续播放 第N集, 订阅, download icon.
 - Tabs 简介 / 节目 / 评价, swipeable, with no divider. The episode toolbar (sort, 选集 by 200-episode chunks: 1–200, 201–400…, search) sticks under the tabs; search opens in place of it. Multi-select arrives with downloads.
 - Episode rows: number, duration, 已听 35%, download state, animated equalizer on the one playing. Long-press opens a multi-select action bar.
