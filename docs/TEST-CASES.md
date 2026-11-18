@@ -196,11 +196,15 @@ Album playback queue
 
 Settings
 
+Moved to Phase 6 with the settings store: volume and master volume, and the album and global defaults. Speed stays in Phase 3 as a session value until settings land.
+
 - PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 15 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.
 - PB-02 Ranges: speed 0.5–3.0; intro and outro 0–3600 whole seconds; back and forward 1–300 whole seconds; volume and master volume 0–100. Invalid input is rejected and the old value kept.
 - PB-03 Output volume is 0 when muted, otherwise album volume × master volume / 100.
 
 Intro and outro
+
+Moved to Phase 6 with the settings store.
 
 - PB-10 Starting at 0 with a 30 s intro → playback starts at 30 s.
 - PB-11 Resuming at 10 s with a 30 s intro → starts at 30 s; resuming at 45 s → starts at 45 s.
@@ -223,7 +227,7 @@ Shuffle
 
 Sleep timer
 
-First version (player sheet): 15, 30, 60 or 90 minutes, or the end of this episode, then pause; the button shows the time left. A custom duration, the exit action, wait-for-end and the saved preset (PB-40, 41 exit, 42, 45 preset) arrive with Settings.
+Phase 3 (player sheet): 15, 30, 60 or 90 minutes, or the end of this episode, then pause; the button shows the time left. Moved to Phase 6 with the settings store: a custom duration, the exit action, wait-for-end and the saved preset (PB-40 custom values, PB-41 exit, PB-42, PB-45 preset).
 
 - PB-40 Duration must be 1–1440 minutes. Defaults: 30 minutes, pause.
 - PB-41 After the duration, the chosen action (pause or exit) happens.
