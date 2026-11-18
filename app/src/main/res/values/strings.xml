@@ -20,6 +20,11 @@
     <string name="player_queue_changed">The album has changed. Refresh it and try again.</string>
     <string name="player_queue_limit">The album queue supports up to 5,000 episodes.</string>
     <string name="player_more">More</string>
+    <string name="player_sleep">Sleep timer</string>
+    <string name="player_sleep_minutes">%1$d minutes</string>
+    <string name="player_sleep_episode_end">End of this episode</string>
+    <string name="player_sleep_off">Turn off timer</string>
+    <string name="player_sleep_episode_end_short">This episode</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>
     <string name="player_go_to_start">Go to start</string>

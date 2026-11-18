@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.core.media
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -65,6 +66,8 @@ class PlaybackController(
     val state = mutableState.asStateFlow()
     private val mutableQueue = MutableStateFlow(PlaybackQueueState())
     val queue = mutableQueue.asStateFlow()
+    private val mutableSleep = MutableStateFlow(SleepTimerState())
+    val sleepTimer = mutableSleep.asStateFlow()
 
     private var revision = 0L
     private var command: Job? = null
@@ -72,6 +75,7 @@ class PlaybackController(
     private var queueWork: Job? = null
     private var queueIntent = 0L
     private var clock: Job? = null
+    private var sleepJob: Job? = null
     private var sampling: Job? = null
     private var opened: OpenSource? = null
     private var admitted = false
@@ -327,8 +331,40 @@ class PlaybackController(
         seekTo(player.currentPosition + deltaMs)
     }
 
+    /** Pause after [minutes] of wall-clock time, whether or not the audio is running. */
+    fun startSleepTimer(minutes: Int) {
+        if (mutableState.value.selection == null) return
+        cancelSleepTimer()
+        val deadline = SystemClock.elapsedRealtime() + minutes * 60_000L
+        sleepJob = scope.launch {
+            while (true) {
+                val remaining = deadline - SystemClock.elapsedRealtime()
+                if (remaining <= 0) break
+                mutableSleep.value = SleepTimerState(remainingMs = (remaining + 999) / 1000 * 1000)
+                delay(minOf(remaining, 1_000L))
+            }
+            sleepJob = null
+            mutableSleep.value = SleepTimerState()
+            pause()
+        }
+    }
+
+    /** Pause when the current episode ends, in place of moving to the next one. */
+    fun sleepAtEpisodeEnd() {
+        if (mutableState.value.selection == null) return
+        cancelSleepTimer()
+        mutableSleep.value = SleepTimerState(atEpisodeEnd = true)
+    }
+
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        sleepJob = null
+        if (mutableSleep.value.active) mutableSleep.value = SleepTimerState()
+    }
+
     fun stop() {
         clearQueue()
+        cancelSleepTimer()
         val request = supersede()
         clearSource()
         mutableState.value = PlaybackState()
@@ -341,6 +377,7 @@ class PlaybackController(
             accountChanges++
             try {
                 clearQueue()
+                cancelSleepTimer()
                 supersede()
                 clearSource()
                 mutableState.value = PlaybackState()
@@ -485,7 +522,9 @@ class PlaybackController(
 
     private fun finishEpisode() {
         val advanceIntent = queueIntent
-        val shouldAdvance = queueWork == null
+        val sleepAtEnd = mutableSleep.value.atEpisodeEnd
+        if (sleepAtEnd) cancelSleepTimer()
+        val shouldAdvance = queueWork == null && !sleepAtEnd
         val request = supersede()
         val current = mutableState.value
         mutableState.value = current.copy(

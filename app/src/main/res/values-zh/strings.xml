@@ -18,6 +18,11 @@
     <string name="player_queue_changed">专辑节目有变动，请刷新后重试。</string>
     <string name="player_queue_limit">播放队列最多支持 5000 集。</string>
     <string name="player_more">更多</string>
+    <string name="player_sleep">定时关闭</string>
+    <string name="player_sleep_minutes">%1$d 分钟后</string>
+    <string name="player_sleep_episode_end">本集播完后</string>
+    <string name="player_sleep_off">关闭定时</string>
+    <string name="player_sleep_episode_end_short">本集</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>
     <string name="player_go_to_start">回到开头</string>

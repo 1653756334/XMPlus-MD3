@@ -191,12 +191,12 @@ Album playback queue
 - PB-04 Select an episode from a descending album or its search results. The queue starts at that exact episode and follows ascending official episode numbers.
 - PB-05 From the first or last episode of a page, Previous or Next reads the adjacent page without duplicating rows. Next is disabled on the album's last episode. Natural completion still re-reads the last page, so an episode appended since the queue was built plays on.
 - PB-06 Reject a moved catalogue anchor or a repeated episode ID. A failed page read leaves the current episode and queue intact; selecting a different episode or changing the primary account cancels a pending read. After a failed read, tapping the loaded episode rebuilds the queue without restarting playback.
-- PB-07 Open the play queue from the second row, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The two 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode.
+- PB-07 Under the progress bar the controls read queue, previous, play/pause, next, sleep timer; More is at the top right. Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The 15-second seek buttons beside the progress bar move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode.
 - PB-08 Let a metered episode end at the page boundary; the next episode opens through normal authorization, and a free next episode does not start a meter. Pause while the page or settlement is pending; the next episode must not start.
 
 Settings
 
-- PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 30 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.
+- PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 15 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.
 - PB-02 Ranges: speed 0.5–3.0; intro and outro 0–3600 whole seconds; back and forward 1–300 whole seconds; volume and master volume 0–100. Invalid input is rejected and the old value kept.
 - PB-03 Output volume is 0 when muted, otherwise album volume × master volume / 100.
 
@@ -222,6 +222,8 @@ Shuffle
 - PB-33 Shuffle history keeps at most 5,000 entries.
 
 Sleep timer
+
+First version (player sheet): 15, 30, 60 or 90 minutes, or the end of this episode, then pause; the button shows the time left. A custom duration, the exit action, wait-for-end and the saved preset (PB-40, 41 exit, 42, 45 preset) arrive with Settings.
 
 - PB-40 Duration must be 1–1440 minutes. Defaults: 30 minutes, pause.
 - PB-41 After the duration, the chosen action (pause or exit) happens.

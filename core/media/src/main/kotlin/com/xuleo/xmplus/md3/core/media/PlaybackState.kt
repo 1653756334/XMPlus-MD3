@@ -23,3 +23,8 @@ data class PlaybackState(
     val canSeek: Boolean = false,
     val errorCode: String? = null,
 )
+
+/** A pause scheduled after [remainingMs], or when the current episode ends. */
+data class SleepTimerState(val remainingMs: Long? = null, val atEpisodeEnd: Boolean = false) {
+    val active: Boolean get() = remainingMs != null || atEpisodeEnd
+}

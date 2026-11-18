@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -38,14 +39,17 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
@@ -87,6 +91,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
 import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
+import com.xuleo.xmplus.md3.core.media.SleepTimerState
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
@@ -104,6 +109,7 @@ internal fun PlayerSheet(
 ) {
     val state by playback.state.collectAsStateWithLifecycle()
     val queue by playback.queue.collectAsStateWithLifecycle()
+    val sleep by playback.sleepTimer.collectAsStateWithLifecycle()
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -134,6 +140,7 @@ internal fun PlayerSheet(
         val episode = state.selection
         var showActions by remember(episode?.album?.id, episode?.track?.id) { mutableStateOf(false) }
         var showQueue by remember(episode?.album?.id) { mutableStateOf(false) }
+        var showSleep by remember { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -156,6 +163,9 @@ internal fun PlayerSheet(
                             Icons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp),
                         )
                     }
+                    if (episode != null) IconButton(onClick = { showActions = true }) {
+                        Icon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more))
+                    }
                 }
                 if (episode == null) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -167,9 +177,10 @@ internal fun PlayerSheet(
                             episode = episode,
                             state = state,
                             queue = queue,
+                            sleep = sleep,
                             playback = playback,
                             onOpenQueue = { showQueue = true },
-                            onOpenActions = { showActions = true },
+                            onOpenSleep = { showSleep = true },
                             onAccounts = { closeThen(onAccounts) },
                         )
                     }
@@ -190,6 +201,15 @@ internal fun PlayerSheet(
         }
         if (showQueue && episode != null) {
             PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
+        }
+        if (showSleep && episode != null) {
+            PlayerSleepSheet(
+                timer = sleep,
+                onMinutes = playback::startSleepTimer,
+                onEpisodeEnd = playback::sleepAtEpisodeEnd,
+                onOff = playback::cancelSleepTimer,
+                onDismiss = { showSleep = false },
+            )
         }
     }
 }
@@ -233,9 +253,10 @@ private fun PlayerControls(
     episode: PlaybackSelection,
     state: PlaybackState,
     queue: PlaybackQueueState,
+    sleep: SleepTimerState,
     playback: PlaybackController,
     onOpenQueue: () -> Unit,
-    onOpenActions: () -> Unit,
+    onOpenSleep: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -251,9 +272,8 @@ private fun PlayerControls(
                 )
             }
         }
-        PositionControl(state, playback::seekTo)
-        TransportControls(state, queue, playback)
-        UtilityControls(queue.items.isNotEmpty(), onOpenQueue, onOpenActions)
+        PositionControl(state, playback::seekTo, playback::skipBack, playback::skipForward)
+        TransportControls(state, queue, sleep, playback, onOpenQueue, onOpenSleep)
         queue.errorCode?.let { error ->
             Text(
                 stringResource(playbackMessage(error)),
@@ -275,21 +295,28 @@ private fun PlayerControls(
     }
 }
 
-/** One row for the transport: previous episode, 15-second seeks around play/pause, and next episode. */
+/** One row: play queue, previous episode, play/pause, next episode, sleep timer. */
 @Composable
-private fun TransportControls(state: PlaybackState, queue: PlaybackQueueState, playback: PlaybackController) {
+private fun TransportControls(
+    state: PlaybackState,
+    queue: PlaybackQueueState,
+    sleep: SleepTimerState,
+    playback: PlaybackController,
+    onOpenQueue: () -> Unit,
+    onOpenSleep: () -> Unit,
+) {
     val canChange = queue.currentTrackId != null && !queue.isLoading
-    Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 20.dp), contentAlignment = Alignment.Center) {
         Row(
             Modifier.widthIn(max = 360.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SideButton(Icons.Filled.QueueMusic, R.string.player_queue, queue.items.isNotEmpty(), onOpenQueue)
             EpisodeButton(forward = false, enabled = canChange, onClick = playback::previousEpisode)
-            SeekButton(forward = false, enabled = state.canSeek, onClick = playback::skipBack)
             MainPlaybackButton(state, queue.isLoading, playback::toggle)
-            SeekButton(forward = true, enabled = state.canSeek, onClick = playback::skipForward)
             EpisodeButton(forward = true, enabled = canChange && queue.hasNext, onClick = playback::nextEpisode)
+            SleepButton(sleep, onOpenSleep)
         }
     }
 }
@@ -300,38 +327,43 @@ private fun EpisodeButton(forward: Boolean, enabled: Boolean, onClick: () -> Uni
         Icon(
             if (forward) Icons.Filled.SkipNext else Icons.Filled.SkipPrevious,
             stringResource(if (forward) R.string.player_next_episode else R.string.player_previous_episode),
-            Modifier.size(32.dp),
+            Modifier.size(36.dp),
         )
     }
 }
 
-/** The second row: the play queue and more actions, icon above label, spread evenly under the transport. */
 @Composable
-private fun UtilityControls(queueEnabled: Boolean, onOpenQueue: () -> Unit, onOpenActions: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-        Row(Modifier.widthIn(max = 360.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            UtilityButton(Icons.Filled.QueueMusic, R.string.player_queue, queueEnabled, onOpenQueue)
-            UtilityButton(Icons.Filled.MoreHoriz, R.string.player_more, true, onOpenActions)
-        }
-    }
-}
-
-@Composable
-private fun UtilityButton(icon: ImageVector, @StringRes label: Int, enabled: Boolean, onClick: () -> Unit) {
-    TextButton(
-        onClick,
-        enabled = enabled,
-        shape = MaterialTheme.shapes.large,
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+private fun SideButton(icon: ImageVector, @StringRes label: Int, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick, Modifier.size(48.dp), enabled = enabled,
+        colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
-        }
+        Icon(icon, stringResource(label), Modifier.size(26.dp))
     }
 }
 
+/** The timer icon turns green while a timer runs, with the time left (or the episode) under it. */
+@Composable
+private fun SleepButton(timer: SleepTimerState, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val caption = timer.remainingMs?.let { formatDuration(it / 1000.0) }
+        ?: if (timer.atEpisodeEnd) stringResource(R.string.player_sleep_episode_end_short) else null
+    Box(contentAlignment = Alignment.Center) {
+        IconButton(
+            onClick, Modifier.size(48.dp),
+            colors = IconButtonDefaults.iconButtonColors(contentColor = if (timer.active) scheme.primary else scheme.onSurfaceVariant),
+        ) {
+            Icon(
+                if (timer.active) Icons.Filled.Timer else Icons.Outlined.Timer,
+                stringResource(R.string.player_sleep), Modifier.size(26.dp),
+            )
+        }
+        if (caption != null) Text(
+            caption, Modifier.align(Alignment.BottomCenter).offset(y = 14.dp),
+            style = MaterialTheme.typography.labelSmall, color = scheme.primary,
+        )
+    }
+}
 @Composable
 private fun PlayerActionsSheet(
     onDismiss: () -> Unit,
@@ -426,7 +458,7 @@ private fun SeekButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) 
     val description = stringResource(
         if (forward) R.string.player_seek_forward else R.string.player_seek_back, PlaybackSkipSeconds,
     )
-    IconButton(onClick, Modifier.size(48.dp).semantics { contentDescription = description }, enabled = enabled) {
+    IconButton(onClick, Modifier.size(SeekButtonSize).semantics { contentDescription = description }, enabled = enabled) {
         Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             // The forward arrow is the back arrow mirrored, so the two seeks read as one pair.
             Icon(
@@ -469,7 +501,7 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
 }
 
 @Composable
-private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit) {
+private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit, onSkipBack: () -> Unit, onSkipForward: () -> Unit) {
     var dragging by remember(state.selection?.track?.id, state.canSeek) { mutableStateOf<Float?>(null) }
     val duration = state.durationMs.coerceAtLeast(1).toFloat()
     val position = (dragging ?: state.positionMs.toFloat()).coerceIn(0f, duration)
@@ -482,36 +514,42 @@ private fun PositionControl(state: PlaybackState, onSeek: (Long) -> Unit) {
     val timeStyle = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum")
     val touchHeight = 48.dp
 
-    Column(Modifier.fillMaxWidth()) {
-        // Keep the full touch target and slider semantics; only the painted track and thumb are small.
-        Slider(
-            state = slider,
-            onValueChange = { dragging = it },
-            onValueChangeFinished = {
-                dragging?.let { onSeek(it.toLong()) }
-                dragging = null
-            },
-            enabled = state.canSeek,
-            modifier = Modifier.fillMaxWidth().height(touchHeight).semantics { contentDescription = label },
-            colors = colors,
-            thumb = {
-                Box(Modifier.height(touchHeight), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(8.dp).background(thumb, CircleShape))
-                }
-            },
-            track = { trackState ->
-                SliderDefaults.Track(
-                    sliderState = trackState, modifier = Modifier.height(3.dp), enabled = state.canSeek, colors = colors,
-                    drawStopIndicator = null, thumbTrackGapSize = 0.dp,
-                )
-            },
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SeekButton(forward = false, enabled = state.canSeek, onClick = onSkipBack)
+            // Keep the full touch target and slider semantics; only the painted track and thumb are small.
+            Slider(
+                state = slider,
+                onValueChange = { dragging = it },
+                onValueChangeFinished = {
+                    dragging?.let { onSeek(it.toLong()) }
+                    dragging = null
+                },
+                enabled = state.canSeek,
+                modifier = Modifier.weight(1f).height(touchHeight).semantics { contentDescription = label },
+                colors = colors,
+                thumb = {
+                    Box(Modifier.height(touchHeight), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(8.dp).background(thumb, CircleShape))
+                    }
+                },
+                track = { trackState ->
+                    SliderDefaults.Track(
+                        sliderState = trackState, modifier = Modifier.height(3.dp), enabled = state.canSeek, colors = colors,
+                        drawStopIndicator = null, thumbTrackGapSize = 0.dp,
+                    )
+                },
+            )
+            SeekButton(forward = true, enabled = state.canSeek, onClick = onSkipForward)
+        }
+        // The times sit under the bar, between the two seek buttons.
+        Row(Modifier.fillMaxWidth().padding(horizontal = SeekButtonSize), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatDuration(position / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
             Text(formatDuration(state.durationMs / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
         }
     }
 }
+private val SeekButtonSize = 48.dp
 
 private val AccountErrors = setOf("login_required", "login_expired", "insufficient_quota", "usage_uncertain", "uncertain")
 

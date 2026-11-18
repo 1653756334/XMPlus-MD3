@@ -208,8 +208,8 @@ Rules:
 - Swipeable pages: 播放 / 文稿 / 评论.
 - The cover shrinks slightly with a spring when paused.
 - Progress bar is wavy while playing and flat when paused.
-- Main controls: previous · seek back · play/pause (shape-morph button) · seek forward · next. Labels follow the configured intervals (defaults: back 15s, forward 30s).
-- Second row: 倍速, 定时, 列表, 下载, 更多.
+- Seek back and seek forward sit on either side of the progress bar, labelled with the configured interval (default 15 s each way). Controls under the bar, left to right: queue · previous · play/pause (shape-morph button) · next · sleep timer. 更多 is at the top right.
+- 倍速 and 下载 join the control row when playback settings and downloads arrive.
 - Queue sheet: play mode, reverse, drag handles, 回到当前.
 - Sleep timer sheet: 15 / 30 / 60 / 90 min, end of episode, custom; countdown chip on the player.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
