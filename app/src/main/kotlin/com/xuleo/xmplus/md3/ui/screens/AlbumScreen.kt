@@ -270,7 +270,8 @@ private fun AlbumShelf(albums: List<Album>, onOpenAlbum: (String) -> Unit) {
 }
 
 private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) {
-    state.score?.let { score -> item(key = "score") { ScoreSummary(score) } }
+    // Always the first item, empty until the score arrives. An item that appears above the first visible one is pushed out of view.
+    item(key = "score") { state.score?.let { ScoreSummary(it) } }
     item(key = "review-sort") { ReviewSort(state.newestReviews, viewModel::setNewestReviews) }
     when {
         state.reviewPage == 0 && state.reviewsErrorCode != null ->

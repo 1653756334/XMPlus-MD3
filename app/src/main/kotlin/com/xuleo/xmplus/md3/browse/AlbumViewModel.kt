@@ -276,7 +276,7 @@ class AlbumViewModel(
     fun setNewestReviews(newest: Boolean) {
         if (mutable.value.newestReviews == newest) return
         mutable.update {
-            it.copy(newestReviews = newest, score = null, reviews = emptyList(), reviewPage = 0, reviewsHasMore = false, reviewsErrorCode = null)
+            it.copy(newestReviews = newest, reviews = emptyList(), reviewPage = 0, reviewsHasMore = false, reviewsErrorCode = null)
         }
         loadReviews(1)
     }
