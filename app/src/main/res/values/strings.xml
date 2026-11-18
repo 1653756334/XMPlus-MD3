@@ -35,7 +35,9 @@
     <string name="player_bookmarks">Bookmarks</string>
     <string name="bookmark_add">Add bookmark</string>
     <string name="bookmark_empty">No bookmarks for this episode</string>
+    <string name="bookmark_no_note">No note</string>
     <string name="bookmark_edit_note">Edit note</string>
+    <string name="bookmark_options">Bookmark options at %1$s</string>
     <string name="bookmark_note">Note (optional)</string>
     <string name="bookmark_note_limit">Use no more than %1$d characters</string>
     <string name="bookmark_save">Save</string>

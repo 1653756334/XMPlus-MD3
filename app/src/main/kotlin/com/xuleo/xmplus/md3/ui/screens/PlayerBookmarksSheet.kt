@@ -1,30 +1,44 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
@@ -38,10 +52,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
@@ -130,50 +146,22 @@ internal fun PlayerBookmarksSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentWindowInsets = { WindowInsets.safeDrawing },
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.player_bookmarks), Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.titleMedium,
-            )
-            TextButton(enabled = canSeek && !busy && bookmarks != null, onClick = {
+        BookmarkSheetContent(
+            rows = bookmarks,
+            canSeek = canSeek,
+            busy = busy,
+            loadFailed = loadFailed,
+            actionFailed = actionFailed && editor == null && deleting == null,
+            onAdd = {
                 val draft = playback.captureBookmark(episode)
                 actionFailed = draft == null
                 if (draft != null) editor = BookmarkEditor.Add(draft)
-            }) { Text(stringResource(R.string.bookmark_add)) }
-        }
-        if (actionFailed && editor == null && deleting == null) BookmarkError(Modifier.padding(horizontal = XmLayout.PagePadding))
-        val rows = bookmarks
-        when {
-            loadFailed -> Column(Modifier.padding(horizontal = XmLayout.PagePadding, vertical = XmLayout.ItemGap)) {
-                BookmarkError()
-                TextButton(onClick = { reload++ }) { Text(stringResource(R.string.action_retry)) }
-            }
-            rows == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
-            rows.isEmpty() -> Text(
-                stringResource(R.string.bookmark_empty),
-                Modifier.padding(horizontal = XmLayout.PagePadding, vertical = 24.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            else -> LazyColumn(
-                Modifier.fillMaxWidth().fillMaxHeight(0.55f),
-                contentPadding = PaddingValues(bottom = XmLayout.ItemGap),
-            ) {
-                items(rows, key = { it.id }) { row ->
-                    BookmarkRow(
-                        row, canSeek = canSeek, busy = busy,
-                        onPlay = {
-                            if (playback.playBookmark(row)) onDismiss() else actionFailed = true
-                        },
-                        onEdit = { actionFailed = false; editor = BookmarkEditor.Edit(row) },
-                        onDelete = { actionFailed = false; deleting = row },
-                    )
-                }
-            }
-        }
+            },
+            onRetry = { reload++ },
+            onPlay = { if (playback.playBookmark(it)) onDismiss() else actionFailed = true },
+            onEdit = { actionFailed = false; editor = BookmarkEditor.Edit(it) },
+            onDelete = { actionFailed = false; deleting = it },
+        )
     }
 
     editor?.let { target ->
@@ -204,9 +192,88 @@ internal fun PlayerBookmarksSheet(
                         playback.deleteBookmark(bookmark)
                         bookmarks = bookmarks.orEmpty().filterNot { it.id == bookmark.id }
                     }
-                }) { Text(stringResource(R.string.bookmark_delete_action)) }
+                }) { Text(stringResource(R.string.bookmark_delete_action), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(enabled = !busy, onClick = ::dismiss) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun BookmarkSheetContent(
+    rows: List<PlaybackBookmark>?,
+    canSeek: Boolean,
+    busy: Boolean,
+    loadFailed: Boolean,
+    actionFailed: Boolean,
+    onAdd: () -> Unit,
+    onRetry: () -> Unit,
+    onPlay: (PlaybackBookmark) -> Unit,
+    onEdit: (PlaybackBookmark) -> Unit,
+    onDelete: (PlaybackBookmark) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Short lists wrap their content; long lists leave room for the fixed add action.
+        val listLimit = (maxHeight * 0.6f).coerceAtMost(384.dp)
+        Column(
+            Modifier.fillMaxWidth().padding(bottom = XmLayout.ItemGap),
+            verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        ) {
+            Text(
+                stringResource(R.string.player_bookmarks),
+                Modifier.padding(horizontal = XmLayout.PagePadding).semantics { heading() },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (actionFailed) BookmarkError(Modifier.padding(horizontal = XmLayout.PagePadding))
+            when {
+                loadFailed -> Column(Modifier.padding(horizontal = XmLayout.PagePadding, vertical = XmLayout.ItemGap)) {
+                    BookmarkError()
+                    TextButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+                }
+                rows == null -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding))
+                rows.isEmpty() -> EmptyBookmarks()
+                else -> LazyColumn(
+                    Modifier.weight(1f, fill = false).fillMaxWidth().heightIn(max = listLimit),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
+                    items(rows, key = { it.id }) { row ->
+                        BookmarkRow(
+                            row, canSeek = canSeek, busy = busy,
+                            onPlay = { onPlay(row) }, onEdit = { onEdit(row) }, onDelete = { onDelete(row) },
+                        )
+                    }
+                }
+            }
+            Button(
+                onClick = onAdd,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
+                enabled = canSeek && !busy && !loadFailed && rows != null,
+            ) {
+                Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.bookmark_add), textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyBookmarks() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    ) {
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.BookmarkBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Text(
+            stringResource(R.string.bookmark_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -220,18 +287,52 @@ private fun BookmarkRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val time = formatDuration(bookmark.positionMs / 1_000.0)
+    val playLabel = stringResource(R.string.action_play)
     ListItem(
-        modifier = Modifier.clickable(enabled = canSeek && !busy, role = Role.Button, onClick = onPlay),
-        supportingContent = if (bookmark.note.isEmpty()) null else ({
-            Text(bookmark.note, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }),
-        trailingContent = {
-            Row {
-                IconButton(onEdit, enabled = !busy) { Icon(Icons.Outlined.Edit, stringResource(R.string.bookmark_edit_note)) }
-                IconButton(onDelete, enabled = !busy) { Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.bookmark_delete_action)) }
+        modifier = Modifier.clickable(enabled = canSeek && !busy, onClickLabel = playLabel, role = Role.Button, onClick = onPlay),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    time,
+                    Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
             }
         },
-    ) { Text(formatDuration(bookmark.positionMs / 1_000.0)) }
+        trailingContent = { BookmarkOptions(time, busy, onEdit, onDelete) },
+    ) {
+        if (bookmark.note.isEmpty()) {
+            Text(stringResource(R.string.bookmark_no_note), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text(bookmark.note, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun BookmarkOptions(time: String, busy: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    Box {
+        IconButton(onClick = { expanded = true }, enabled = !busy) {
+            Icon(Icons.Outlined.MoreVert, stringResource(R.string.bookmark_options, time), tint = colors.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = expanded && !busy, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.bookmark_edit_note)) },
+                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                onClick = { expanded = false; onEdit() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.bookmark_delete_action), color = colors.error) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = colors.error) },
+                onClick = { expanded = false; onDelete() },
+            )
+        }
+    }
 }
 
 @Composable
@@ -250,8 +351,14 @@ private fun BookmarkEditorDialog(
             Text(stringResource(if (target is BookmarkEditor.Add) R.string.bookmark_add else R.string.bookmark_edit_note))
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(formatDuration(target.positionMs / 1_000.0), style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+                Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Text(
+                        formatDuration(target.positionMs / 1_000.0), Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -259,6 +366,7 @@ private fun BookmarkEditorDialog(
                     enabled = !busy,
                     minLines = 2,
                     maxLines = 5,
+                    shape = MaterialTheme.shapes.medium,
                     label = { Text(stringResource(R.string.bookmark_note)) },
                     isError = !valid,
                     supportingText = if (valid) null else ({ Text(stringResource(R.string.bookmark_note_limit, BookmarkNoteLimit)) }),
@@ -266,7 +374,7 @@ private fun BookmarkEditorDialog(
                 if (failed) BookmarkError()
             }
         },
-        confirmButton = { TextButton(enabled = !busy && valid, onClick = { onSave(note) }) { Text(stringResource(R.string.bookmark_save)) } },
+        confirmButton = { Button(enabled = !busy && valid, onClick = { onSave(note) }) { Text(stringResource(R.string.bookmark_save)) } },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
@@ -274,4 +382,69 @@ private fun BookmarkEditorDialog(
 @Composable
 private fun BookmarkError(modifier: Modifier = Modifier) {
     Text(stringResource(R.string.bookmark_error), modifier, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun BookmarkStyleFixture(scenario: String, narrow: Boolean) {
+    val episode = remember {
+        BookmarkEpisode::class.java.getDeclaredConstructor(String::class.java, String::class.java, String::class.java)
+            .newInstance("fixture", "1", "2")
+    }
+    fun marker(id: Long, time: Long, note: String): PlaybackBookmark {
+        val number = Long::class.javaPrimitiveType
+        return PlaybackBookmark::class.java.getDeclaredConstructor(BookmarkEpisode::class.java, number, number, number, String::class.java)
+            .newInstance(episode, id, time, 0L, note)
+    }
+    val initial = remember(scenario) {
+        val sample = listOf(
+            marker(1, 90_000, "这里是关键伏笔，后面再回来对照。"),
+            marker(2, 316_000, "人物第一次见面"),
+            marker(3, 725_000, ""),
+        )
+        when (scenario) {
+            "empty" -> emptyList()
+            "single" -> sample.take(1)
+            "long" -> List(12) { marker(it + 1L, (it + 1) * 40_000L, "这一段值得再听一次，看看人物与前文的关系。") }
+            else -> sample
+        }
+    }
+    var rows by remember { mutableStateOf(initial) }
+    var editing by remember { mutableStateOf<BookmarkEditor?>(if (scenario == "editor") BookmarkEditor.Edit(initial.first()) else null) }
+    var deleting by remember { mutableStateOf<PlaybackBookmark?>(null) }
+    var show by remember { mutableStateOf(true) }
+    if (show) ModalBottomSheet(
+        onDismissRequest = { show = false },
+        sheetState = rememberBottomSheetState(SheetValue.Hidden, enabledValues = setOf(SheetValue.Expanded, SheetValue.Hidden)),
+        sheetMaxWidth = if (narrow) 320.dp else 640.dp,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentWindowInsets = { WindowInsets.safeDrawing },
+    ) {
+        BookmarkSheetContent(
+            rows, canSeek = true, busy = false, loadFailed = false, actionFailed = false,
+            onAdd = {
+                val number = Long::class.javaPrimitiveType
+                val draft = BookmarkDraft::class.java.getDeclaredConstructor(BookmarkEpisode::class.java, number, number)
+                    .newInstance(episode, 456_000L, 0L)
+                editing = BookmarkEditor.Add(draft)
+            },
+            onRetry = {}, onPlay = { show = false },
+            onEdit = { editing = BookmarkEditor.Edit(it) }, onDelete = { deleting = it },
+        )
+    }
+    editing?.let { target -> BookmarkEditorDialog(target, false, false, onDismiss = { editing = null }) { note ->
+        rows = when (target) {
+            is BookmarkEditor.Add -> rows + marker(80L, target.positionMs, note)
+            is BookmarkEditor.Edit -> rows.map { if (it.id == target.bookmark.id) marker(it.id, it.positionMs, note) else it }
+        }
+        editing = null
+    } }
+    deleting?.let { target -> AlertDialog(
+        onDismissRequest = { deleting = null },
+        title = { Text(stringResource(R.string.bookmark_delete_title)) },
+        confirmButton = { TextButton(onClick = { rows = rows.filterNot { it == target }; deleting = null }) {
+            Text(stringResource(R.string.bookmark_delete_action), color = MaterialTheme.colorScheme.error)
+        } },
+        dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.action_cancel)) } },
+    ) }
 }
