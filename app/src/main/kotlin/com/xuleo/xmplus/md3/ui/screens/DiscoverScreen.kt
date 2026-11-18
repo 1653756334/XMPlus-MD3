@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
+import com.xuleo.xmplus.md3.browse.RankingsViewModel
 import com.xuleo.xmplus.md3.browse.ChannelState
 import com.xuleo.xmplus.md3.browse.ChannelsState
 import com.xuleo.xmplus.md3.browse.DiscoverState
@@ -67,10 +68,17 @@ internal class DiscoverLinks(
 internal enum class DiscoverMode(@StringRes val label: Int) {
     Recommend(R.string.discover_mode_recommend),
     Categories(R.string.discover_mode_categories),
+    Rankings(R.string.discover_mode_rankings),
 }
 
 @Composable
-internal fun DiscoverScreen(viewModel: DiscoverViewModel, categories: CategoriesViewModel, hotWords: List<HotWord>, links: DiscoverLinks) {
+internal fun DiscoverScreen(
+    viewModel: DiscoverViewModel,
+    categories: CategoriesViewModel,
+    rankings: RankingsViewModel,
+    hotWords: List<HotWord>,
+    links: DiscoverLinks,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val actions = remember(viewModel, links) {
         DiscoverActions(links.onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, links.onAllAlbums, links.onFullRanking)
@@ -78,7 +86,8 @@ internal fun DiscoverScreen(viewModel: DiscoverViewModel, categories: Categories
     DiscoverContent(state, hotWords, actions) { mode ->
         when (mode) {
             DiscoverMode.Categories -> CategoriesView(categories, links.onCategory)
-            else -> Unit
+            DiscoverMode.Rankings -> RankingsView(rankings)
+            DiscoverMode.Recommend -> Unit
         }
     }
 }

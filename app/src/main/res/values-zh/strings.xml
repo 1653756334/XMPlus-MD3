@@ -156,4 +156,7 @@
     <string name="filter_reset">重置</string>
     <string name="filter_apply">应用</string>
     <string name="sort_newest">最新</string>
+    <string name="discover_mode_rankings">排行</string>
+    <string name="rank_plays">%s播放</string>
+    <string name="rank_score">%s分</string>
 </resources>

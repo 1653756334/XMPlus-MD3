@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Icon
@@ -16,13 +17,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.Album
+import com.xuleo.xmplus.md3.core.model.AlbumStats
 import com.xuleo.xmplus.md3.core.model.AnchorProfile
 import com.xuleo.xmplus.md3.core.model.Track
+import java.util.Locale
 
 private val RowPadding = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp)
 
@@ -39,6 +44,41 @@ fun AlbumRow(album: Album, modifier: Modifier = Modifier) {
             if (album.trackCount > 0) {
                 Text(pluralStringResource(R.plurals.episode_count, album.trackCount, album.trackCount),
                     style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** The number beside a chart row; the first three use the accent colour. */
+@Composable
+fun RankPosition(position: Int?) {
+    Text(
+        position?.toString().orEmpty(), Modifier.width(28.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+        color = if (position != null && position <= 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+/** A chart row: the server's position, a cover, the title and anchor, and play count, score and episodes when known. */
+@Composable
+fun RankedAlbumRow(position: Int?, album: Album, stats: AlbumStats?, modifier: Modifier = Modifier) {
+    Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+        RankPosition(position)
+        Cover(album.coverUrl, Modifier.size(56.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(album.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (album.artist.isNotEmpty()) {
+                Text(album.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            val details = listOfNotNull(
+                stats?.playCount?.let { stringResource(R.string.rank_plays, formatCount(it)) },
+                stats?.score?.let { stringResource(R.string.rank_score, String.format(Locale.ROOT, "%.1f", it)) },
+                if (album.trackCount > 0) pluralStringResource(R.plurals.episode_count, album.trackCount, album.trackCount) else null,
+            ).joinToString(" · ")
+            if (details.isNotEmpty()) {
+                Text(details, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -63,8 +103,9 @@ fun TrackRow(track: Track, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AnchorRow(anchor: AnchorProfile, modifier: Modifier = Modifier) {
+fun AnchorRow(anchor: AnchorProfile, modifier: Modifier = Modifier, position: Int? = null) {
     Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+        if (position != null) RankPosition(position)
         Avatar(anchor.avatarUrl, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -164,4 +164,7 @@
     <string name="filter_reset">Reset</string>
     <string name="filter_apply">Apply</string>
     <string name="sort_newest">Newest</string>
+    <string name="discover_mode_rankings">Charts</string>
+    <string name="rank_plays">%s plays</string>
+    <string name="rank_score">Rating %s</string>
 </resources>

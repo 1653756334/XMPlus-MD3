@@ -29,6 +29,7 @@ import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
+import com.xuleo.xmplus.md3.browse.RankingsViewModel
 import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
@@ -46,8 +47,9 @@ fun XmApp() {
     val allAlbums: AllAlbumsViewModel = viewModel(factory = AllAlbumsViewModel.factory(application.browse))
     val categories: CategoriesViewModel = viewModel(factory = CategoriesViewModel.factory(application.discovery))
     val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))
+    val rankings: RankingsViewModel = viewModel(factory = RankingsViewModel.factory(application.discovery))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums)
+    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings)
 }
 
 @Composable
@@ -60,6 +62,7 @@ internal fun XmAppContent(
     allAlbums: AllAlbumsViewModel? = null,
     categories: CategoriesViewModel? = null,
     categoryAlbums: CategoryAlbumsViewModel? = null,
+    rankings: RankingsViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -164,7 +167,7 @@ internal fun XmAppContent(
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
-                                TabContent(tab, stateHolder, accounts, discover, categories, hotWords, links,
+                                TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
@@ -225,10 +228,10 @@ internal fun XmAppContent(
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
-    categories: CategoriesViewModel?, hotWords: List<HotWord>, links: DiscoverLinks, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+    categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
-            Destination.Discover -> if (discover != null && categories != null) DiscoverScreen(discover, categories, hotWords, links) else EmptyTab(destination.label, destination.icon)
+            Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)
