@@ -18,6 +18,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -102,11 +105,23 @@ internal fun DiscoverContent(
 ) {
     var mode by rememberSaveable { mutableStateOf(DiscoverMode.Recommend) }
     val holder = rememberSaveableStateHolder()
-    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
-        SearchEntry(hotWords, actions.onSearch)
-        PrimaryTabRow(selectedTabIndex = mode.ordinal, containerColor = MaterialTheme.colorScheme.surface, divider = {}) {
-            DiscoverMode.entries.forEach { entry ->
-                Tab(selected = entry == mode, onClick = { mode = entry }, text = { Text(stringResource(entry.label), maxLines = 1) })
+    // The search bar and mode row scroll away with the content; the channel tabs below them stay pinned.
+    val chrome = remember { CollapsingChrome() }
+    LaunchedEffect(mode) { chrome.expand() }
+    Column(
+        Modifier.fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .clipToBounds()
+            .nestedScroll(chrome.connection),
+    ) {
+        Box(Modifier.collapsing(chrome)) {
+            Column(Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) {
+                SearchEntry(hotWords, actions.onSearch)
+                PrimaryTabRow(selectedTabIndex = mode.ordinal, containerColor = MaterialTheme.colorScheme.surface, divider = {}) {
+                    DiscoverMode.entries.forEach { entry ->
+                        Tab(selected = entry == mode, onClick = { mode = entry }, text = { Text(stringResource(entry.label), maxLines = 1) })
+                    }
+                }
             }
         }
         Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
@@ -116,7 +131,6 @@ internal fun DiscoverContent(
         }
     }
 }
-
 @Composable
 private fun ColumnScope.Recommendations(state: DiscoverState, actions: DiscoverActions) {
     when (val channels = state.channels) {

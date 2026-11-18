@@ -1,12 +1,15 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -42,12 +45,23 @@ internal fun RankingsContent(
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
 ) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         val categories = state.categories
         val category = state.category
         if (categories != null && category != null) {
-            Chips { items(categories, key = { it.id }) { FilterChip(it.id == state.categoryId, { onCategory(it.id) }, { Text(it.title, maxLines = 1) }) } }
-            Chips { items(category.tabs, key = { it.rankingId }) { FilterChip(it.rankingId == state.rankingId, { onTab(it.rankingId) }, { Text(it.title, maxLines = 1) }) } }
+            // One row: the category opens a sheet with the others, and the tabs of the chosen category follow it.
+            Chips {
+                item(key = "category") {
+                    AssistChip({ choosing = true }, { Text(category.title, maxLines = 1) },
+                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp)) })
+                }
+                items(category.tabs, key = { it.rankingId }) { FilterChip(it.rankingId == state.rankingId, { onTab(it.rankingId) }, { Text(it.title, maxLines = 1) }) }
+            }
+            if (choosing) {
+                CategorySheet(categories, state.categoryId,
+                    onPick = { choosing = false; onCategory(it) }, onDismiss = { choosing = false })
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val charts = state.current
@@ -58,6 +72,24 @@ internal fun RankingsContent(
                 charts?.blocks != null -> PullToRefreshBox(state.refreshing, onRefresh) { Charts(charts.blocks, state.tab) }
                 charts?.errorCode != null -> ErrorState(charts.errorCode, onRetry)
                 else -> ListSkeleton()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun CategorySheet(categories: List<RankCategory>, selected: Int?, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismiss) {
+        Column(
+            Modifier.padding(horizontal = XmLayout.FormPadding).padding(bottom = XmLayout.PagePadding),
+            verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        ) {
+            Text(stringResource(R.string.discover_mode_categories), style = MaterialTheme.typography.titleMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                categories.forEach { category ->
+                    FilterChip(category.id == selected, { onPick(category.id) }, { Text(category.title, maxLines = 1) })
+                }
             }
         }
     }
