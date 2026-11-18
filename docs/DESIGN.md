@@ -72,13 +72,13 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Queue editing: drag to reorder, reverse, remove, clear, check the album for new episodes
 - [ ] Modes: sequential, list loop, single loop, shuffle without repeats
 - [ ] Speed (global and per album), master volume and mute, per-album volume, seek intervals
-- [ ] Intro/outro skip
+- [ ] Intro/outro skip, set per album (see Episode end)
 - [ ] Sleep timer: after a duration or at the end of the episode; then pause or exit; optionally keep downloading
 - [ ] Like, favorite, with counts
 - [ ] Comments: replies, likes, posting, deleting your own
 - [ ] Transcript (文稿)
 - [x] Bookmarks with notes
-- [x] Resume from local and cloud progress; optional upload with consent; start over above 95%
+- [x] Resume from local and cloud progress; optional upload with consent; the finished-episode rules below (the code still uses a 95% position until they are built)
 - [ ] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
 - [ ] System controls: notification, lock screen, Bluetooth, headset
@@ -218,6 +218,13 @@ Rules:
 - Queue sheet: reverse, drag handles, 回到当前.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
 - Sleep timer sheet: the same slider for 1–120 minutes in whole minutes, with 15 / 30 / 60 / 90 / 120 as snap points; 开始计时 starts it. Below the slider, 本集播完后 is a chip that acts at once; 关闭定时 and 开始计时 sit side by side, 关闭定时 enabled only while a timer is running. The countdown replaces the 定时关闭 label.
+- Episode end. One rule decides what happens when an episode finishes, and the same rule serves the sleep timer, the next episode and progress:
+  - An episode is finished when playback reaches its end, or reaches the outro skip point when the album has one. A position the user only seeks to never finishes it.
+  - When it finishes, in this order: 本集播完后 is on → pause, clear the timer, stay on the episode; otherwise there is a next episode → play it; otherwise → pause at the end.
+  - Progress of a finished episode is saved as finished, not as an end position. Opening it again starts from the beginning (after the intro skip), and so does tapping it in the album or queue.
+  - The play button on a finished episode plays the next episode when there is one, and replays the last one from the beginning.
+  - Intro/outro skip is set per album: the intro skip moves the start of an episode that begins at 0 and never a resumed position; the outro skip ends the episode early by the rule above. Both are off by default and live in the 更多 sheet.
+  - Nothing here replaces the user's own seeking: a bookmark or a drag to the end plays from that point, and the 95% position rule goes away once finished is a recorded state.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
 
 ### 听过 Library
