@@ -4,14 +4,9 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import android.widget.Toast
 import androidx.annotation.StringRes
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,8 +56,8 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.ButtonDefaults
@@ -80,9 +75,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -139,7 +132,6 @@ import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.formatDuration
-import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -479,8 +471,8 @@ private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onC
 }
 
 /**
- * The position as a bar with the time riding on it in a pill, as in Ximalaya. The played part ripples while audio
- * plays and settles flat when paused. Drag the pill or tap the bar to seek; the pill shows where a drag will land.
+ * The position as a bar with the time riding on it in a pill, as in Ximalaya. Drag the pill or tap the bar to seek;
+ * the pill shows where a drag will land.
  */
 @Composable
 private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
@@ -500,20 +492,6 @@ private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modi
     fun fractionAt(x: Float): Float {
         val travel = (barWidth - pillWidth).toFloat()
         return if (travel <= 0f) 0f else ((x - pillWidth / 2f) / travel).coerceIn(0f, 1f)
-    }
-
-    val waving = state.phase == PlaybackPhase.Playing && dragging == null
-    val amplitude = animateFloatAsState(if (waving) 1f else 0f, tween(SeekWaveSettleMillis), label = "waveAmplitude")
-    // The clock only runs while there is a wave to move.
-    val phase: State<Float> = if (waving || amplitude.value > 0f) {
-        rememberInfiniteTransition(label = "wave").animateFloat(
-            initialValue = 0f,
-            targetValue = TwoPi,
-            animationSpec = infiniteRepeatable(tween(SeekWavePeriodMillis, easing = LinearEasing)),
-            label = "wavePhase",
-        )
-    } else {
-        remember { mutableFloatStateOf(0f) }
     }
 
     val scheme = MaterialTheme.colorScheme
@@ -564,22 +542,7 @@ private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modi
             val stroke = SeekTrackHeight.toPx()
             val head = pillWidth / 2f + (size.width - pillWidth).coerceAtLeast(0f) * fraction
             drawLine(inactiveColor, Offset(head, y), Offset(size.width - stroke / 2f, y), stroke, StrokeCap.Round)
-            val amp = SeekWaveAmplitude.toPx() * amplitude.value
-            if (amp < 0.5f) {
-                drawLine(activeColor, Offset(stroke / 2f, y), Offset(head, y), stroke, StrokeCap.Round)
-            } else {
-                val k = TwoPi / SeekWaveLength.toPx()
-                val shift = phase.value
-                val step = 1.dp.toPx()
-                val wave = Path()
-                var x = stroke / 2f
-                wave.moveTo(x, y + amp * sin(k * x - shift))
-                while (x < head) {
-                    x = minOf(x + step, head)
-                    wave.lineTo(x, y + amp * sin(k * x - shift))
-                }
-                drawPath(wave, activeColor, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            }
+            drawLine(activeColor, Offset(stroke / 2f, y), Offset(head, y), stroke, StrokeCap.Round)
         }
         Text(
             time,
@@ -658,7 +621,7 @@ private fun ListeningTools(
     Row(modifier.fillMaxWidth()) {
         ToolButton(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.player_queue), onOpenQueue, enabled = hasQueue)
         ToolButton(
-            if (queue.shuffle) Icons.Outlined.Shuffle else Icons.AutoMirrored.Outlined.PlaylistPlay,
+            if (queue.shuffle) Icons.Rounded.Shuffle else Icons.AutoMirrored.Outlined.PlaylistPlay,
             stringResource(if (queue.shuffle) R.string.player_shuffle else R.string.player_mode_sequential),
             onToggleShuffle,
             highlighted = queue.shuffle,
@@ -905,11 +868,6 @@ private const val PausedCoverScale = 0.9f
 
 private val SeekBarHeight = 40.dp
 private val SeekTrackHeight = 3.dp
-private val SeekWaveAmplitude = 2.5.dp
-private val SeekWaveLength = 28.dp
-private const val SeekWavePeriodMillis = 1_600
-private const val SeekWaveSettleMillis = 300
-private val TwoPi = (2 * PI).toFloat()
 
 private val SeekButtonSize = 48.dp
 private val SeekGlyphSize = 36.dp

@@ -2,21 +2,19 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
@@ -27,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -45,8 +42,8 @@ private val SleepMarkers = listOf(15f, 30f, 60f, 90f, 120f)
 private const val SleepDefaultMinutes = 30f
 
 /**
- * Drag to any whole number of minutes from 1 to 120; a drag lands on a common length when it gets close. Start sets
- * the timer and closes the sheet. Episode end and turning the timer off act at once.
+ * Drag to any whole number of minutes from 1 to 120; a drag lands on a common length when it gets close. The bottom
+ * row pairs 关闭定时 (enabled only while a timer runs) with 开始计时. 本集播完后 is a toggle chip that acts at once.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,55 +76,47 @@ internal fun PlayerSleepSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentWindowInsets = { WindowInsets.safeDrawing },
     ) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = XmLayout.ItemGap)) {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    stringResource(R.string.player_sleep),
-                    Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    stringResource(R.string.player_sleep_minutes, minutes.toInt()),
-                    Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                SnapSlider(
-                    value = minutes,
-                    onValueChange = { minutes = it },
-                    onValueChangeFinished = {},
-                    label = stringResource(R.string.player_sleep),
-                    range = 1f..120f,
-                    step = 1f,
-                    markers = SleepMarkers,
-                    markerLabel = { it.toInt().toString() },
-                    magnet = 2f,
-                )
-                Button(
-                    onClick = { choose { onMinutes(minutes.toInt()) } },
-                    Modifier.fillMaxWidth(),
-                ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding, bottom = XmLayout.ItemGap),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                stringResource(R.string.player_sleep),
+                Modifier.semantics { heading() },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.player_sleep_minutes, minutes.toInt()),
+                Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            SnapSlider(
+                value = minutes,
+                onValueChange = { minutes = it },
+                onValueChangeFinished = {},
+                label = stringResource(R.string.player_sleep),
+                range = 1f..120f,
+                step = 1f,
+                markers = SleepMarkers,
+                markerLabel = { it.toInt().toString() },
+                magnet = 2f,
+            )
+            FilterChip(
+                selected = timer.atEpisodeEnd,
+                onClick = { choose(onEpisodeEnd) },
+                label = { Text(stringResource(R.string.player_sleep_episode_end)) },
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = { choose(onOff) }, Modifier.weight(1f), enabled = timer.active) {
+                    Text(stringResource(R.string.player_sleep_off))
+                }
+                Button(onClick = { choose { onMinutes(minutes.toInt()) } }, Modifier.weight(1f)) {
                     Text(stringResource(R.string.player_sleep_start))
                 }
             }
-            SleepOption(stringResource(R.string.player_sleep_episode_end), timer.atEpisodeEnd) { choose(onEpisodeEnd) }
-            if (timer.active) SleepOption(stringResource(R.string.player_sleep_off), selected = false, onClick = { choose(onOff) })
         }
-    }
-}
-
-@Composable
-private fun SleepOption(label: String, selected: Boolean, onClick: () -> Unit) {
-    ListItem(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        trailingContent = if (selected) ({ Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    ) {
-        Text(label)
     }
 }
