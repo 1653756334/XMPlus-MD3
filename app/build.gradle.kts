@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -28,7 +30,7 @@ android {
     // The release key lives outside the repository: keystore.properties on a developer machine, or the XM_* variables in CI.
     // Without either, assembleRelease still builds, but the APK is unsigned and cannot be installed.
     val keyFile = rootProject.file("keystore.properties")
-    val keyProperties = java.util.Properties().apply { if (keyFile.exists()) keyFile.inputStream().use(::load) }
+    val keyProperties = Properties().apply { if (keyFile.exists()) keyFile.inputStream().use { load(it) } }
     fun releaseKey(property: String, variable: String): String? = keyProperties.getProperty(property) ?: System.getenv(variable)
     signingConfigs {
         val store = releaseKey("storeFile", "XM_KEYSTORE_FILE")
