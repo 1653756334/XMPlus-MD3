@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 万 and 亿; there is no third unit, so its step is 0. -->
+    <integer name="count_step_small">10000</integer>
+    <integer name="count_step_medium">100000000</integer>
+    <integer name="count_step_large">0</integer>
+</resources>

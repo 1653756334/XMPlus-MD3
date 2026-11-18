@@ -48,6 +48,15 @@ class AccountRepository(
         }
     }
 
+    /**
+     * The primary account's login, for reads that differ by account. Null when there is none or its login has
+     * expired; callers then browse anonymously. The login never leaves the process.
+     */
+    suspend fun primaryCredentials(): Credentials? = mutex.withLock {
+        val current = snapshot ?: return@withLock null
+        current.records.firstOrNull { it.identity == current.primaryIdentity && it.identity !in expired }?.credentials
+    }
+
     suspend fun importCredentials(input: String, makePrimary: Boolean, recoveryIdentity: String? = null) =
         importCredentials(Credentials.parse(input), makePrimary, recoveryIdentity)
 

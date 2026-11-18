@@ -107,4 +107,15 @@
     <string name="login_error_challenge">The code expired. Request a new one.</string>
     <string name="captcha_title">Security check</string>
     <string name="captcha_failed">The security check could not load. Close it and try again, or use login information.</string>
+    <string name="discover_section_default">Recommended albums</string>
+    <string name="discover_ranking_default">Charts</string>
+    <string name="discover_ranking_whole">Top charts</string>
+    <string name="discover_empty">Nothing here yet</string>
+    <string name="error_network">Connection failed. Check your network and try again.</string>
+    <string name="error_rate_limited">Too many requests. Try again in a moment.</string>
+    <string name="error_generic">Couldn\'t load this. Try again.</string>
+    <string name="play_count">Plays</string>
+    <string name="count_unit_small">%1$sK</string>
+    <string name="count_unit_medium">%1$sM</string>
+    <string name="count_unit_large">%1$sB</string>
 </resources>

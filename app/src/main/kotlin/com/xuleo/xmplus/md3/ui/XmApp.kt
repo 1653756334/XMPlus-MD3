@@ -25,6 +25,7 @@ import androidx.navigation3.runtime.*
 import androidx.navigation3.ui.NavDisplay
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
+import com.xuleo.xmplus.md3.browse.DiscoverViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
 import com.xuleo.xmplus.md3.ui.screens.*
@@ -33,12 +34,18 @@ import com.xuleo.xmplus.md3.ui.screens.*
 fun XmApp() {
     val application = LocalContext.current.applicationContext as XmApplication
     val accounts: AccountViewModel = viewModel(factory = AccountViewModel.factory(application.accounts, application.login))
+    val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts)
+    XmAppContent(selected, { selected = it }, accounts, discover)
 }
 
 @Composable
-internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit, accounts: AccountViewModel? = null) {
+internal fun XmAppContent(
+    selected: Destination,
+    onSelect: (Destination) -> Unit,
+    accounts: AccountViewModel? = null,
+    discover: DiscoverViewModel? = null,
+) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
         AccountNavigator(stack) { removed ->
@@ -127,7 +134,7 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
-                                TabContent(tab, stateHolder, accounts,
+                                TabContent(tab, stateHolder, accounts, discover,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
@@ -171,11 +178,11 @@ internal fun XmAppContent(selected: Destination, onSelect: (Destination) -> Unit
 }
 
 @Composable
-private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?,
+private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
     onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
-            Destination.Discover -> DiscoverScreen()
+            Destination.Discover -> if (discover != null) DiscoverScreen(discover) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)

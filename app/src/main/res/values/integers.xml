@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Where a count switches to a shorter unit: K, M, B. -->
+    <integer name="count_step_small">1000</integer>
+    <integer name="count_step_medium">1000000</integer>
+    <integer name="count_step_large">1000000000</integer>
+</resources>

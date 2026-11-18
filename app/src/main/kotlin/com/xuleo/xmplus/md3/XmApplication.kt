@@ -7,6 +7,8 @@ import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
+import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
+import com.xuleo.xmplus.md3.core.protocol.XmlyHome
 import com.xuleo.xmplus.md3.core.protocol.XmlyHttp
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
 import com.xuleo.xmplus.md3.core.protocol.XmlyQuotaClient
@@ -24,6 +26,9 @@ class XmApplication : Application() {
     val http = XmlyHttp()
 
     private val quotaClient by lazy { XmlyQuotaClient(http) }
+
+    val home by lazy { XmlyHome(http) }
+    val browse by lazy { XmlyBrowse(http) }
 
     /** Claims and debits change the same balance, so they share one lock per account. */
     private val balanceLocks = BalanceLocks()
