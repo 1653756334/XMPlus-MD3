@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -126,6 +127,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackSelection
 import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
 import com.xuleo.xmplus.md3.core.media.SleepTimerState
+import com.xuleo.xmplus.md3.core.model.AlbumSkip
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
@@ -149,6 +151,7 @@ internal fun PlayerSheet(
     val queue by playback.queue.collectAsStateWithLifecycle()
     val speed by playback.speed.collectAsStateWithLifecycle()
     val sleep by playback.sleepTimer.collectAsStateWithLifecycle()
+    val skip by playback.skip.collectAsStateWithLifecycle()
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -184,6 +187,7 @@ internal fun PlayerSheet(
         var showBookmarks by remember(bookmarkEpisode) { mutableStateOf<BookmarkEpisode?>(null) }
         var showSpeed by remember { mutableStateOf(false) }
         var showSleep by remember { mutableStateOf(false) }
+    var showSkip by remember { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -216,6 +220,7 @@ internal fun PlayerSheet(
                                 queue = queue,
                                 speed = speed,
                                 sleep = sleep,
+                                skip = skip,
                                 playback = playback,
                                 onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
                                 onOpenQueue = { showQueue = true },
@@ -236,6 +241,8 @@ internal fun PlayerSheet(
                 onDismiss = { showActions = false },
                 onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
                 onOpenAnchor = { closeThen { onOpenAnchor(episode.album.id, episode.album.anchorUid) } },
+                skip = skip,
+                onOpenSkip = { showSkip = true },
                 canGoToStart = state.canSeek && state.positionMs > 0,
                 onGoToStart = {
                     // Playback may have changed while the sheet was closing.
@@ -248,6 +255,15 @@ internal fun PlayerSheet(
         }
         if (bookmarkEpisode != null && showBookmarks == bookmarkEpisode) {
             PlayerBookmarksSheet(playback, bookmarkEpisode, state.canSeek, onDismiss = { showBookmarks = null })
+        }
+        if (showSkip && episode != null) {
+            PlayerSkipSheet(
+                skip = skip,
+                durationMs = state.durationMs,
+                loadSuggestion = playback::skipRecommendation,
+                onSkip = { playback.setSkip(episode.album.id, it) },
+                onDismiss = { showSkip = false },
+            )
         }
         if (showSpeed && episode != null) {
             PlayerSpeedSheet(speed, onSpeed = playback::setSpeed, onDismiss = { showSpeed = false })
@@ -397,6 +413,7 @@ private fun PlayerControls(
     queue: PlaybackQueueState,
     speed: Float,
     sleep: SleepTimerState,
+    skip: AlbumSkip,
     playback: PlaybackController,
     onOpenAlbum: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -409,7 +426,7 @@ private fun PlayerControls(
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
         EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, Modifier.padding(top = 4.dp))
-        SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
+        SeekBar(state, skip, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
         ListeningTools(
@@ -485,7 +502,7 @@ private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onC
  * the pill shows where a drag will land.
  */
 @Composable
-private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+private fun SeekBar(state: PlaybackState, skip: AlbumSkip, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
     val trackId = state.selection?.track?.id
     val enabled = state.canSeek
     val duration = state.durationMs.coerceAtLeast(0L)
@@ -493,6 +510,10 @@ private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modi
     var barWidth by remember { mutableIntStateOf(0) }
     var pillWidth by remember { mutableIntStateOf(0) }
     val played = if (duration > 0) state.positionMs.toFloat() / duration else 0f
+    // The ends that will be skipped, as shares of the bar; none when they would swallow the episode.
+    val skipping = duration > 0 && (skip.introSeconds + skip.outroSeconds) * 1_000L < duration
+    val introShare = if (skipping) skip.introSeconds * 1_000f / duration else 0f
+    val outroShare = if (skipping) skip.outroSeconds * 1_000f / duration else 0f
     val fraction = (dragging ?: played).coerceIn(0f, 1f)
     val shownMs = dragging?.let { (it * duration).toLong() } ?: state.positionMs
     val time = "${formatDuration(shownMs / 1000.0)} / ${formatDuration(duration / 1000.0)}"
@@ -507,6 +528,7 @@ private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modi
     val scheme = MaterialTheme.colorScheme
     val activeColor = if (enabled) scheme.primary else scheme.outline
     val inactiveColor = scheme.outlineVariant
+    val skippedColor = scheme.tertiary.copy(alpha = 0.6f)
     val pillColor = if (enabled) scheme.primary else scheme.surfaceContainerHighest
     val pillTextColor = if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
     val label = stringResource(R.string.player_progress)
@@ -553,6 +575,9 @@ private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modi
             val head = pillWidth / 2f + (size.width - pillWidth).coerceAtLeast(0f) * fraction
             drawLine(inactiveColor, Offset(head, y), Offset(size.width - stroke / 2f, y), stroke, StrokeCap.Round)
             drawLine(activeColor, Offset(stroke / 2f, y), Offset(head, y), stroke, StrokeCap.Round)
+            fun at(share: Float) = pillWidth / 2f + (size.width - pillWidth).coerceAtLeast(0f) * share
+            if (introShare > 0f) drawLine(skippedColor, Offset(stroke / 2f, y), Offset(at(introShare), y), stroke, StrokeCap.Round)
+            if (outroShare > 0f) drawLine(skippedColor, Offset(at(1f - outroShare), y), Offset(size.width - stroke / 2f, y), stroke, StrokeCap.Round)
         }
         Text(
             time,
@@ -692,6 +717,8 @@ private fun PlayerActionsSheet(
     onDismiss: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenAnchor: () -> Unit,
+    skip: AlbumSkip,
+    onOpenSkip: () -> Unit,
     canGoToStart: Boolean,
     onGoToStart: () -> Unit,
 ) {
@@ -747,7 +774,28 @@ private fun PlayerActionsSheet(
                     select(onGoToStart)
                 }
             }
-        }
+            val colors = MaterialTheme.colorScheme
+            Row(
+                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
+                    .clickable(role = Role.Button) { select(onOpenSkip) }
+                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Box(Modifier.size(40.dp).background(colors.surfaceContainerHighest, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.ContentCut, contentDescription = null)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.player_skip_title), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (skip.isOff) stringResource(R.string.player_skip_off)
+                        else stringResource(R.string.player_skip_value, skip.introSeconds, skip.outroSeconds),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (skip.isOff) colors.onSurfaceVariant else colors.primary,
+                    )
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+            }        }
     }
 }
 

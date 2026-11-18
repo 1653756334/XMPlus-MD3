@@ -213,7 +213,7 @@ Rules:
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
   - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the configured interval (default 15 s each way).
   - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 for now; 列表循环 and 单集循环 join when they are built.
-- 更多 sheet: view album, view anchor, go to start. 跳过片头片尾 (see Intro and outro skip) and volume join it in Phase 6.
+- 更多 sheet: view album, view anchor, go to start, and 跳过片头片尾 (see Intro and outro skip). Volume joins it in Phase 6.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
 - Queue sheet: reverse, drag handles, 回到当前.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
