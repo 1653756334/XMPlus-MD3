@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -116,8 +118,12 @@ internal fun DiscoverContent(
     ) {
         Box(Modifier.collapsing(chrome)) {
             Column(Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) {
-                SearchEntry(hotWords, actions.onSearch)
-                ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.fillMaxWidth().padding(top = 4.dp))            }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.weight(1f))
+                    IconButton(actions.onSearch, Modifier.padding(end = 4.dp)) {
+                        Icon(Icons.Filled.Search, stringResource(R.string.search_submit))
+                    }
+                }            }
         }
         Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
             holder.SaveableStateProvider(current.name) {

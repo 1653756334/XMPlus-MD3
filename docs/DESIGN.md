@@ -191,7 +191,7 @@ Rules:
 
 ### 发现 Discover
 
-- Search bar whose placeholder rotates through hot words; scrollable channel tabs.
+- One header row of mode headings (推荐 / 分类 / 排行) with a search icon at the end; scrollable channel tabs below. The header collapses on scroll.
 - Featured carousel, then rows of album covers.
 - Ranking cards with the top 3 numbers highlighted; chip grid of categories. No banners.
 
