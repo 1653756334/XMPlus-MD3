@@ -49,19 +49,26 @@ class PlaybackController(
     private val ledger: UsageLedger,
     private val resolver: XmlyPlayback,
     private val catalogue: XmlyAlbum,
+    private val progress: PlaybackProgressStore,
     private val awaitLedger: suspend () -> Unit,
 ) {
-    private data class OpenSource(
+    private class OpenSource(
         val mediaId: String,
         val authorization: PlaybackAuthorization,
         var refreshes: Int,
-    )
+        var startPositionMs: Long,
+    ) {
+        var observation: PlaybackProgress? = null
+        var checkpoint: PlaybackProgress? = null
+        var checkpointAt = SystemClock.elapsedRealtime()
+    }
 
     private data class QueueChoice(
         val queue: AlbumPlaybackQueue,
         val target: Track?,
         val keepLoaded: Boolean = false,
         val enableShuffle: Boolean = false,
+        val positionMs: Long? = null,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -85,6 +92,7 @@ class PlaybackController(
     private var sleepJob: Job? = null
     private var sampling: Job? = null
     private var opened: OpenSource? = null
+    private var restoreProgressOnRetry = false
     private var admitted = false
     private var wasPlaying = false
     private var accountChanges = 0
@@ -94,9 +102,15 @@ class PlaybackController(
     private val shuffleBag = mutableListOf<String>()
 
     private val listener = object : Player.Listener {
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+            opened?.takeIf { it.observation == null && it.mediaId == newPosition.mediaItem?.mediaId }
+                ?.startPositionMs = newPosition.positionMs
+        }
+
         override fun onEvents(player: Player, events: Player.Events) {
             if (!isCurrent(player)) return
-            recordPlaying(player)
+            recordPlaying(player, events.contains(Player.EVENT_POSITION_DISCONTINUITY))
             val request = revision
             val error = player.playerError
             when {
@@ -123,7 +137,13 @@ class PlaybackController(
             var ticks = 0
             while (true) {
                 delay(250)
-                if (isCurrent(player)) publishPlayer(player)
+                if (isCurrent(player)) {
+                    if (admitted && player.isPlaying) opened?.let { source ->
+                        observeProgress(player, source)
+                        checkpointProgress(source)
+                    }
+                    publishPlayer(player)
+                }
                 if (++ticks % 4 == 0) sample()
             }
         }
@@ -140,7 +160,8 @@ class PlaybackController(
         clock?.cancel()
         val current = mutableState.value
         if (current.phase != PlaybackPhase.Failed && current.selection != null) {
-            mutableState.value = current.copy(phase = PlaybackPhase.Paused, wantsToPlay = false, positionMs = position, canSeek = false)
+            val phase = if (current.phase == PlaybackPhase.Ended) PlaybackPhase.Ended else PlaybackPhase.Paused
+            mutableState.value = current.copy(phase = phase, wantsToPlay = false, positionMs = position, canSeek = false)
         }
         completeCommand(request) { settleCurrent(keepUnsettled = true) }
     }
@@ -192,7 +213,7 @@ class PlaybackController(
             val target = if (forward) shuffledNext(current.id, snapshot.items) else shuffledPrevious(snapshot.items)
             if (target != null) {
                 cancelQueueWork()
-                applyQueueChoice(QueueChoice(snapshot, target))
+                applyQueueChoice(QueueChoice(snapshot, target, positionMs = 0))
             }
             return
         }
@@ -203,7 +224,7 @@ class PlaybackController(
         }
         if (!forward && current.officialPosition == 1) {
             cancelQueueWork()
-            applyQueueChoice(QueueChoice(snapshot, current))
+            applyQueueChoice(QueueChoice(snapshot, current, positionMs = 0))
             return
         }
         readQueue { credentials ->
@@ -221,7 +242,7 @@ class PlaybackController(
                 window = window.merge(page, readAlbumPage(window.detail, page, credentials))
                 target = window.neighbor(current.id, forward)
             }
-            QueueChoice(window, if (forward) target else target ?: current)
+            if (!forward && target == null) QueueChoice(window, current, positionMs = 0) else QueueChoice(window, target)
         }
     }
 
@@ -309,7 +330,7 @@ class PlaybackController(
         if (choice.keepLoaded && loaded != null) {
             if (!mutableState.value.wantsToPlay) resume()
         } else {
-            open(PlaybackSelection(target, album), position = 0)
+            open(PlaybackSelection(target, album), position = choice.positionMs)
         }
     }
 
@@ -425,7 +446,12 @@ class PlaybackController(
         val player = engine.value
         val source = opened
         if (player == null || source == null || player.playbackState == Player.STATE_IDLE || current.phase == PlaybackPhase.Failed) {
-            open(selection, current.positionMs)
+            val position = when {
+                current.phase == PlaybackPhase.Ended -> 0L
+                restoreProgressOnRetry -> null
+                else -> current.positionMs
+            }
+            open(selection, position)
             return
         }
         val request = supersede()
@@ -435,7 +461,11 @@ class PlaybackController(
             settleCurrent(keepUnsettled = true)
             startMeter(source.authorization)
             currentCoroutineContext().ensureActive()
-            if (current.phase == PlaybackPhase.Ended) player.seekTo(0)
+            if (current.phase == PlaybackPhase.Ended) {
+                source.observation = null
+                source.startPositionMs = 0
+                player.seekTo(0)
+            }
             admitted = true
             mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering)
             player.play()
@@ -544,12 +574,13 @@ class PlaybackController(
             }
         }
 
-    private fun open(selection: PlaybackSelection, position: Long, refreshing: OpenSource? = null) {
+    private fun open(selection: PlaybackSelection, position: Long?, refreshing: OpenSource? = null) {
         val request = supersede()
+        restoreProgressOnRetry = position == null
         clearSource()
         mutableState.value = PlaybackState(
             selection, PlaybackPhase.Preparing, wantsToPlay = true,
-            positionMs = position, durationMs = (selection.track.durationSeconds * 1000).toLong().coerceAtLeast(0),
+            positionMs = position ?: 0, durationMs = (selection.track.durationSeconds * 1000).toLong().coerceAtLeast(0),
         )
         completeCommand(request) {
             val player = withTimeoutOrNull(5_000) { engine.filterNotNull().first() }
@@ -564,7 +595,12 @@ class PlaybackController(
             if (resolved.track.id != selection.track.id ||
                 (resolved.track.albumId.isNotBlank() && resolved.track.albumId != selection.album.id)
             ) throw XmlyException("id_mismatch", definitive = true)
+            val duration = mutableState.value.durationMs
+            val start = position ?: progress.position(resolved.accountIdentity, resolved.track.id)?.let {
+                if (duration > 0) it.coerceAtMost(duration) else it
+            } ?: 0L
             verifyAccount(resolved)
+            currentCoroutineContext().ensureActive()
             startMeter(resolved)
             currentCoroutineContext().ensureActive()
 
@@ -576,10 +612,11 @@ class PlaybackController(
             val mediaId = request.toString()
             val item = MediaItem.Builder().setMediaId(mediaId)
                 .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
-            opened = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0)
-            player.setMediaItem(item, position)
+            opened = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
+            player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
-            mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering)
+            restoreProgressOnRetry = false
+            mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Buffering, positionMs = start)
             admitted = true
             player.prepare()
             player.play()
@@ -621,6 +658,14 @@ class PlaybackController(
         admitted = false
         wasPlaying = false
         ledger.recordPlaybackState(playing = false, buffering = false)
+        engine.value?.takeIf(::isCurrent)?.let { player ->
+            opened?.takeIf { it.observation != null }?.let { source ->
+                if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_ENDED) {
+                    observeProgress(player, source)
+                }
+                checkpointProgress(source, force = true)
+            }
+        }
         engine.value?.pause()
     }
 
@@ -635,12 +680,45 @@ class PlaybackController(
     private fun isCurrent(player: Player) = player === engine.value &&
         opened?.let { it.mediaId == player.currentMediaItem?.mediaId } == true
 
-    private fun recordPlaying(player: Player) {
+    private fun recordPlaying(player: Player, positionChanged: Boolean = false) {
         val playing = admitted && player.isPlaying
-        if (playing) opened?.refreshes = 0
         ledger.recordPlaybackState(playing, player.playbackState == Player.STATE_BUFFERING)
         if (wasPlaying && !playing) sample()
+        opened?.let { source ->
+            if (playing) source.refreshes = 0
+            // Opening or seeking a source that never played must not overwrite a saved position.
+            if (playing || (source.observation != null && (wasPlaying || positionChanged || player.playbackState == Player.STATE_ENDED))) {
+                observeProgress(player, source)
+                checkpointProgress(source, force = !playing)
+            }
+        }
         wasPlaying = playing
+    }
+
+    private fun observeProgress(player: Player, source: OpenSource) {
+        if (player.playerError != null || player.playbackState == Player.STATE_IDLE) return
+        val position = player.currentPosition.takeIf { it >= 0 } ?: return
+        val duration = player.duration
+        val bounded = if (duration > 0) position.coerceAtMost(duration) else position
+        // Media3 can clamp a start at the exact end to just before it and briefly report isPlaying.
+        if (source.observation == null && duration > 0 && maxOf(bounded, source.startPositionMs) >= duration) return
+        if (source.observation?.positionMs != bounded) {
+            source.observation = PlaybackProgress(bounded, System.currentTimeMillis())
+        }
+    }
+
+    private fun checkpointProgress(source: OpenSource, force: Boolean = false) {
+        val observation = source.observation ?: return
+        if (source.checkpoint == observation) return
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - source.checkpointAt < ProgressIntervalMs) return
+        source.checkpoint = observation
+        source.checkpointAt = now
+        // Capture the authorizing identity before changing the selected source. Writes outlive a cancelled command.
+        scope.launch {
+            val saved = progress.save(source.authorization.accountIdentity, source.authorization.track.id, observation)
+            if (!saved && source.checkpoint == observation) source.checkpoint = null
+        }
     }
 
     private fun sample() {
@@ -662,9 +740,11 @@ class PlaybackController(
 
     private fun finishEpisode() {
         val advanceIntent = queueIntent
-        val sleepAtEnd = mutableSleep.value.atEpisodeEnd
+        // Restoring a position at the exact end can report ENDED before any audio plays.
+        val played = opened?.observation != null
+        val sleepAtEnd = played && mutableSleep.value.atEpisodeEnd
         if (sleepAtEnd) cancelSleepTimer()
-        val shouldAdvance = queueWork == null && !sleepAtEnd
+        val shouldAdvance = played && queueWork == null && !sleepAtEnd
         val request = supersede()
         val current = mutableState.value
         mutableState.value = current.copy(
@@ -754,6 +834,7 @@ class PlaybackController(
     private companion object {
         const val MaxAuthorizationRefreshes = 3
         const val MaxShuffleHistory = 5_000
+        const val ProgressIntervalMs = 5_000L
         val AccountSettlementErrors = setOf("login_required", "login_expired", "insufficient_quota")
     }
 }

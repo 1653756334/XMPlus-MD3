@@ -9,6 +9,7 @@ import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
+import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
@@ -59,7 +60,7 @@ class XmApplication : Application(), PlaybackOwner {
         }
     }
     override val playback by lazy {
-        PlaybackController(accounts, usage, XmlyPlayback(http), album) { usageReady.await() }
+        PlaybackController(accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this)) { usageReady.await() }
     }
 
     /** One login session per process: it owns the SMS cooldowns and the pending challenge. */
