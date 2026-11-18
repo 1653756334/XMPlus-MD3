@@ -41,17 +41,34 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/** The score, the rating and recommendation counts, and the three shares as bars. Missing parts are left out. */
+/**
+ * The score, the rating and recommendation counts, and the three shares as bars. Missing parts are left out. When the
+ * server sends no album score, the recommendation share is the headline, as in XMPlus; with nothing at all but a review
+ * count, that count stands alone.
+ */
 @Composable
 fun ScoreSummary(score: AlbumScore, modifier: Modifier = Modifier) {
+    val headline = score.albumScore?.let { String.format(Locale.ROOT, "%.1f", it) }
+        ?: score.recommendationScore?.let(::percent)
+    val ratios = listOf(
+        score.recommended to R.string.album_ratio_recommend,
+        score.neutral to R.string.album_ratio_neutral,
+        score.notRecommended to R.string.album_ratio_not,
+    ).filter { it.first != null }
+    val summary = listOfNotNull(
+        score.recommendation.ifEmpty { null },
+        score.recommendedCount?.let { stringResource(R.string.album_recommend_count, it) },
+    ).joinToString(" · ")
+    val details = headline != null || score.ratingCount != null || summary.isNotEmpty()
+    if (!details && ratios.isEmpty() && score.commentCount == null) return
     Column(
         modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-            score.albumScore?.let {
+            headline?.let {
                 Text(
-                    String.format(Locale.ROOT, "%.1f", it), style = MaterialTheme.typography.displaySmall,
+                    it, style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -60,27 +77,22 @@ fun ScoreSummary(score: AlbumScore, modifier: Modifier = Modifier) {
                     Text(stringResource(R.string.album_rating_count, it), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                val summary = listOfNotNull(
-                    score.recommendation.ifEmpty { null },
-                    score.recommendedCount?.let { stringResource(R.string.album_recommend_count, it) },
-                ).joinToString(" · ")
                 if (summary.isNotEmpty()) {
                     Text(summary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                score.recommendationScore?.let {
+                if (score.albumScore != null) score.recommendationScore?.let {
                     Text(stringResource(R.string.album_recommend_score, percent(it)), style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!details) score.commentCount?.let {
+                    Text(stringResource(R.string.album_recommend_count, it), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        listOf(
-            score.recommended to R.string.album_ratio_recommend,
-            score.neutral to R.string.album_ratio_neutral,
-            score.notRecommended to R.string.album_ratio_not,
-        ).forEach { (share, label) -> share?.let { RatioBar(stringResource(label), it) } }
+        ratios.forEach { (share, label) -> share?.let { RatioBar(stringResource(label), it) } }
     }
 }
-
 @Composable
 private fun RatioBar(label: String, share: Double) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
