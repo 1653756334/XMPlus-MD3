@@ -7,6 +7,7 @@ internal enum class Host(val origin: String) {
     Mobile("https://mobile.ximalaya.com"),
     Welfare("https://m.ximalaya.com"),
     PaidMedia("https://mpaywsa.ximalaya.com"),
+    History("https://mobwsa.ximalaya.com"),
     /** The website's JSON API: categories, rankings, search, public profiles. */
     Web("https://www.ximalaya.com"),
     /** The desktop site's API: category filters, ranking tabs, locating a track in its album. */
@@ -71,6 +72,7 @@ internal object Endpoints {
     val HotWords = read(Host.Search, "/hotWordBillboard/list/2.0")
 
     val TrackPublicInfo = read(Host.Mobile, "/mobile/track/{trackId}")
+    val HistoryQuery = read(Host.History, "/nyx/v1/history/query/android", Login.Required)
     val TrackAccountInfo = Endpoint(
         Host.Mobile, "POST", "/fmobile-track/fmobile/track/v2/baseInfo",
         idempotent = true, playbackTicket = true,

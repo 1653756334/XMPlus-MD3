@@ -18,6 +18,7 @@ import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.PlaybackAuthorization
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
+import com.xuleo.xmplus.md3.core.protocol.XmlyHistory
 import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,7 @@ class PlaybackController(
     private val resolver: XmlyPlayback,
     private val catalogue: XmlyAlbum,
     private val progress: PlaybackProgressStore,
+    private val history: XmlyHistory,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -92,6 +94,8 @@ class PlaybackController(
     private var sleepJob: Job? = null
     private var sampling: Job? = null
     private var opened: OpenSource? = null
+    private var cloudRestore: Job? = null
+    private var cloudIntent = 0L
     private var restoreProgressOnRetry = false
     private var admitted = false
     private var wasPlaying = false
@@ -104,8 +108,10 @@ class PlaybackController(
     private val listener = object : Player.Listener {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
             if (reason != Player.DISCONTINUITY_REASON_SEEK) return
-            opened?.takeIf { it.observation == null && it.mediaId == newPosition.mediaItem?.mediaId }
-                ?.startPositionMs = newPosition.positionMs
+            val source = opened?.takeIf { it.mediaId == newPosition.mediaItem?.mediaId } ?: return
+            // Seeks from system controls can arrive here without going through seekTo().
+            cancelCloudRestore()
+            if (source.observation == null) source.startPositionMs = newPosition.positionMs
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
@@ -170,6 +176,7 @@ class PlaybackController(
         if (accountChanges > 0) return
         val current = mutableState.value
         val loaded = current.selection?.takeIf { it.track.id == track.id && it.album.id == detail.album.id } != null
+        if (!loaded) cancelCloudRestore()
         // With a failed queue, tapping the loaded episode rebuilds the queue and keeps it playing.
         if (loaded && mutableQueue.value.errorCode == null) {
             cancelQueueWork()
@@ -209,6 +216,7 @@ class PlaybackController(
         if (accountChanges > 0 || queueWork != null) return
         val snapshot = albumQueue ?: return
         val current = mutableState.value.selection?.track ?: return
+        cancelCloudRestore()
         if (shuffleOn) {
             val target = if (forward) shuffledNext(current.id, snapshot.items) else shuffledPrevious(snapshot.items)
             if (target != null) {
@@ -486,6 +494,7 @@ class PlaybackController(
     fun seekTo(positionMs: Long) {
         val current = mutableState.value
         if (current.canSeek) {
+            cancelCloudRestore()
             if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
             engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
         }
@@ -576,6 +585,7 @@ class PlaybackController(
 
     private fun open(selection: PlaybackSelection, position: Long?, refreshing: OpenSource? = null) {
         val request = supersede()
+        val restoreIntent = cloudIntent
         restoreProgressOnRetry = position == null
         clearSource()
         mutableState.value = PlaybackState(
@@ -596,7 +606,8 @@ class PlaybackController(
                 (resolved.track.albumId.isNotBlank() && resolved.track.albumId != selection.album.id)
             ) throw XmlyException("id_mismatch", definitive = true)
             val duration = mutableState.value.durationMs
-            val start = position ?: progress.position(resolved.accountIdentity, resolved.track.id)?.let {
+            val local = if (position == null) progress.latest(resolved.accountIdentity, resolved.track.id) else null
+            val start = position ?: local?.positionMs?.let {
                 if (duration > 0) it.coerceAtMost(duration) else it
             } ?: 0L
             verifyAccount(resolved)
@@ -612,7 +623,8 @@ class PlaybackController(
             val mediaId = request.toString()
             val item = MediaItem.Builder().setMediaId(mediaId)
                 .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
-            opened = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
+            val source = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
+            opened = source
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
             restoreProgressOnRetry = false
@@ -622,7 +634,73 @@ class PlaybackController(
             player.play()
             recordPlaying(player)
             publishPlayer(player)
+            if (position == null && credentials != null && cloudIntent == restoreIntent) {
+                restoreCloudProgress(player, source, credentials, selection.album.id, local)
+            }
         }
+    }
+
+    private fun restoreCloudProgress(
+        player: ExoPlayer,
+        source: OpenSource,
+        credentials: Credentials,
+        albumId: String,
+        local: PlaybackProgress?,
+    ) {
+        // The local source is already admitted. History never holds the playback or settlement lock.
+        val request = revision
+        cloudRestore = scope.launch(Dispatchers.Main) {
+            val task = currentCoroutineContext()[Job]
+            fun active() = cloudRestore === task && request == revision && opened === source && isCurrent(player) &&
+                admitted && player.playbackState != Player.STATE_ENDED && player.playerError == null
+            try {
+                if (!active()) return@launch
+                val seekDeadline = SystemClock.elapsedRealtime() + CloudStartupWindowMs
+                val cloud = withContext(Dispatchers.Default) { history.progress(credentials, albumId, source.authorization.track.id) }
+                    ?: return@launch
+                if (local != null && cloud.observedAtMs <= local.observedAtMs) return@launch
+
+                // Give a fast result time to meet the timeline, without starting another wait after a slow query.
+                if (!state.value.canSeek) {
+                    val seekable = withTimeoutOrNull(seekDeadline - SystemClock.elapsedRealtime()) {
+                        state.first { it.canSeek || it.phase == PlaybackPhase.Ended || it.phase == PlaybackPhase.Failed }.canSeek
+                    }
+                    if (seekable != true) return@launch
+                }
+                if (!active()) return@launch
+                verifyAccount(source.authorization)
+                currentCoroutineContext().ensureActive()
+                if (!active() || !player.isCurrentMediaItemSeekable) return@launch
+                val duration = player.duration.takeIf { it > 0 } ?: mutableState.value.durationMs
+                if (duration <= 0) return@launch
+                // Floor of 95% in milliseconds, without overflowing or rounding a position at exactly 95%.
+                val threshold = duration - (duration / 20 + if (duration % 20 == 0L) 0 else 1)
+                val target = if (cloud.positionMs > threshold) 0L else cloud.positionMs
+                if (player.currentPosition == target) return@launch
+
+                // Only playback observed after the seek may replace the saved progress.
+                cloudRestore = null
+                source.observation = null
+                source.startPositionMs = target
+                player.seekTo(target)
+                publishPlayer(player)
+            } catch (_: XmlyException) {
+                // History is best effort. Keep the already running local position on error.
+            } finally {
+                if (cloudRestore === task) {
+                    cloudRestore = null
+                    if (opened === source && isCurrent(player) && !player.isPlaying) checkpointProgress(source, force = true)
+                }
+            }
+        }
+    }
+
+    private fun cancelCloudRestore() {
+        // New intents can supersede a restore even while its local source is still preparing.
+        cloudIntent++
+        val pending = cloudRestore ?: return
+        cloudRestore = null
+        pending.cancel()
     }
 
     private suspend fun verifyAccount(source: PlaybackAuthorization) {
@@ -658,6 +736,7 @@ class PlaybackController(
         admitted = false
         wasPlaying = false
         ledger.recordPlaybackState(playing = false, buffering = false)
+        cancelCloudRestore()
         engine.value?.takeIf(::isCurrent)?.let { player ->
             opened?.takeIf { it.observation != null }?.let { source ->
                 if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_ENDED) {
@@ -708,6 +787,7 @@ class PlaybackController(
     }
 
     private fun checkpointProgress(source: OpenSource, force: Boolean = false) {
+        if (source === opened && cloudRestore != null) return
         val observation = source.observation ?: return
         if (source.checkpoint == observation) return
         val now = SystemClock.elapsedRealtime()
@@ -835,6 +915,7 @@ class PlaybackController(
         const val MaxAuthorizationRefreshes = 3
         const val MaxShuffleHistory = 5_000
         const val ProgressIntervalMs = 5_000L
+        const val CloudStartupWindowMs = 2_000L
         val AccountSettlementErrors = setOf("login_required", "login_expired", "insufficient_quota")
     }
 }

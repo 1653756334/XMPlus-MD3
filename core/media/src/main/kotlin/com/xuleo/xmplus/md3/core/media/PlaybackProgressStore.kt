@@ -20,12 +20,15 @@ class PlaybackProgressStore(context: Context) {
     private val access = Mutex()
     private val helper by lazy { Database(appContext) }
 
-    internal suspend fun position(account: String, track: String): Long? = onDisk(null) {
+    internal suspend fun latest(account: String, track: String): PlaybackProgress? = onDisk(null) {
         helper.readableDatabase.rawQuery(
-            "SELECT position_ms FROM progress WHERE account = ? AND track = ?",
+            "SELECT position_ms, observed_at_ms FROM progress WHERE account = ? AND track = ?",
             arrayOf(account, track),
         ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getLong(0).takeIf { it in 0..MaxPositionMs } else null
+            if (!cursor.moveToFirst()) return@use null
+            val position = cursor.getLong(0)
+            val observedAt = cursor.getLong(1)
+            if (position in 0..MaxPositionMs && observedAt >= 0) PlaybackProgress(position, observedAt) else null
         }
     }
 
