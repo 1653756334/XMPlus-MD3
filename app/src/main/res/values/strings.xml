@@ -12,6 +12,7 @@
     <string name="player_minimize">Minimize player</string>
     <string name="player_seek_back">Back %1$d seconds</string>
     <string name="player_seek_forward">Forward %1$d seconds</string>
+    <string name="player_skip_interval">%1$d s</string>
     <string name="player_more">More</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>

@@ -10,6 +10,7 @@
     <string name="player_minimize">收起播放器</string>
     <string name="player_seek_back">后退 %1$d 秒</string>
     <string name="player_seek_forward">前进 %1$d 秒</string>
+    <string name="player_skip_interval">%1$d 秒</string>
     <string name="player_more">更多</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>

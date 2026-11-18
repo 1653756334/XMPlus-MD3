@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +29,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -36,9 +39,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -62,18 +64,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackPhase
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
@@ -123,6 +127,7 @@ internal fun PlayerSheet(
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
         val episode = state.selection
+        var showActions by remember(episode?.album?.id, episode?.track?.id) { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -135,11 +140,20 @@ internal fun PlayerSheet(
                 ),
             ) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-                Row(Modifier.fillMaxWidth().height(DetailTopBarHeight), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { closeThen() }, modifier = Modifier.padding(start = 4.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { closeThen() }) {
                         Icon(
                             Icons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp),
                         )
+                    }
+                    if (episode != null) {
+                        IconButton(onClick = { showActions = true }) {
+                            Icon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more))
+                        }
                     }
                 }
                 if (episode == null) {
@@ -152,13 +166,23 @@ internal fun PlayerSheet(
                             episode = episode,
                             state = state,
                             playback = playback,
-                            onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
-                            onOpenAnchor = { closeThen { onOpenAnchor(episode.album.id, episode.album.anchorUid) } },
                             onAccounts = { closeThen(onAccounts) },
                         )
                     }
                 }
             }
+        }
+        if (showActions && episode != null) {
+            PlayerActionsSheet(
+                onDismiss = { showActions = false },
+                onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
+                onOpenAnchor = { closeThen { onOpenAnchor(episode.album.id, episode.album.anchorUid) } },
+                canGoToStart = state.canSeek && state.positionMs > 0,
+                onGoToStart = {
+                    // Playback may have changed while the sheet was closing.
+                    if (playback.state.value.selection == episode) playback.seekTo(0)
+                },
+            )
         }
     }
 }
@@ -202,37 +226,30 @@ private fun PlayerControls(
     episode: PlaybackSelection,
     state: PlaybackState,
     playback: PlaybackController,
-    onOpenAlbum: () -> Unit,
-    onOpenAnchor: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                episode.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+            if (episode.subtitle.isNotBlank() && episode.subtitle != episode.title) {
                 Text(
-                    episode.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    episode.subtitle, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                if (episode.subtitle.isNotBlank() && episode.subtitle != episode.title) {
-                    Text(
-                        episode.subtitle, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            PlayerMenu(onOpenAlbum, onOpenAnchor, canGoToStart = state.canSeek && state.positionMs > 0) {
-                playback.seekTo(0)
             }
         }
         PositionControl(state, playback::seekTo)
         Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 264.dp).fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SkipButton(forward = false, enabled = state.canSeek, onClick = playback::skipBack)
+            SkipButton(forward = false, enabled = state.canSeek, modifier = Modifier.weight(1f), onClick = playback::skipBack)
             MainPlaybackButton(state, playback::toggle)
-            SkipButton(forward = true, enabled = state.canSeek, onClick = playback::skipForward)
+            SkipButton(forward = true, enabled = state.canSeek, modifier = Modifier.weight(1f), onClick = playback::skipForward)
         }
         state.errorCode?.let { error ->
             Column(
@@ -247,55 +264,114 @@ private fun PlayerControls(
 }
 
 @Composable
-private fun PlayerMenu(
+private fun PlayerActionsSheet(
+    onDismiss: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenAnchor: () -> Unit,
     canGoToStart: Boolean,
     onGoToStart: () -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more))
+    val sheet = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
+
+    fun select(action: () -> Unit) {
+        if (closing || sheet.targetValue == SheetValue.Hidden) return
+        closing = true
+        scope.launch {
+            try {
+                sheet.hide()
+                if (!sheet.isVisible) {
+                    onDismiss()
+                    action()
+                }
+            } finally {
+                closing = false
+            }
         }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.player_view_album)) },
-                leadingIcon = { Icon(Icons.Outlined.Album, contentDescription = null) },
-                onClick = { expanded = false; onOpenAlbum() },
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheet,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentWindowInsets = { WindowInsets.safeDrawing },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding, bottom = XmLayout.ItemGap),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                stringResource(R.string.player_more),
+                Modifier.padding(horizontal = 8.dp).semantics { heading() },
+                style = MaterialTheme.typography.titleMedium,
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.player_view_anchor)) },
-                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                onClick = { expanded = false; onOpenAnchor() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.player_go_to_start)) },
-                leadingIcon = { Icon(Icons.Filled.Replay, contentDescription = null) },
-                enabled = canGoToStart,
-                onClick = { expanded = false; onGoToStart() },
-            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PlayerActionButton(R.string.player_view_album, Icons.Outlined.Album, Modifier.weight(1f)) {
+                    select(onOpenAlbum)
+                }
+                PlayerActionButton(R.string.player_view_anchor, Icons.Outlined.Person, Modifier.weight(1f)) {
+                    select(onOpenAnchor)
+                }
+                PlayerActionButton(
+                    R.string.player_go_to_start, Icons.Filled.Replay, Modifier.weight(1f), enabled = canGoToStart,
+                ) {
+                    select(onGoToStart)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SkipButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun PlayerActionButton(
+    @StringRes label: Int,
+    icon: ImageVector,
+    modifier: Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    TextButton(
+        onClick, modifier, enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurface),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val iconBackground = colors.surfaceContainerHighest.let { if (enabled) it else it.copy(alpha = 0.5f) }
+            Box(Modifier.size(48.dp).background(iconBackground, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null)
+            }
+            Text(stringResource(label), textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun SkipButton(forward: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val description = stringResource(
         if (forward) R.string.player_seek_forward else R.string.player_seek_back, PlaybackSkipSeconds,
     )
-    IconButton(
-        onClick, Modifier.size(56.dp).semantics { contentDescription = description }, enabled = enabled,
+    TextButton(
+        onClick,
+        modifier.heightIn(min = 56.dp).semantics { contentDescription = description },
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
     ) {
-        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Icon(
-                Icons.Filled.Replay, contentDescription = null,
-                modifier = Modifier.matchParentSize().graphicsLayer { scaleX = if (forward) -1f else 1f },
+                if (forward) Icons.Filled.FastForward else Icons.Filled.FastRewind,
+                contentDescription = null, modifier = Modifier.size(24.dp),
             )
             Text(
-                PlaybackSkipSeconds.toString(),
-                Modifier.align(Alignment.Center).padding(top = 4.dp).clearAndSetSemantics {},
-                fontSize = 11.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold,
+                stringResource(R.string.player_skip_interval, PlaybackSkipSeconds), Modifier.clearAndSetSemantics {},
+                style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,
             )
         }
     }
