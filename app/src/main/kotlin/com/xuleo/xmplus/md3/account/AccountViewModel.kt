@@ -11,18 +11,25 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.ArchiveContents
 import com.xuleo.xmplus.md3.core.account.XmplusArchive
+import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AccountViewModel(private val repository: AccountRepository, login: XmlyLogin) : ViewModel() {
+class AccountViewModel(
+    private val repository: AccountRepository,
+    login: XmlyLogin,
+    private val playback: PlaybackController,
+) : ViewModel() {
     val accounts = repository.state
     private val operations = Operations(viewModelScope)
 
     /** Set when a sign-in finished; the UI consumes it to leave the login screens. */
     var importCompleted by mutableStateOf(false)
         private set
-    val phone = PhoneLoginSession(login, repository, viewModelScope) { importCompleted = true }
+    val phone = PhoneLoginSession(login, viewModelScope, saveAccount = { credentials, primary ->
+        playback.changeAccount { repository.importCredentials(credentials, primary) }
+    }) { importCompleted = true }
 
     /** A parsed backup waiting for the user's yes. It holds logins, so it stays in memory and never in saved state. */
     var archive by mutableStateOf<ArchiveContents?>(null)
@@ -48,13 +55,15 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
     }
 
     fun importCredentials(makePrimary: Boolean, recoveryIdentity: String? = null) = operations.launch {
-        repository.importCredentials(draft, makePrimary, recoveryIdentity)
+        playback.changeAccount { repository.importCredentials(draft, makePrimary, recoveryIdentity) }
         draft = ""
         importCompleted = true
     }
 
-    fun setPrimary(identity: String) = operations.launch { repository.setPrimary(identity) }
-    fun remove(identity: String) = operations.launch { repository.remove(identity) }
+    fun setPrimary(identity: String) = operations.launch {
+        if (repository.primaryCredentials()?.identity != identity) playback.changeAccount { repository.setPrimary(identity) }
+    }
+    fun remove(identity: String) = operations.launch { playback.changeAccount { repository.remove(identity) } }
     fun refreshQuota(identity: String) = operations.launch { repository.refreshQuota(identity) }
     fun claim(identity: String) = operations.launch { repository.claimOnce(identity) }
     fun resumeRewards(identity: String) = operations.launch { repository.resumeRewards(identity) }
@@ -66,7 +75,7 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
 
     fun confirmArchive() = operations.launch {
         val contents = archive ?: return@launch
-        repository.restoreArchive(contents)
+        playback.changeAccount(preserveJournal = true) { repository.restoreArchive(contents) }
         archive = null
     }
 
@@ -101,8 +110,7 @@ class AccountViewModel(private val repository: AccountRepository, login: XmlyLog
     companion object {
         const val MaxImportCharacters = 65_536
 
-        fun factory(repository: AccountRepository, login: XmlyLogin): ViewModelProvider.Factory = viewModelFactory {
-            initializer { AccountViewModel(repository, login) }
-        }
+        fun factory(repository: AccountRepository, login: XmlyLogin, playback: PlaybackController): ViewModelProvider.Factory =
+            viewModelFactory { initializer { AccountViewModel(repository, login, playback) } }
     }
 }

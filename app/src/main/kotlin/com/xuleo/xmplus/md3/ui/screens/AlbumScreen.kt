@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -95,11 +97,16 @@ private val SearchHeight = 44.dp
 
 /**
  * One album: a header that scrolls away over its blurred cover, then the tabs and their pages. The header comes back only
- * when its page is at the top, and the top bar stays clear until the header has gone. Playback, subscription and download
- * controls are not offered yet.
+ * when its page is at the top, and the top bar stays clear until the header has gone.
  */
 @Composable
-internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAlbum: (String) -> Unit, onOpenAnchor: (String?) -> Unit) {
+internal fun AlbumScreen(
+    viewModel: AlbumViewModel,
+    onBack: () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onOpenAnchor: (String?) -> Unit,
+    onPlayEpisode: (Album, Track) -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
     val pager = rememberPagerState { AlbumTabs.size }
@@ -120,7 +127,10 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
             DetailTabs(pager, AlbumTabs)
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {
-                    AlbumTab.Episodes -> EpisodesPage(state, detail, viewModel, episodesList) { showRange = true }
+                    AlbumTab.Episodes -> EpisodesPage(
+                        state, detail, viewModel, episodesList, { showRange = true },
+                        onPlay = { onPlayEpisode(detail.album, it) },
+                    )
                     AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
                     else -> IntroductionPage(state, viewModel, onOpenAlbum, introList)
                 }
@@ -160,12 +170,16 @@ private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpe
 }
 
 @Composable
-private fun EpisodesPage(state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState, onRange: () -> Unit) {
+private fun EpisodesPage(
+    state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState,
+    onRange: () -> Unit, onPlay: (Track) -> Unit,
+) {
     Column(Modifier.fillMaxSize()) {
         // The toolbar sits above the list rather than inside it. A field inside a list is scrolled into view when it takes
         // focus, which would pull the list back to its first row every time search opens.
         EpisodeToolbar(state, detail.album.trackCount, viewModel, onRange)
-        if (searchResultsShown(state)) SearchResults(state, viewModel) else EpisodeList(state, viewModel, list)
+        if (searchResultsShown(state)) SearchResults(state, viewModel, onPlay)
+        else EpisodeList(state, viewModel, list, onPlay)
     }
 }
 
@@ -185,21 +199,21 @@ private fun searchResultsShown(state: AlbumState): Boolean =
 
 /** The episodes of the chunk on show. Its list keeps its place while search results take its space. */
 @Composable
-private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState) {
+private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState, onPlay: (Track) -> Unit) {
     AlbumListPage(list) {
         when {
             state.episodesLoading -> item(key = "episodes-loading") { SkeletonRow() }
             state.episodesErrorCode != null ->
                 item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryChunk) }
             state.episodes.isEmpty() -> item(key = "episodes-empty") { EmptyText(R.string.album_episodes_empty) }
-            else -> items(state.episodes, key = { it.id }) { EpisodeRow(it) }
+            else -> items(state.episodes, key = { it.id }) { track -> EpisodeRow(track) { onPlay(track) } }
         }
     }
 }
 
 /** The search hits. A new search starts at its first hit; closing search returns to the episodes where they were. */
 @Composable
-private fun ColumnScope.SearchResults(state: AlbumState, viewModel: AlbumViewModel) {
+private fun ColumnScope.SearchResults(state: AlbumState, viewModel: AlbumViewModel, onPlay: (Track) -> Unit) {
     val list = rememberLazyListState()
     LoadMoreEffect(
         { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
@@ -212,7 +226,7 @@ private fun ColumnScope.SearchResults(state: AlbumState, viewModel: AlbumViewMod
                 item(key = "hits-error") { InlineError(state.hitsErrorCode.orEmpty(), viewModel::retryHits) }
             state.hits.isEmpty() -> item(key = "hits-empty") { EmptyText(R.string.search_empty) }
             else -> {
-                items(state.hits, key = { "hit-" + it.id }) { TrackRow(it) }
+                items(state.hits, key = { "hit-" + it.id }) { track -> TrackRow(track, onClick = { onPlay(track) }) }
                 item(key = "hits-footer") {
                     PagingFooter(state.hitsLoading, state.hitsErrorCode != null, state.hitsHasMore, viewModel::retryHits)
                 }
@@ -358,9 +372,13 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -
 }
 
 @Composable
-private fun EpisodeRow(track: Track) {
+private fun EpisodeRow(track: Track, onClick: () -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
-    Row(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = XmLayout.PagePadding, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             track.officialPosition?.toString().orEmpty(), Modifier.width(48.dp), style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,

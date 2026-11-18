@@ -232,10 +232,10 @@ class UsageLedger(
     /** A restore pauses producers first; unknown journals are preserved without sending anything. */
     suspend fun captureForRestore() = watchChanges.withLock {
         val current = watch ?: return@withLock
+        pauseWatch(current)
         locked(current.identity) {
             // Keep the watch and its unsaved sample reachable if persisting fails.
             sample(current.identity)
-            synchronized(current) { current.playing = false }
             watch = null
         }
     }
@@ -251,6 +251,9 @@ class UsageLedger(
     suspend fun settle(identity: String? = null) {
         if (identity != null) locked(identity) { settleLocked(identity) } else settleAccounts(exiting = false)
     }
+
+    /** Also attempts usage that had already been saved when the last source was paused. */
+    suspend fun settleBeforeAccountChange(identity: String) = locked(identity) { settleOrDefer(identity) }
 
     /** Exit refreshes unknown reports without replaying them. */
     suspend fun settleForExit() = settleAccounts(exiting = true)
@@ -275,10 +278,10 @@ class UsageLedger(
 
     /** Reports the whole seconds of debt, one balance-locked debit at a time. */
     private suspend fun settleLocked(identity: String, pause: Boolean = true) {
+        val current = watch
+        if (pause && current?.identity == identity) pauseWatch(current)
         recover(identity)
         sample(identity)
-        val current = watch
-        if (pause && current?.identity == identity) synchronized(current) { current.playing = false }
         if (!isBlocked(identity) && debt(identity) < 1 && current?.identity != identity) return
         guard(identity)
         var seconds = floor(debt(identity)).toLong()
@@ -298,7 +301,12 @@ class UsageLedger(
 
     private suspend fun stopWatchLocked() {
         val current = watch ?: return
-        locked(current.identity) { settleOrDefer(current.identity) }
+        pauseWatch(current)
+        locked(current.identity) {
+            // A retry cooldown may skip the remote settlement, never the last local sample.
+            sample(current.identity)
+            settleOrDefer(current.identity)
+        }
         watch = null
     }
 
@@ -439,6 +447,11 @@ class UsageLedger(
         captureElapsed(current)
         current.playing = false
         current.suspended = true
+    }
+
+    private fun pauseWatch(current: Listening) = synchronized(current) {
+        captureElapsed(current)
+        current.playing = false
     }
 
     private fun checkAvailableUsage(identity: String) {

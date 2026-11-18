@@ -1,9 +1,12 @@
 package com.xuleo.xmplus.md3.core.protocol
 
+import com.xuleo.xmplus.md3.core.model.xmlyIdentifier
+
 /** The API hosts this app talks to. The login host has its own client. */
 internal enum class Host(val origin: String) {
     Mobile("https://mobile.ximalaya.com"),
     Welfare("https://m.ximalaya.com"),
+    PaidMedia("https://mpaywsa.ximalaya.com"),
     /** The website's JSON API: categories, rankings, search, public profiles. */
     Web("https://www.ximalaya.com"),
     /** The desktop site's API: category filters, ranking tabs, locating a track in its album. */
@@ -39,11 +42,16 @@ internal class Endpoint(
     val login: Login = Login.Required,
     val idempotent: Boolean = false,
     val successCode: String = "0",
+    val playbackTicket: Boolean = false,
 ) {
-    fun resolve(timestamp: Long?): String = path.replace(TimestampToken, timestamp?.toString() ?: "")
+    fun resolve(timestamp: Long?, trackId: String?): String {
+        val timedPath = path.replace(TimestampToken, timestamp?.toString().orEmpty())
+        return if (TrackToken in timedPath) timedPath.replace(TrackToken, xmlyIdentifier(requireNotNull(trackId))) else timedPath
+    }
 
     companion object {
         const val TimestampToken = "{ts}"
+        private const val TrackToken = "{trackId}"
     }
 }
 
@@ -61,6 +69,13 @@ internal object Endpoints {
     val HomeChannels = read(Host.Mobile, "/lite-mobile/index/v1/subPages/{ts}", Login.Optional)
     val HomeModules = read(Host.Mobile, "/lite-mobile/index/v1/modules/{ts}", Login.Optional)
     val HotWords = read(Host.Search, "/hotWordBillboard/list/2.0")
+
+    val TrackPublicInfo = read(Host.Mobile, "/mobile/track/{trackId}")
+    val TrackAccountInfo = Endpoint(
+        Host.Mobile, "POST", "/fmobile-track/fmobile/track/v2/baseInfo",
+        idempotent = true, playbackTicket = true,
+    )
+    val TrackPaidMedia = read(Host.PaidMedia, "/mobile/track/pay/{trackId}/ts-{ts}", Login.Required)
 
     val Search = web("/revision/search")
     val AllCategories = web("/revision/category/v2/allCategory")

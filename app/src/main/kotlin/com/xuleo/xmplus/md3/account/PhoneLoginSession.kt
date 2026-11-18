@@ -3,7 +3,6 @@ package com.xuleo.xmplus.md3.account
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.model.Credentials
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.GeetestProof
@@ -17,8 +16,8 @@ import kotlinx.coroutines.CoroutineScope
  */
 class PhoneLoginSession(
     private val login: XmlyLogin,
-    private val repository: AccountRepository,
     scope: CoroutineScope,
+    private val saveAccount: suspend (Credentials, Boolean) -> Unit,
     private val onSignedIn: () -> Unit,
 ) {
     private val operations = Operations(scope)
@@ -96,7 +95,7 @@ class PhoneLoginSession(
         operations.launch {
             try {
                 val credentials = candidate ?: verified(requireNotNull(pending))
-                repository.importCredentials(credentials, makePrimary)
+                saveAccount(credentials, makePrimary)
                 candidate = null
                 onSignedIn()
             } catch (failure: XmlyException) {

@@ -41,11 +41,12 @@ class XmlyHttp internal constructor(
         timestamp: Long? = null,
         body: JsonObject? = null,
         query: Map<String, String> = emptyMap(),
+        trackId: String? = null,
     ): JsonObject {
         if (endpoint.login == Login.Required && credentials == null) throw XmlyException("login_required", definitive = true)
         val account = credentials.takeIf { endpoint.login != Login.Never }
-        // The request is built once: a retry must repeat the same signed body, not sign a new one.
-        val url = (endpoint.host.origin + endpoint.resolve(timestamp)).toHttpUrl().newBuilder()
+        // The body is stable across attempts; an authorization read gets a fresh ticket header each time.
+        val url = (endpoint.host.origin + endpoint.resolve(timestamp, trackId)).toHttpUrl().newBuilder()
             .apply { for ((name, value) in query) addQueryParameter(name, value) }.build()
         val request = Request.Builder().url(url)
             .header("Accept", "application/json")
@@ -65,7 +66,10 @@ class XmlyHttp internal constructor(
                 wait(cooling)
             }
             try {
-                return attempt(request, endpoint, key, account != null)
+                val attemptRequest = if (endpoint.playbackTicket && account != null) {
+                    request.newBuilder().header("x-tk", XmlyCrypto.freshTicket(account, nowMillis = clock())).build()
+                } else request
+                return attempt(attemptRequest, endpoint, key, account != null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: IOException) {

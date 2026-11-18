@@ -8,7 +8,19 @@
     <string name="tab_me">Me</string>
 
     <string name="mini_player_idle">Nothing playing</string>
+    <string name="player_title">Now playing</string>
+    <string name="player_open">Open player</string>
+    <string name="player_seek_back">15 s</string>
+    <string name="player_seek_forward">30 s</string>
+    <string name="player_rewind">Back</string>
+    <string name="player_fast_forward">Forward</string>
+    <string name="player_progress">Playback position</string>
+    <string name="player_insufficient_quota">Not enough listening time.</string>
+    <string name="player_login_required">Sign in to play this episode.</string>
+    <string name="player_permission_denied">This episode is not available to play.</string>
+    <string name="player_unavailable">Couldn’t play this episode.</string>
     <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
     <string name="action_cancel">Cancel</string>
 
     <string name="setting_language">Language</string>

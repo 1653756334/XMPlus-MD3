@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":core:account"))
     implementation(project(":core:data"))
     implementation(project(":core:protocol"))
+    implementation(project(":core:media"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3.navigation.suite)
     implementation(libs.compose.material3.adaptive)

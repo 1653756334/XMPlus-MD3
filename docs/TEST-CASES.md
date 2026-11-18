@@ -178,6 +178,14 @@ Source: XMPlus `lib/storage/config_archive.dart`.
 
 Source: XMPlus `lib/services/playback_policy.dart`.
 
+Playback integration
+
+- PB-00a Pick a free, previously authorized, and listening-time episode through the same album list. Only the last one meters; catalog paid labels do not determine the result.
+- PB-00b The mini player, full player, and system controls all act on the same episode. Returning to Discover or locking the screen keeps active audio playing.
+- PB-00c Rapid episode selection or a primary-account change during authorization cannot start a stale source. When switching accounts, close the old watch before replacing the credentials; retain any unsettled usage under the old account.
+- PB-00d Unavailable or preview-only audio never starts. An expired stream is reauthorized for the same account and track and resumes at the current position.
+- PB-00e During a settlement retry cooldown, pausing or stopping still saves every final local listening sample. Retrying an unknown debit must not resend it.
+
 Settings
 
 - PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 30 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.

@@ -36,6 +36,8 @@ import com.xuleo.xmplus.md3.browse.RankingsViewModel
 import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
+import com.xuleo.xmplus.md3.core.media.PlaybackController
+import com.xuleo.xmplus.md3.core.media.PlaybackSelection
 import com.xuleo.xmplus.md3.core.model.CategoryChannel
 import com.xuleo.xmplus.md3.core.model.CategoryGroup
 import com.xuleo.xmplus.md3.core.model.HotWord
@@ -44,7 +46,9 @@ import com.xuleo.xmplus.md3.ui.screens.*
 @Composable
 fun XmApp() {
     val application = LocalContext.current.applicationContext as XmApplication
-    val accounts: AccountViewModel = viewModel(factory = AccountViewModel.factory(application.accounts, application.login))
+    val accounts: AccountViewModel = viewModel(
+        factory = AccountViewModel.factory(application.accounts, application.login, application.playback),
+    )
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
     val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
     val allAlbums: AllAlbumsViewModel = viewModel(factory = AllAlbumsViewModel.factory(application.browse))
@@ -61,7 +65,7 @@ fun XmApp() {
     }
     XmAppContent(
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
-        anchorPage = anchorPage, onAnchorPopped = anchorStores::remove,
+        anchorPage = anchorPage, onAnchorPopped = anchorStores::remove, playback = application.playback,
     )
 }
 
@@ -79,6 +83,7 @@ internal fun XmAppContent(
     albumPage: @Composable (String) -> AlbumViewModel? = { null },
     anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel? = { null },
     onAnchorPopped: (Any) -> Unit = {},
+    playback: PlaybackController? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -87,12 +92,13 @@ internal fun XmAppContent(
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
-                is AppRoute.AlbumPage, is AppRoute.AnchorPage -> Unit
+                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player -> Unit
                 else -> accounts?.clearError()
             }
         }
     }
     val isHome = stack.lastOrNull() == AppRoute.Home
+    val isPlayer = stack.lastOrNull() == AppRoute.Player
     val stateHolder = rememberSaveableStateHolder()
     val security = rememberSensitiveWindow()
     val suite = rememberNavigationSuiteScaffoldState()
@@ -215,16 +221,27 @@ internal fun XmAppContent(
                     entry<AppRoute.AlbumPage> { route ->
                         Surface(Modifier.fillMaxSize()) {
                             albumPage(route.albumId)?.let { vm ->
-                                AlbumScreen(vm, { navigator.pop() }, ::openAlbum) { uid ->
-                                    if (uid != null) openAnchor(uid)
-                                    else navigator.push(AppRoute.AnchorPage(route.albumId, resolveFromAlbum = true))
-                                }
+                                AlbumScreen(
+                                    vm, { navigator.pop() }, ::openAlbum,
+                                    onOpenAnchor = { uid ->
+                                        if (uid != null) openAnchor(uid)
+                                        else navigator.push(AppRoute.AnchorPage(route.albumId, resolveFromAlbum = true))
+                                    },
+                                    onPlayEpisode = { album, track -> playback?.play(PlaybackSelection(track, album)) },
+                                )
                             }
                         }
                     }
                     entry<AppRoute.AnchorPage>(clazzContentKey = { it.contentKey }) { route ->
                         Surface(Modifier.fillMaxSize()) {
                             anchorPage(route)?.let { AnchorScreen(it, ::openAlbum) { navigator.pop() } }
+                        }
+                    }
+                    entry<AppRoute.Player> {
+                        Surface(Modifier.fillMaxSize()) {
+                            if (playback != null) PlayerScreen(
+                                playback, { navigator.pop() }, { navigator.push(AppRoute.Accounts) },
+                            )
                         }
                     }
                     entry<AppRoute.Accounts> {
@@ -257,7 +274,7 @@ internal fun XmAppContent(
                     }
                 },
             )
-            MiniPlayer()
+            if (!isPlayer) MiniPlayer(playback, onOpen = { navigator.push(AppRoute.Player) })
         }
     }
     accounts?.archive?.let {

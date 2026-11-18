@@ -6,7 +6,19 @@
     <string name="tab_me">我的</string>
 
     <string name="mini_player_idle">未在播放</string>
+    <string name="player_title">正在播放</string>
+    <string name="player_open">打开播放器</string>
+    <string name="player_seek_back">15 秒</string>
+    <string name="player_seek_forward">30 秒</string>
+    <string name="player_rewind">后退</string>
+    <string name="player_fast_forward">前进</string>
+    <string name="player_progress">播放进度</string>
+    <string name="player_insufficient_quota">听时不足。</string>
+    <string name="player_login_required">登录后可播放此节目。</string>
+    <string name="player_permission_denied">此节目暂不可播放。</string>
+    <string name="player_unavailable">播放失败。</string>
     <string name="action_play">播放</string>
+    <string name="action_pause">暂停</string>
     <string name="action_cancel">取消</string>
 
     <string name="setting_language">语言</string>

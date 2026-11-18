@@ -7,6 +7,8 @@ import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
+import com.xuleo.xmplus.md3.core.media.PlaybackController
+import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
@@ -14,15 +16,16 @@ import com.xuleo.xmplus.md3.core.protocol.XmlyDiscovery
 import com.xuleo.xmplus.md3.core.protocol.XmlyHome
 import com.xuleo.xmplus.md3.core.protocol.XmlyHttp
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
+import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
 import com.xuleo.xmplus.md3.core.protocol.XmlyQuotaClient
 import com.xuleo.xmplus.md3.core.protocol.XmlyRewards
 import com.xuleo.xmplus.md3.core.protocol.XmlySearch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
-class XmApplication : Application() {
+class XmApplication : Application(), PlaybackOwner {
     /** Work that belongs to the process rather than to a screen. */
     private val processScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -48,16 +51,23 @@ class XmApplication : Application() {
     /** Every charge for listening time goes through this ledger. */
     val usage: UsageLedger by lazy { UsageLedger(accounts, XmlyUsageService(quotaClient), balanceLocks) }
 
+    // Resolve an interrupted debit locally before allowing a new playback to charge.
+    private val usageReady by lazy {
+        processScope.async {
+            accounts.load()
+            usage.load()
+        }
+    }
+    override val playback by lazy {
+        PlaybackController(accounts, usage, XmlyPlayback(http)) { usageReady.await() }
+    }
+
     /** One login session per process: it owns the SMS cooldowns and the pending challenge. */
     val login: XmlyLogin by lazy { XmlyLogin() }
 
     override fun onCreate() {
         super.onCreate()
         RewardScheduler(accounts, processScope)
-        // A debit caught mid-send by the last exit becomes "uncertain" before anything can be charged again.
-        processScope.launch {
-            accounts.load()
-            usage.load()
-        }
+        usageReady.start()
     }
 }

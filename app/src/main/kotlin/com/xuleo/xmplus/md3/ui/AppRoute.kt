@@ -15,6 +15,7 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class AnchorPage(val id: String, val resolveFromAlbum: Boolean = false) : AppRoute {
         val contentKey: String get() = "anchor:${if (resolveFromAlbum) "album" else "uid"}:$id"
     }
+    @Serializable data object Player : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object PhoneLogin : AppRoute
     @Serializable data class ImportLogin(val recoveryIdentity: String? = null) : AppRoute
