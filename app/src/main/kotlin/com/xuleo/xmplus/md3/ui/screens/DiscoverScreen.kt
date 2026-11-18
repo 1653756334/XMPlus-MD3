@@ -35,25 +35,29 @@ import com.xuleo.xmplus.md3.core.model.AlbumStats
 import com.xuleo.xmplus.md3.core.model.HomeChannel
 import com.xuleo.xmplus.md3.core.model.HomeContent
 import com.xuleo.xmplus.md3.core.model.HomeTab
+import com.xuleo.xmplus.md3.core.model.HotWord
 import com.xuleo.xmplus.md3.core.model.HotRanking
 import com.xuleo.xmplus.md3.ui.components.*
 import kotlinx.coroutines.launch
 
 @Composable
-fun DiscoverScreen(viewModel: DiscoverViewModel) {
+fun DiscoverScreen(viewModel: DiscoverViewModel, hotWords: List<HotWord>, onSearch: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    DiscoverContent(state, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking)
+    DiscoverContent(state, hotWords, onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking)
 }
 
 @Composable
 internal fun DiscoverContent(
     state: DiscoverState,
+    hotWords: List<HotWord>,
+    onSearch: () -> Unit,
     onReload: () -> Unit,
     onLoad: (pageId: Int, refresh: Boolean) -> Unit,
     onSelectTab: (pageId: Int, tabId: Int) -> Unit,
     onRetryRanking: (pageId: Int) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+        SearchEntry(hotWords, onSearch)
         when (val channels = state.channels) {
             ChannelsState.Loading -> {
                 Row(Modifier.fillMaxWidth().padding(XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
@@ -274,10 +278,10 @@ private val samplePage = ChannelState(
 private fun DiscoverPreview() = XmPreview {
     DiscoverContent(
         DiscoverState(ChannelsState.Ready(listOf(HomeChannel(1, "Recommended", null), HomeChannel(2, "Novels", 3))), mapOf(1 to samplePage)),
-        {}, { _, _ -> }, { _, _ -> }, {},
+        emptyList(), {}, {}, { _, _ -> }, { _, _ -> }, {},
     )
 }
 
 @XmPreviews
 @Composable
-private fun DiscoverLoadingPreview() = XmPreview { DiscoverContent(DiscoverState(), {}, { _, _ -> }, { _, _ -> }, {}) }
+private fun DiscoverLoadingPreview() = XmPreview { DiscoverContent(DiscoverState(), emptyList(), {}, {}, { _, _ -> }, { _, _ -> }, {}) }

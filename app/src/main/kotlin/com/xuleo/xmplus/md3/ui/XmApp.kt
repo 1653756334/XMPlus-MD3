@@ -26,8 +26,10 @@ import androidx.navigation3.ui.NavDisplay
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
+import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
+import com.xuleo.xmplus.md3.core.model.HotWord
 import com.xuleo.xmplus.md3.ui.screens.*
 
 @Composable
@@ -35,8 +37,9 @@ fun XmApp() {
     val application = LocalContext.current.applicationContext as XmApplication
     val accounts: AccountViewModel = viewModel(factory = AccountViewModel.factory(application.accounts, application.login))
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
+    val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts, discover)
+    XmAppContent(selected, { selected = it }, accounts, discover, search)
 }
 
 @Composable
@@ -45,6 +48,7 @@ internal fun XmAppContent(
     onSelect: (Destination) -> Unit,
     accounts: AccountViewModel? = null,
     discover: DiscoverViewModel? = null,
+    search: SearchViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -52,6 +56,7 @@ internal fun XmAppContent(
             when (removed) {
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
+                AppRoute.Search -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -62,6 +67,7 @@ internal fun XmAppContent(
     val suite = rememberNavigationSuiteScaffoldState()
     val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
     val accountState = accounts?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
+    val hotWords = search?.state?.collectAsStateWithLifecycle()?.value?.hotWords.orEmpty()
 
     BackHandler(enabled = isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
     LaunchedEffect(isHome) { if (isHome) suite.show() else suite.hide() }
@@ -74,6 +80,10 @@ internal fun XmAppContent(
     fun openPhone() {
         accounts?.clearError()
         navigator.push(AppRoute.PhoneLogin)
+    }
+    fun openSearch() {
+        search?.clear()
+        navigator.push(AppRoute.Search)
     }
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
@@ -134,10 +144,13 @@ internal fun XmAppContent(
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
-                                TabContent(tab, stateHolder, accounts, discover,
+                                TabContent(tab, stateHolder, accounts, discover, hotWords, ::openSearch,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
+                    }
+                    entry<AppRoute.Search> {
+                        Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search) { navigator.pop() } }
                     }
                     entry<AppRoute.Accounts> {
                         Surface(Modifier.fillMaxSize()) {
@@ -179,10 +192,10 @@ internal fun XmAppContent(
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
-    onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+    hotWords: List<HotWord>, onSearch: () -> Unit, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
-            Destination.Discover -> if (discover != null) DiscoverScreen(discover) else EmptyTab(destination.label, destination.icon)
+            Destination.Discover -> if (discover != null) DiscoverScreen(discover, hotWords, onSearch) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)

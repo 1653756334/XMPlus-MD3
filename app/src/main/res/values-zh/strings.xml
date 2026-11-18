@@ -114,4 +114,30 @@
     <string name="count_unit_small">%1$s万</string>
     <string name="count_unit_medium">%1$s亿</string>
     <string name="count_unit_large">%1$s万亿</string>
+    <string name="search_hint">搜索专辑、声音、主播</string>
+    <string name="search_submit">搜索</string>
+    <string name="search_clear">清空</string>
+    <string name="search_hot">热搜</string>
+    <string name="search_prompt">搜索你想听的内容</string>
+    <string name="search_empty">没有找到相关内容</string>
+    <string name="search_invalid">请输入 1～200 字的关键词</string>
+    <string name="search_more">更多</string>
+    <string name="search_end">没有更多了</string>
+    <string name="search_kind_all">全部</string>
+    <string name="search_kind_album">专辑</string>
+    <string name="search_kind_track">声音</string>
+    <string name="search_kind_anchor">主播</string>
+    <string name="anchor_verified">已认证</string>
+    <plurals name="episode_count">
+        <item quantity="other">%d 集</item>
+    </plurals>
+    <plurals name="anchor_album_count">
+        <item quantity="other">%s 张专辑</item>
+    </plurals>
+    <plurals name="anchor_sound_count">
+        <item quantity="other">%s 个声音</item>
+    </plurals>
+    <plurals name="anchor_follower_count">
+        <item quantity="other">%s 粉丝</item>
+    </plurals>
 </resources>

@@ -118,4 +118,34 @@
     <string name="count_unit_small">%1$sK</string>
     <string name="count_unit_medium">%1$sM</string>
     <string name="count_unit_large">%1$sB</string>
+    <string name="search_hint">Search albums, sounds, anchors</string>
+    <string name="search_submit">Search</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_hot">Trending</string>
+    <string name="search_prompt">Search for something to listen to</string>
+    <string name="search_empty">No results found</string>
+    <string name="search_invalid">Enter 1 to 200 characters</string>
+    <string name="search_more">More</string>
+    <string name="search_end">That\'s all</string>
+    <string name="search_kind_all">All</string>
+    <string name="search_kind_album">Albums</string>
+    <string name="search_kind_track">Sounds</string>
+    <string name="search_kind_anchor">Anchors</string>
+    <string name="anchor_verified">Verified</string>
+    <plurals name="episode_count">
+        <item quantity="one">%d episode</item>
+        <item quantity="other">%d episodes</item>
+    </plurals>
+    <plurals name="anchor_album_count">
+        <item quantity="one">%s album</item>
+        <item quantity="other">%s albums</item>
+    </plurals>
+    <plurals name="anchor_sound_count">
+        <item quantity="one">%s sound</item>
+        <item quantity="other">%s sounds</item>
+    </plurals>
+    <plurals name="anchor_follower_count">
+        <item quantity="one">%s follower</item>
+        <item quantity="other">%s followers</item>
+    </plurals>
 </resources>
