@@ -32,7 +32,7 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
         modifier = Modifier.toggleable(state.enabled, enabled = canChange, role = Role.Switch) { enabled ->
             if (enabled) confirm = true else uploader.setEnabled(false)
         },
-        supportingContent = { Text(stringResource(R.string.history_upload_read_unaffected)) },
+        supportingContent = { Text(stringResource(if (state.enabled) R.string.history_upload_on_hint else R.string.history_upload_off_hint)) },
         leadingContent = { Icon(Icons.Outlined.CloudUpload, contentDescription = null) },
         trailingContent = { Switch(checked = state.enabled, onCheckedChange = null, enabled = canChange) },
     ) { Text(stringResource(R.string.history_upload_title)) }

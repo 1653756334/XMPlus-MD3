@@ -68,11 +68,12 @@
     <string name="action_retry">Retry</string>
     <string name="settings_general">General</string>
     <string name="history_upload_title">Upload listening progress</string>
-    <string name="history_upload_read_unaffected">Cloud resume still works when this is off</string>
+    <string name="history_upload_off_hint">Off · cloud progress is still read for resuming</string>
+    <string name="history_upload_on_hint">On · your listening position syncs to your Ximalaya account</string>
     <string name="history_upload_confirm_title">Upload listening progress?</string>
     <string name="history_upload_confirm_body">This sends what you listen to and where you stopped to the Ximalaya account used for playback.</string>
     <string name="history_upload_enable">Enable upload</string>
-    <string name="history_upload_retry">Retry progress upload</string>
+    <string name="history_upload_retry">Sync progress now</string>
     <string name="history_upload_sending">Syncing progress…</string>
     <string name="history_upload_done">Progress is up to date</string>
     <string name="history_upload_failed">Progress kept on this device. Try again later.</string>

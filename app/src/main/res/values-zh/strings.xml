@@ -64,11 +64,12 @@
     <string name="action_retry">重试</string>
     <string name="settings_general">通用</string>
     <string name="history_upload_title">上传收听进度</string>
-    <string name="history_upload_read_unaffected">关闭后仍可读取云端进度</string>
+    <string name="history_upload_off_hint">未开启 · 仍会读取云端进度用于续播</string>
+    <string name="history_upload_on_hint">已开启 · 收听位置会同步到喜马拉雅账号</string>
     <string name="history_upload_confirm_title">上传收听进度？</string>
     <string name="history_upload_confirm_body">开启后，收听的节目和播放位置将同步到播放所用的喜马拉雅账号。</string>
     <string name="history_upload_enable">开启上传</string>
-    <string name="history_upload_retry">重试进度上传</string>
+    <string name="history_upload_retry">立即同步进度</string>
     <string name="history_upload_sending">正在同步进度…</string>
     <string name="history_upload_done">进度已同步</string>
     <string name="history_upload_failed">进度保留在本机，请稍后重试。</string>
