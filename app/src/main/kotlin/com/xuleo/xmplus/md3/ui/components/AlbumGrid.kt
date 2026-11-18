@@ -30,6 +30,7 @@ fun AlbumGrid(
     hasMore: Boolean,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     val grid = rememberLazyGridState()
     LoadMoreEffect({ grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { grid.layoutInfo.totalItemsCount }, grid, page, loading,
@@ -41,7 +42,7 @@ fun AlbumGrid(
             horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
             verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap - 8.dp),
         ) {
-            items(albums, key = { it.id }) { AlbumCard(it, stats[it.id], Modifier.fillMaxWidth()) }
+            items(albums, key = { it.id }) { AlbumCard(it, stats[it.id], Modifier.fillMaxWidth()) { onOpenAlbum(it.id) } }
             item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { PagingFooter(loading, failed, hasMore, onRetry) }
         }
     }

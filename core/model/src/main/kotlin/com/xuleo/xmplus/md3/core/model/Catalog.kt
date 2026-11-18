@@ -167,3 +167,63 @@ data class RankBlock(
     val stats: Map<String, AlbumStats>,
     val positions: Map<String, Int>,
 )
+/**
+ * An album's own page. [recordDescending] is the order the server lists episodes in by default; sorting asks for the
+ * other order when it differs.
+ */
+data class AlbumDetail(
+    val album: Album,
+    val stats: AlbumStats,
+    val paid: Boolean,
+    val anchorVerified: Boolean,
+    val tags: List<String>,
+    val recordDescending: Boolean,
+)
+
+/** A reply under a review. The first reply of a review may be previewed there, when the server sends it in full. */
+data class AlbumReply(
+    val id: String,
+    val commentId: String,
+    val uid: String,
+    val author: String,
+    val content: String,
+    val createdAtMillis: Long,
+    val avatarUrl: String?,
+    val parentNickname: String,
+    val likes: Long?,
+)
+
+/** One comment on an album. [preview] is the first reply, when the server sends it in full. */
+data class AlbumReview(
+    val id: String,
+    val uid: String,
+    val author: String,
+    val content: String,
+    val createdAtMillis: Long,
+    val replyCount: Int,
+    val likes: Long?,
+    val avatarUrl: String?,
+    val highQuality: Boolean,
+    val preview: AlbumReply?,
+)
+
+/** The score summary above an album's reviews. Any part can be missing; the three shares are between 0 and 1. */
+data class AlbumScore(
+    val albumScore: Double?,
+    val ratingCount: Int?,
+    val commentCount: Int?,
+    val recommendationScore: Double?,
+    val recommendation: String,
+    val recommendedCount: Int?,
+    val recommended: Double?,
+    val neutral: Double?,
+    val notRecommended: Double?,
+)
+
+/** One page of reviews with the album's score. [hasMore] follows the server's last page number. */
+data class AlbumReviews(val score: AlbumScore, val items: List<AlbumReview>, val page: Int, val hasMore: Boolean)
+
+data class AlbumReplies(val items: List<AlbumReply>, val page: Int, val hasMore: Boolean)
+
+/** Other albums by the same anchor, and albums listeners also play. [anchorMore] says the anchor has more than [anchorAlbums]. */
+data class AlbumSimilar(val anchorAlbums: List<Album>, val anchorMore: Boolean, val recommendations: List<Album>)

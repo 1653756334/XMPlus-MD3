@@ -25,6 +25,7 @@ import androidx.navigation3.runtime.*
 import androidx.navigation3.ui.NavDisplay
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
+import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
@@ -49,7 +50,10 @@ fun XmApp() {
     val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))
     val rankings: RankingsViewModel = viewModel(factory = RankingsViewModel.factory(application.discovery))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings)
+    val albumPage: @Composable (String) -> AlbumViewModel = { id ->
+        viewModel(key = "album:$id", factory = AlbumViewModel.factory(id, application.album, application.accounts))
+    }
+    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage)
 }
 
 @Composable
@@ -63,6 +67,7 @@ internal fun XmAppContent(
     categories: CategoriesViewModel? = null,
     categoryAlbums: CategoryAlbumsViewModel? = null,
     rankings: RankingsViewModel? = null,
+    albumPage: @Composable (String) -> AlbumViewModel? = { null },
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -70,7 +75,7 @@ internal fun XmAppContent(
             when (removed) {
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
-                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking -> Unit
+                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking, is AppRoute.AlbumPage -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -107,7 +112,10 @@ internal fun XmAppContent(
         categoryAlbums?.start(group.id, channel?.relationMetadataValueId)
         navigator.push(AppRoute.CategoryAlbums(group.id, group.title, channel?.relationMetadataValueId, channel?.title))
     }
-    val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory)
+    fun openAlbum(albumId: String) {
+        navigator.push(AppRoute.AlbumPage(albumId))
+    }
+    val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory, ::openAlbum)
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
         navigator.push(AppRoute.ImportLogin(identity))
@@ -173,22 +181,27 @@ internal fun XmAppContent(
                         }
                     }
                     entry<AppRoute.Search> {
-                        Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search) { navigator.pop() } }
+                        Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search, ::openAlbum) { navigator.pop() } }
                     }
                     entry<AppRoute.AllAlbums> { route ->
-                        Surface(Modifier.fillMaxSize()) { if (allAlbums != null) AllAlbumsScreen(allAlbums, route.categoryId) { navigator.pop() } }
+                        Surface(Modifier.fillMaxSize()) { if (allAlbums != null) AllAlbumsScreen(allAlbums, route.categoryId, ::openAlbum) { navigator.pop() } }
                     }
                     entry<AppRoute.CategoryAlbums> { route ->
                         Surface(Modifier.fillMaxSize()) {
                             if (categoryAlbums != null) {
-                                CategoryAlbumsScreen(categoryAlbums, route.groupId, route.groupTitle, route.channelId, route.channelTitle) { navigator.pop() }
+                                CategoryAlbumsScreen(categoryAlbums, route.groupId, route.groupTitle, route.channelId, route.channelTitle, ::openAlbum) { navigator.pop() }
                             }
                         }
                     }
                     entry<AppRoute.HotRanking> { route ->
-                        Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId) { navigator.pop() } }
+                        Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId, ::openAlbum) { navigator.pop() } }
                     }
-                    entry<AppRoute.Accounts> {
+                    entry<AppRoute.AlbumPage> { route ->
+            Surface(Modifier.fillMaxSize()) {
+                albumPage(route.albumId)?.let { AlbumScreen(it, { navigator.pop() }, ::openAlbum) }
+            }
+        }
+        entry<AppRoute.Accounts> {
                         Surface(Modifier.fillMaxSize()) {
                             AccountsContent(accountState, accounts?.busy == true, accounts?.errorCode,
                                 { navigator.pop() }, ::openPhone, { accounts?.setPrimary(it) }, { accounts?.remove(it) },

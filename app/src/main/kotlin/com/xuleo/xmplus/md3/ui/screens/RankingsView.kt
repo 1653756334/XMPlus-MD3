@@ -31,10 +31,10 @@ import com.xuleo.xmplus.md3.core.model.RankTab
 import com.xuleo.xmplus.md3.ui.components.*
 
 @Composable
-fun RankingsView(viewModel: RankingsViewModel) {
+fun RankingsView(viewModel: RankingsViewModel, onOpenAlbum: (String) -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.ensureLoaded() }
-    RankingsContent(state, viewModel::selectCategory, viewModel::selectTab, viewModel::refresh, viewModel::retry)
+    RankingsContent(state, viewModel::selectCategory, viewModel::selectTab, viewModel::refresh, viewModel::retry, onOpenAlbum)
 }
 
 @Composable
@@ -44,6 +44,7 @@ internal fun RankingsContent(
     onTab: (Int) -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
@@ -69,7 +70,7 @@ internal fun RankingsContent(
                 state.errorCode != null && categories == null -> ErrorState(state.errorCode, onRetry)
                 categories == null -> ListSkeleton()
                 categories.isEmpty() -> Message(R.string.discover_empty)
-                charts?.blocks != null -> PullToRefreshBox(state.refreshing, onRefresh) { Charts(charts.blocks, state.tab) }
+                charts?.blocks != null -> PullToRefreshBox(state.refreshing, onRefresh) { Charts(charts.blocks, state.tab, onOpenAlbum) }
                 charts?.errorCode != null -> ErrorState(charts.errorCode, onRetry)
                 else -> ListSkeleton()
             }
@@ -112,7 +113,7 @@ private fun Message(text: Int) {
 }
 
 @Composable
-private fun Charts(blocks: List<RankBlock>, tab: RankTab?) {
+private fun Charts(blocks: List<RankBlock>, tab: RankTab?, onOpenAlbum: (String) -> Unit) {
     val shown = blocks.filter { (it.contentType == 2 && it.albums.isNotEmpty()) || (it.contentType == 3 && it.anchors.isNotEmpty()) }
     if (shown.isEmpty()) {
         Message(R.string.discover_empty)
@@ -129,7 +130,7 @@ private fun Charts(blocks: List<RankBlock>, tab: RankTab?) {
                 if (title.isNotEmpty()) item(key = "title-${block.rankingId}-$index") { SectionHeader(title, Modifier.padding(top = if (index == 0) 0.dp else XmLayout.SectionGap)) }
                 if (block.contentType == 2) {
                     items(block.albums, key = { "album-${block.rankingId}-$index-${it.id}" }) { album ->
-                        RankedAlbumRow(block.positions[album.id], album, block.stats[album.id])
+                        RankedAlbumRow(block.positions[album.id], album, block.stats[album.id]) { onOpenAlbum(album.id) }
                     }
                 } else {
                     items(block.anchors, key = { "anchor-${block.rankingId}-$index-${it.uid}" }) { anchor ->

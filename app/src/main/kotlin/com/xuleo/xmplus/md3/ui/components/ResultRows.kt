@@ -1,5 +1,6 @@
 package com.xuleo.xmplus.md3.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,8 +33,8 @@ import java.util.Locale
 private val RowPadding = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp)
 
 @Composable
-fun AlbumRow(album: Album, modifier: Modifier = Modifier) {
-    Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+fun AlbumRow(album: Album, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Row(modifier.clickable(onClick = onClick).then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         Cover(album.coverUrl, Modifier.size(72.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(album.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -61,8 +62,8 @@ fun RankPosition(position: Int?) {
 
 /** A chart row: the server's position, a cover, the title and anchor, and play count, score and episodes when known. */
 @Composable
-fun RankedAlbumRow(position: Int?, album: Album, stats: AlbumStats?, modifier: Modifier = Modifier) {
-    Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+fun RankedAlbumRow(position: Int?, album: Album, stats: AlbumStats?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Row(modifier.clickable(onClick = onClick).then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         RankPosition(position)
         Cover(album.coverUrl, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -37,10 +37,10 @@ internal val AlbumSorts = listOf(
 )
 
 @Composable
-fun AllAlbumsScreen(viewModel: AllAlbumsViewModel, category: Int, onBack: () -> Unit) {
+fun AllAlbumsScreen(viewModel: AllAlbumsViewModel, category: Int, onOpenAlbum: (String) -> Unit = {}, onBack: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(category) { viewModel.ensureStarted(category) }
-    AllAlbumsContent(state, onBack, viewModel::select, viewModel::refresh, viewModel::loadMore, viewModel::retry)
+    AllAlbumsContent(state, onBack, viewModel::select, viewModel::refresh, viewModel::loadMore, viewModel::retry, onOpenAlbum)
 }
 
 @Composable
@@ -51,6 +51,7 @@ internal fun AllAlbumsContent(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     BrowsePage(stringResource(R.string.browse_all_albums), onBack) {
         if (state.categories.isNotEmpty()) {
@@ -75,7 +76,7 @@ internal fun AllAlbumsContent(
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
                 )
                 else -> PullToRefreshBox(state.refreshing, onRefresh) {
-                    AlbumGrid(state.albums, state.stats, state.page, state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onLoadMore, onRetry)
+                    AlbumGrid(state.albums, state.stats, state.page, state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onLoadMore, onRetry, onOpenAlbum)
                 }
             }
         }

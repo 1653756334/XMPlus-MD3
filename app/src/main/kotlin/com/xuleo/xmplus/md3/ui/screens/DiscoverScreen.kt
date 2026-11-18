@@ -3,6 +3,7 @@ package com.xuleo.xmplus.md3.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -60,6 +61,7 @@ internal class DiscoverActions(
     val onRetryRanking: (pageId: Int) -> Unit = {},
     val onAllAlbums: (categoryId: Int) -> Unit = {},
     val onFullRanking: (pageId: Int) -> Unit = {},
+    val onAlbum: (String) -> Unit = {},
 )
 
 /** Where 发现 can send the user. */
@@ -68,6 +70,7 @@ internal class DiscoverLinks(
     val onAllAlbums: (categoryId: Int) -> Unit = {},
     val onFullRanking: (pageId: Int) -> Unit = {},
     val onCategory: OpenCategory = { _, _ -> },
+    val onAlbum: (String) -> Unit = {},
 )
 
 internal enum class DiscoverMode(@StringRes val label: Int) {
@@ -86,12 +89,12 @@ internal fun DiscoverScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val actions = remember(viewModel, links) {
-        DiscoverActions(links.onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, links.onAllAlbums, links.onFullRanking)
+        DiscoverActions(links.onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, links.onAllAlbums, links.onFullRanking, links.onAlbum)
     }
     DiscoverContent(state, hotWords, actions) { mode ->
         when (mode) {
             DiscoverMode.Categories -> CategoriesView(categories, links.onCategory)
-            DiscoverMode.Rankings -> RankingsView(rankings)
+            DiscoverMode.Rankings -> RankingsView(rankings, links.onAlbum)
             DiscoverMode.Recommend -> Unit
         }
     }
@@ -218,15 +221,15 @@ private fun Feed(content: HomeContent, ranking: HotRanking?, rankingFailed: Bool
             contentPadding = PaddingValues(top = 4.dp, bottom = XmLayout.SectionGap),
             verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap),
         ) {
-            if (featured != null) item(key = "featured") { Featured(featured, actions.onAllAlbums) }
+            if (featured != null) item(key = "featured") { Featured(featured, actions.onAllAlbums, actions.onAlbum) }
             if (ranking != null && ranking.section.albums.isNotEmpty()) {
-                item(key = "ranking") { RankingCard(ranking) { actions.onFullRanking(pageId) } }
+                item(key = "ranking") { RankingCard(ranking, { actions.onFullRanking(pageId) }, actions.onAlbum) }
             } else if (rankingFailed) {
                 item(key = "ranking-retry") {
                     TextButton({ actions.onRetryRanking(pageId) }, Modifier.padding(horizontal = XmLayout.PagePadding)) { Text(stringResource(R.string.action_retry)) }
                 }
             }
-            items(shelves, key = { it.title + it.albums.first().id }) { Shelf(it, actions.onAllAlbums) }
+            items(shelves, key = { it.title + it.albums.first().id }) { Shelf(it, actions.onAllAlbums, actions.onAlbum) }
             if (sections.isEmpty() && ranking == null) {
                 item(key = "empty") {
                     Text(stringResource(R.string.discover_empty), Modifier.fillMaxWidth().padding(XmLayout.FormPadding),
@@ -248,15 +251,15 @@ private fun SectionHeader(title: String, section: AlbumSection, onAllAlbums: (In
 }
 
 @Composable
-private fun Featured(section: AlbumSection, onAllAlbums: (Int) -> Unit) {
+private fun Featured(section: AlbumSection, onAllAlbums: (Int) -> Unit, onAlbum: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) }, section = section, onAllAlbums = onAllAlbums)
-        FeaturedCarousel(section)
+        FeaturedCarousel(section, onAlbum)
     }
 }
 
 @Composable
-private fun FeaturedCarousel(section: AlbumSection) {
+private fun FeaturedCarousel(section: AlbumSection, onAlbum: (String) -> Unit) {
     val albums = section.albums
     HorizontalMultiBrowseCarousel(
         state = rememberCarouselState { albums.size },
@@ -266,7 +269,7 @@ private fun FeaturedCarousel(section: AlbumSection) {
         modifier = Modifier.fillMaxWidth().height(200.dp),
     ) { index ->
         val album = albums[index]
-        Box(Modifier.fillMaxSize().maskClip(MaterialTheme.shapes.extraLarge)) {
+        Box(Modifier.fillMaxSize().maskClip(MaterialTheme.shapes.extraLarge).clickable { onAlbum(album.id) }) {
             Cover(album.coverUrl, Modifier.fillMaxSize(), RectangleShape)
             Column(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth()
@@ -284,20 +287,20 @@ private fun FeaturedCarousel(section: AlbumSection) {
 }
 
 @Composable
-private fun Shelf(section: AlbumSection, onAllAlbums: (Int) -> Unit) {
+private fun Shelf(section: AlbumSection, onAllAlbums: (Int) -> Unit, onAlbum: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         SectionHeader(section.title.ifEmpty { stringResource(R.string.discover_section_default) }, section = section, onAllAlbums = onAllAlbums)
         LazyRow(
             contentPadding = PaddingValues(horizontal = XmLayout.PagePadding),
             horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
         ) {
-            items(section.albums, key = { it.id }) { AlbumCard(it, section.stats[it.id]) }
+            items(section.albums, key = { it.id }) { AlbumCard(it, section.stats[it.id]) { onAlbum(it.id) } }
         }
     }
 }
 
 @Composable
-private fun RankingCard(ranking: HotRanking, onFullRanking: () -> Unit) {
+private fun RankingCard(ranking: HotRanking, onFullRanking: () -> Unit, onAlbum: (String) -> Unit) {
     val section = ranking.section
     Surface(
         Modifier.padding(horizontal = XmLayout.PagePadding).fillMaxWidth(),
@@ -311,7 +314,7 @@ private fun RankingCard(ranking: HotRanking, onFullRanking: () -> Unit) {
                 actionLabel = stringResource(R.string.ranking_full), onAction = onFullRanking,
             )
             section.albums.take(5).forEachIndexed { index, album ->
-                RankRow(index + 1, album, section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding))
+                RankRow(index + 1, album, section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding)) { onAlbum(album.id) }
             }
         }
     }

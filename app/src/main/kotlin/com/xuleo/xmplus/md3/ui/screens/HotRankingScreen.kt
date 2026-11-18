@@ -22,7 +22,7 @@ import com.xuleo.xmplus.md3.ui.components.*
 
 /** The whole 热播榜 behind a channel's preview card. The preview already loaded it, so this normally opens at once. */
 @Composable
-fun HotRankingScreen(viewModel: DiscoverViewModel, pageId: Int, onBack: () -> Unit) {
+fun HotRankingScreen(viewModel: DiscoverViewModel, pageId: Int, onOpenAlbum: (String) -> Unit = {}, onBack: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val page = state.pages[pageId]
     val ranking = page?.ranking
@@ -39,7 +39,7 @@ fun HotRankingScreen(viewModel: DiscoverViewModel, pageId: Int, onBack: () -> Un
                     contentPadding = PaddingValues(vertical = XmLayout.PagePadding),
                 ) {
                     itemsIndexed(ranking.section.albums, key = { _, album -> album.id }) { index, album ->
-                        RankRow(index + 1, album, ranking.section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding, vertical = 8.dp))
+                        RankRow(index + 1, album, ranking.section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding, vertical = 8.dp)) { onOpenAlbum(album.id) }
                     }
                 }
             }

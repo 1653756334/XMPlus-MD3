@@ -74,4 +74,12 @@ internal object Endpoints {
     val CategoryChannelAlbums = pc("/simple-revision-for-pc/metadata/v2/channel/albums")
     val RankTabs = pc("/simple-revision-for-pc/rank/v4/rankTabs")
     val RankElements = pc("/simple-revision-for-pc/rank/v4/element")
+    val AlbumInfo = read(Host.Mobile, "/mobile/v1/album/info")
+    val AlbumTracks = read(Host.Mobile, "/mobile/v1/album/track/ts-{ts}", Login.Optional)
+    val AlbumIntroduction = read(Host.Mobile, "/fmobile-album/album/rec/detail/ts-{ts}")
+    val AlbumIntroductionAccount = read(Host.Mobile, "/mobile-album/album/plant/detail", Login.Required)
+    val AlbumSimilar = read(Host.Mobile, "/album-mobile/album/similar/querySimilarAlbumList/ts-{ts}")
+    val AlbumReviews = read(Host.Mobile, "/album-comment-mobile/album/comment/list/query/{ts}")
+    val AlbumReviewReplies = read(Host.Mobile, "/album-comment-mobile/ipad/album/comment/reply/list/query/{ts}")
+    val AlbumSearch = Endpoint(Host.Search, "POST", "/front-vertical", Login.Never, idempotent = true)
 }

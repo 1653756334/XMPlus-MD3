@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,8 +67,8 @@ fun PlayCountBadge(playCount: Long, modifier: Modifier = Modifier) {
 
 /** A cover with its title and anchor beneath, sized for a horizontal shelf. */
 @Composable
-fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.width(128.dp)) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.width(128.dp), onClick: () -> Unit = {}) {
+    Column(modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
             Cover(album.coverUrl, Modifier.matchParentSize())
             stats?.playCount?.let { PlayCountBadge(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }
@@ -82,8 +83,8 @@ fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.wi
 
 /** A numbered chart row. The first three numbers use the accent colour. */
 @Composable
-fun RankRow(position: Int, album: Album, stats: AlbumStats?, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+fun RankRow(position: Int, album: Album, stats: AlbumStats?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Row(modifier.fillMaxWidth().clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             position.toString(), Modifier.width(24.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
             color = if (position <= 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,

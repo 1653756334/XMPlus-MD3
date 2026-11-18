@@ -11,6 +11,7 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class AllAlbums(val categoryId: Int = 0) : AppRoute
     @Serializable data class CategoryAlbums(val groupId: Int, val groupTitle: String, val channelId: Int? = null, val channelTitle: String? = null) : AppRoute
     @Serializable data class HotRanking(val pageId: Int) : AppRoute
+    @Serializable data class AlbumPage(val albumId: String) : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object PhoneLogin : AppRoute
     @Serializable data class ImportLogin(val recoveryIdentity: String? = null) : AppRoute

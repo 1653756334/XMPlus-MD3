@@ -168,7 +168,7 @@ Source: XMPlus `lib/storage/config_archive.dart`.
 ### 专辑 and 主播
 
 - BR-30 Album header shows cover, title, anchor, stats, 连载 / 完结 and paid labels; the intro shows the full text.
-- BR-31 Episodes: sort order is remembered per album; range chips follow the sort; jump to a page; search inside the album; 定位 finds a track's own place in the list.
+- BR-31 Episodes: sort order applies to the list; 选集 chunks (1–200, 201–400…) stay in episode-number order and the rows inside a chunk follow the sort; jump to a chunk; search inside the album; 定位 waits for playback.
 - BR-32 Similar albums are listed and open their own pages.
 - BR-33 Reviews: score, sort, replies and copy; an album with no reviews says so.
 - BR-34 Anchor page: profile, verification badge, albums and tracks tabs sorted by 默认 / 最新 / 最早 / 最多播放, and paging.

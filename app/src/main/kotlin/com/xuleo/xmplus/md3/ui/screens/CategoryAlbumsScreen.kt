@@ -37,12 +37,12 @@ private val CategorySorts = listOf(
 )
 
 @Composable
-fun CategoryAlbumsScreen(viewModel: CategoryAlbumsViewModel, groupId: Int, groupTitle: String, channelId: Int?, channelTitle: String?, onBack: () -> Unit) {
+fun CategoryAlbumsScreen(viewModel: CategoryAlbumsViewModel, groupId: Int, groupTitle: String, channelId: Int?, channelTitle: String?, onOpenAlbum: (String) -> Unit = {}, onBack: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(groupId, channelId) { viewModel.ensureStarted(groupId, channelId) }
     val title = channelTitle ?: stringResource(R.string.category_featured, groupTitle)
     CategoryAlbumsContent(
-        state, title, onBack, viewModel::selectSort, viewModel::applyFilters, viewModel::refresh, viewModel::loadMore, viewModel::retry, viewModel::retryInfo,
+        state, title, onBack, viewModel::selectSort, viewModel::applyFilters, viewModel::refresh, viewModel::loadMore, viewModel::retry, viewModel::retryInfo, onOpenAlbum,
     )
 }
 
@@ -57,6 +57,7 @@ internal fun CategoryAlbumsContent(
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
     onRetryInfo: () -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     var filtering by rememberSaveable { mutableStateOf(false) }
     BrowsePage(title, onBack) {
@@ -89,7 +90,7 @@ internal fun CategoryAlbumsContent(
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
                 )
                 else -> PullToRefreshBox(state.refreshing, onRefresh) {
-                    AlbumGrid(state.albums, emptyMap(), state.page, state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onLoadMore, onRetry)
+                    AlbumGrid(state.albums, emptyMap(), state.page, state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onLoadMore, onRetry, onOpenAlbum)
                 }
             }
         }

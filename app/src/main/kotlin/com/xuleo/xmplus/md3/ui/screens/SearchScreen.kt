@@ -60,12 +60,12 @@ private fun SearchKind.label(): Int = when (this) {
 }
 
 @Composable
-fun SearchScreen(viewModel: SearchViewModel, onBack: () -> Unit) {
+fun SearchScreen(viewModel: SearchViewModel, onOpenAlbum: (String) -> Unit = {}, onBack: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.loadHotWords() }
     SearchContent(
         state, onBack, viewModel::submit, viewModel::clear, viewModel::dismissInvalid,
-        viewModel::selectKind, viewModel::loadMore, viewModel::retry,
+        viewModel::selectKind, viewModel::loadMore, viewModel::retry, onOpenAlbum,
     )
 }
 
@@ -79,6 +79,7 @@ internal fun SearchContent(
     onSelectKind: (SearchKind) -> Unit,
     onLoadMore: () -> Unit,
     onRetry: (SearchKind) -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     val query = rememberTextFieldState()
     val focus = LocalFocusManager.current
@@ -138,7 +139,7 @@ internal fun SearchContent(
                 submit(it.word)
             }
         } else {
-            Results(state, onSelectKind, onLoadMore, onRetry)
+            Results(state, onSelectKind, onLoadMore, onRetry, onOpenAlbum)
         }
     }
 }
@@ -164,7 +165,13 @@ private fun Suggestions(hotWords: List<HotWord>, onPick: (HotWord) -> Unit) {
 }
 
 @Composable
-private fun ColumnScope.Results(state: SearchState, onSelectKind: (SearchKind) -> Unit, onLoadMore: () -> Unit, onRetry: (SearchKind) -> Unit) {
+private fun ColumnScope.Results(
+    state: SearchState,
+    onSelectKind: (SearchKind) -> Unit,
+    onLoadMore: () -> Unit,
+    onRetry: (SearchKind) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+) {
     val pager = rememberPagerState(SearchTabs.indexOf(state.kind)) { SearchTabs.size }
     val scope = rememberCoroutineScope()
     LaunchedEffect(pager) { snapshotFlow { pager.settledPage }.collect { onSelectKind(SearchTabs[it]) } }
@@ -178,22 +185,36 @@ private fun ColumnScope.Results(state: SearchState, onSelectKind: (SearchKind) -
     }
     HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), key = { SearchTabs[it].code }) { index ->
         val kind = SearchTabs[index]
-        ResultPane(kind, state.results[kind], ::show, onLoadMore) { onRetry(kind) }
+        ResultPane(kind, state.results[kind], ::show, onLoadMore, { onRetry(kind) }, onOpenAlbum)
     }
 }
 
 @Composable
-private fun ResultPane(kind: SearchKind, result: SearchResult?, onMore: (SearchKind) -> Unit, onLoadMore: () -> Unit, onRetry: () -> Unit) {
+private fun ResultPane(
+    kind: SearchKind,
+    result: SearchResult?,
+    onMore: (SearchKind) -> Unit,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+) {
     when {
         result == null || (!result.loaded && result.errorCode == null) -> ListSkeleton()
         !result.loaded -> ErrorState(result.errorCode.orEmpty(), onRetry)
         result.empty -> Message(R.string.search_empty)
-        else -> ResultList(kind, result, onMore, onLoadMore, onRetry)
+        else -> ResultList(kind, result, onMore, onLoadMore, onRetry, onOpenAlbum)
     }
 }
 
 @Composable
-private fun ResultList(kind: SearchKind, result: SearchResult, onMore: (SearchKind) -> Unit, onLoadMore: () -> Unit, onRetry: () -> Unit) {
+private fun ResultList(
+    kind: SearchKind,
+    result: SearchResult,
+    onMore: (SearchKind) -> Unit,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+) {
     val listState = rememberLazyListState()
     if (kind != SearchKind.All) {
         // Ask for the next page when the end is a few rows away; runs again whenever a page lands.
@@ -204,11 +225,11 @@ private fun ResultList(kind: SearchKind, result: SearchResult, onMore: (SearchKi
         LazyColumn(Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), listState, contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
             if (kind == SearchKind.All) {
                 anchors(result.anchors, result.totals[SearchKind.Anchor] ?: 0, onMore)
-                albums(result.albums, result.totals[SearchKind.Album] ?: 0, onMore)
+                albums(result.albums, result.totals[SearchKind.Album] ?: 0, onMore, onOpenAlbum)
                 tracks(result.tracks, result.totals[SearchKind.Track] ?: 0, onMore)
             } else {
                 items(result.anchors, key = { "anchor-" + it.uid }) { AnchorRow(it) }
-                items(result.albums, key = { "album-" + it.id }) { AlbumRow(it) }
+                items(result.albums, key = { "album-" + it.id }) { album -> AlbumRow(album) { onOpenAlbum(album.id) } }
                 items(result.tracks, key = { "track-" + it.id }) { TrackRow(it) }
                 item(key = "footer") { PagingFooter(result.loading, result.errorCode != null, result.hasMore, onRetry) }
             }
@@ -222,10 +243,10 @@ private fun LazyListScope.anchors(rows: List<AnchorProfile>, total: Int, onMore:
     items(rows, key = { "anchor-" + it.uid }) { AnchorRow(it) }
 }
 
-private fun LazyListScope.albums(rows: List<Album>, total: Int, onMore: (SearchKind) -> Unit) {
+private fun LazyListScope.albums(rows: List<Album>, total: Int, onMore: (SearchKind) -> Unit, onOpenAlbum: (String) -> Unit) {
     if (rows.isEmpty()) return
     item(key = "head-album") { ResultHeader(R.string.search_kind_album, total > rows.size) { onMore(SearchKind.Album) } }
-    items(rows, key = { "album-" + it.id }) { AlbumRow(it) }
+    items(rows, key = { "album-" + it.id }) { album -> AlbumRow(album) { onOpenAlbum(album.id) } }
 }
 
 private fun LazyListScope.tracks(rows: List<Track>, total: Int, onMore: (SearchKind) -> Unit) {

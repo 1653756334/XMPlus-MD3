@@ -4,11 +4,13 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +30,7 @@ import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 fun browseErrorMessage(code: String): Int = when (code) {
     "network", "network_error", "http_error" -> R.string.error_network
     "rate_limited" -> R.string.error_rate_limited
+    "content_removed" -> R.string.album_unavailable
     else -> R.string.error_generic
 }
 
@@ -41,6 +44,20 @@ fun ErrorState(code: String, onRetry: () -> Unit, modifier: Modifier = Modifier)
         Icon(Icons.Outlined.CloudOff, contentDescription = null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
         Text(stringResource(browseErrorMessage(code)), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+    }
+}
+
+/** A section that failed inside a page: the words for the failure and a retry, sized for that section. */
+@Composable
+fun InlineError(code: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxWidth().padding(XmLayout.PagePadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(stringResource(browseErrorMessage(code)), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }
 

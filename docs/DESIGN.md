@@ -199,7 +199,7 @@ Rules:
 
 - Collapsing header: blurred cover tinted with the cover's color; the cover animates in from the previous screen; anchor chip with follow button; stats row.
 - Main actions: 继续播放 第N集, 订阅, download icon.
-- Tabs 简介 / 节目 / 评价, with a sticky toolbar: sort, range chips (1–50, 51–100…), search, multi-select.
+- Tabs 简介 / 节目 / 评价. The episode toolbar (sort, 选集 by 200-episode chunks: 1–200, 201–400…, search) scrolls with the page for now; multi-select arrives with downloads.
 - Episode rows: number, duration, 已听 35%, download state, animated equalizer on the one playing. Long-press opens a multi-select action bar.
 
 ### Full player
