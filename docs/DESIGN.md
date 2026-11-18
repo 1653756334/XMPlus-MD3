@@ -105,10 +105,10 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 ### 账号 Accounts
 
-- [ ] SMS login with Geetest verification
+- [x] SMS login with Geetest verification
 - [x] Cookie / request-header import (verified by a listening-time query before saving)
 - [ ] Multiple accounts, primary account, restore and remove
-- [ ] 听时 balance, claim once
+- [x] 听时 balance, claim once
 - [ ] Auto-claim: top up to 4 h when below 2 h; pauses after an uncertain result until confirmed manually
 - [ ] Usage ledger: charges for playback and download prepayment; states prepared, submitting, confirmed, uncertain, rejected; settles before switching account or exiting; no charge while the balance is above 20 h
 
