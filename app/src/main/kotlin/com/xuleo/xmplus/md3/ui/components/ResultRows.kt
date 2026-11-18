@@ -86,8 +86,9 @@ fun RankedAlbumRow(position: Int?, album: Album, stats: AlbumStats?, modifier: M
 }
 
 @Composable
-fun TrackRow(track: Track, modifier: Modifier = Modifier) {
-    Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+fun TrackRow(track: Track, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val click = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    Row(modifier.then(click).then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         Cover(track.coverUrl, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(track.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -104,8 +105,9 @@ fun TrackRow(track: Track, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AnchorRow(anchor: AnchorProfile, modifier: Modifier = Modifier, position: Int? = null) {
-    Row(modifier.then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+fun AnchorRow(anchor: AnchorProfile, modifier: Modifier = Modifier, position: Int? = null, onClick: (() -> Unit)? = null) {
+    val click = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    Row(modifier.then(click).then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         if (position != null) RankPosition(position)
         Avatar(anchor.avatarUrl, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

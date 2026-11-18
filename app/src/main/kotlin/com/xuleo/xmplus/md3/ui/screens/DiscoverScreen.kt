@@ -71,6 +71,7 @@ internal class DiscoverLinks(
     val onFullRanking: (pageId: Int) -> Unit = {},
     val onCategory: OpenCategory = { _, _ -> },
     val onAlbum: (String) -> Unit = {},
+    val onAnchor: (String) -> Unit = {},
 )
 
 internal enum class DiscoverMode(@StringRes val label: Int) {
@@ -94,7 +95,7 @@ internal fun DiscoverScreen(
     DiscoverContent(state, hotWords, actions) { mode ->
         when (mode) {
             DiscoverMode.Categories -> CategoriesView(categories, links.onCategory)
-            DiscoverMode.Rankings -> RankingsView(rankings, links.onAlbum)
+            DiscoverMode.Rankings -> RankingsView(rankings, links.onAlbum, links.onAnchor)
             DiscoverMode.Recommend -> Unit
         }
     }

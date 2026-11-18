@@ -1,5 +1,6 @@
 package com.xuleo.xmplus.md3.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -71,7 +72,7 @@ private const val TopThreshold = 0.5f
  * is short and every line has a fixed height.
  */
 @Composable
-fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier) {
+fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier, onOpenAnchor: (() -> Unit)? = null) {
     val album = detail.album
     val surface = MaterialTheme.colorScheme.surface
     val shape = MaterialTheme.shapes.large
@@ -96,7 +97,7 @@ fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier) {
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(10.dp))
-                    AnchorLine(album.artist, album.anchorAvatarUrl, detail.anchorVerified)
+                    AnchorLine(album.artist, album.anchorAvatarUrl, detail.anchorVerified, onOpenAnchor)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -160,11 +161,12 @@ private fun statsLine(detail: AlbumDetail): String {
     ).joinToString(" · ")
 }
 
-/** The anchor's avatar and name. It does not open the anchor page yet, which arrives with the anchor step. */
+/** The anchor's avatar and name also serve as the entry to their page. */
 @Composable
-private fun AnchorLine(name: String, avatar: String?, verified: Boolean) {
-    Row(Modifier.fillMaxWidth().height(AnchorHeight), verticalAlignment = Alignment.CenterVertically) {
-        if (name.isNotEmpty()) {
+private fun AnchorLine(name: String, avatar: String?, verified: Boolean, onOpen: (() -> Unit)?) {
+    if (name.isNotEmpty()) {
+        val click = if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier
+        Row(click.height(AnchorHeight), verticalAlignment = Alignment.CenterVertically) {
             Avatar(avatar, Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(

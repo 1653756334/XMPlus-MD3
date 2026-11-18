@@ -82,4 +82,11 @@ internal object Endpoints {
     val AlbumReviews = read(Host.Mobile, "/album-comment-mobile/album/comment/list/query/{ts}")
     val AlbumReviewReplies = read(Host.Mobile, "/album-comment-mobile/ipad/album/comment/reply/list/query/{ts}")
     val AlbumSearch = Endpoint(Host.Search, "POST", "/front-vertical", Login.Never, idempotent = true)
+    val AnchorProfile = web("/revision/user/basic")
+    val AnchorAlbumInfo = web("/revision/album/v1/simple")
+    val AnchorAlbumsDesktop = pc("/simple-revision-for-pc/user/pub")
+    val AnchorAlbumsWeb = web("/revision/user/pub")
+    val AnchorProfileAccount = read(Host.Mobile, "/mobile-user/v3/artist/homepage/ts-{ts}", Login.Required)
+    val AnchorAlbumsAccount = read(Host.Mobile, "/mobile-user/v3/artist/album/ts-{ts}", Login.Required)
+    val AnchorTracks = read(Host.Welfare, "/m-revision/common/anchor/queryAnchorTracksByPage")
 }

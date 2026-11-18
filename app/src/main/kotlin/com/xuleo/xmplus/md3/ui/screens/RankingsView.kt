@@ -31,10 +31,10 @@ import com.xuleo.xmplus.md3.core.model.RankTab
 import com.xuleo.xmplus.md3.ui.components.*
 
 @Composable
-fun RankingsView(viewModel: RankingsViewModel, onOpenAlbum: (String) -> Unit = {}) {
+fun RankingsView(viewModel: RankingsViewModel, onOpenAlbum: (String) -> Unit = {}, onOpenAnchor: (String) -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.ensureLoaded() }
-    RankingsContent(state, viewModel::selectCategory, viewModel::selectTab, viewModel::refresh, viewModel::retry, onOpenAlbum)
+    RankingsContent(state, viewModel::selectCategory, viewModel::selectTab, viewModel::refresh, viewModel::retry, onOpenAlbum, onOpenAnchor)
 }
 
 @Composable
@@ -45,6 +45,7 @@ internal fun RankingsContent(
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     onOpenAlbum: (String) -> Unit = {},
+    onOpenAnchor: (String) -> Unit = {},
 ) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
@@ -70,7 +71,7 @@ internal fun RankingsContent(
                 state.errorCode != null && categories == null -> ErrorState(state.errorCode, onRetry)
                 categories == null -> ListSkeleton()
                 categories.isEmpty() -> Message(R.string.discover_empty)
-                charts?.blocks != null -> PullToRefreshBox(state.refreshing, onRefresh) { Charts(charts.blocks, state.tab, onOpenAlbum) }
+                charts?.blocks != null -> PullToRefreshBox(state.refreshing, onRefresh) { Charts(charts.blocks, state.tab, onOpenAlbum, onOpenAnchor) }
                 charts?.errorCode != null -> ErrorState(charts.errorCode, onRetry)
                 else -> ListSkeleton()
             }
@@ -113,7 +114,7 @@ private fun Message(text: Int) {
 }
 
 @Composable
-private fun Charts(blocks: List<RankBlock>, tab: RankTab?, onOpenAlbum: (String) -> Unit) {
+private fun Charts(blocks: List<RankBlock>, tab: RankTab?, onOpenAlbum: (String) -> Unit, onOpenAnchor: (String) -> Unit) {
     val shown = blocks.filter { (it.contentType == 2 && it.albums.isNotEmpty()) || (it.contentType == 3 && it.anchors.isNotEmpty()) }
     if (shown.isEmpty()) {
         Message(R.string.discover_empty)
@@ -134,7 +135,7 @@ private fun Charts(blocks: List<RankBlock>, tab: RankTab?, onOpenAlbum: (String)
                     }
                 } else {
                     items(block.anchors, key = { "anchor-${block.rankingId}-$index-${it.uid}" }) { anchor ->
-                        AnchorRow(anchor, position = block.positions[anchor.uid])
+                        AnchorRow(anchor, position = block.positions[anchor.uid]) { onOpenAnchor(anchor.uid) }
                     }
                 }
             }

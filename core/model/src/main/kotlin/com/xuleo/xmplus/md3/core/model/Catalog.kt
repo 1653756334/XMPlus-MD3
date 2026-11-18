@@ -1,5 +1,7 @@
 package com.xuleo.xmplus.md3.core.model
 
+import java.time.LocalDate
+
 /** An album as lists and headers show it. Covers are absolute https URLs, already checked. */
 data class Album(
     val id: String,
@@ -66,6 +68,19 @@ data class AnchorProfile(
     val following: Int? = null,
     val albums: Int? = null,
     val tracks: Int? = null,
+)
+
+/** Album metadata used when ordering the works of an anchor. */
+data class AnchorAlbum(val album: Album, val playCount: Long? = null, val createdOn: LocalDate? = null)
+
+/** The service can omit the total for albums and limits the track catalogue to its first 5,000 tracks. */
+data class AnchorContentPage<T>(
+    val items: List<T>,
+    val page: Int,
+    val pageSize: Int,
+    val hasMore: Boolean,
+    val total: Int?,
+    val reportedTotal: Long? = total?.toLong(),
 )
 
 /** One page of a numbered listing. [pageSize] is never 0, so paging controls always have a divisor. */

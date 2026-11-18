@@ -8,6 +8,7 @@ import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
+import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
 import com.xuleo.xmplus.md3.core.protocol.XmlyDiscovery
 import com.xuleo.xmplus.md3.core.protocol.XmlyHome
@@ -35,6 +36,7 @@ class XmApplication : Application() {
     val discovery by lazy { XmlyDiscovery(http) }
     val search by lazy { XmlySearch(http) }
     val album by lazy { XmlyAlbum(http) }
+    val anchor by lazy { XmlyAnchor(http) }
 
     /** Claims and debits change the same balance, so they share one lock per account. */
     private val balanceLocks = BalanceLocks()

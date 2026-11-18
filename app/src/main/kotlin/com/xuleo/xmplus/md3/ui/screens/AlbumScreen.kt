@@ -114,7 +114,7 @@ private val SearchHeight = 44.dp
  * controls are not offered yet.
  */
 @Composable
-internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAlbum: (String) -> Unit) {
+internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAlbum: (String) -> Unit, onOpenAnchor: (String?) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
     val density = LocalDensity.current
@@ -150,7 +150,7 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
         } else {
             Column(Modifier.fillMaxSize().clipToBounds().nestedScroll(chrome.connection)) {
                 Box(Modifier.collapsing(chrome)) {
-                    AlbumHero(detail, Modifier.onSizeChanged { chrome.height = it.height.toFloat() })
+                    AlbumHero(detail, Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) { onOpenAnchor(detail.album.anchorUid) }
                 }
                 AlbumTabRow(pager.currentPage) { index -> scope.launch { pager.animateScrollToPage(index) } }
                 HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->

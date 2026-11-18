@@ -27,6 +27,8 @@ import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
+import com.xuleo.xmplus.md3.browse.AnchorRouteStores
+import com.xuleo.xmplus.md3.browse.AnchorViewModel
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
@@ -53,7 +55,14 @@ fun XmApp() {
     val albumPage: @Composable (String) -> AlbumViewModel = { id ->
         viewModel(key = "album:$id", factory = AlbumViewModel.factory(id, application.album, application.accounts))
     }
-    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage)
+    val anchorStores: AnchorRouteStores = viewModel()
+    val anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel = { route ->
+        viewModel(viewModelStoreOwner = anchorStores.owner(route.contentKey), factory = AnchorViewModel.factory(route, application.anchor, application.accounts))
+    }
+    XmAppContent(
+        selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
+        anchorPage = anchorPage, onAnchorPopped = anchorStores::remove,
+    )
 }
 
 @Composable
@@ -68,6 +77,8 @@ internal fun XmAppContent(
     categoryAlbums: CategoryAlbumsViewModel? = null,
     rankings: RankingsViewModel? = null,
     albumPage: @Composable (String) -> AlbumViewModel? = { null },
+    anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel? = { null },
+    onAnchorPopped: (Any) -> Unit = {},
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -75,7 +86,8 @@ internal fun XmAppContent(
             when (removed) {
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
-                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking, is AppRoute.AlbumPage -> Unit
+                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
+                is AppRoute.AlbumPage, is AppRoute.AnchorPage -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -115,7 +127,10 @@ internal fun XmAppContent(
     fun openAlbum(albumId: String) {
         navigator.push(AppRoute.AlbumPage(albumId))
     }
-    val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory, ::openAlbum)
+    fun openAnchor(uid: String) {
+        navigator.push(AppRoute.AnchorPage(uid))
+    }
+    val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory, ::openAlbum, ::openAnchor)
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
         navigator.push(AppRoute.ImportLogin(identity))
@@ -133,6 +148,7 @@ internal fun XmAppContent(
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
+    val anchorDecorator = remember(onAnchorPopped) { NavEntryDecorator<NavKey>(onPop = onAnchorPopped) { it.Content() } }
     NavigationSuiteScaffold(
         state = suite,
         navigationSuiteType = navigationType,
@@ -157,7 +173,7 @@ internal fun XmAppContent(
                 backStack = stack,
                 onBack = { navigator.pop() },
                 modifier = Modifier.weight(1f).clipToBounds(),
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), anchorDecorator),
                 transitionSpec = {
                     (slideInHorizontally(spatial) { it * direction } + fadeIn(effects)) togetherWith
                         (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
@@ -181,7 +197,7 @@ internal fun XmAppContent(
                         }
                     }
                     entry<AppRoute.Search> {
-                        Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search, ::openAlbum) { navigator.pop() } }
+                        Surface(Modifier.fillMaxSize()) { if (search != null) SearchScreen(search, ::openAlbum, ::openAnchor) { navigator.pop() } }
                     }
                     entry<AppRoute.AllAlbums> { route ->
                         Surface(Modifier.fillMaxSize()) { if (allAlbums != null) AllAlbumsScreen(allAlbums, route.categoryId, ::openAlbum) { navigator.pop() } }
@@ -197,11 +213,21 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId, ::openAlbum) { navigator.pop() } }
                     }
                     entry<AppRoute.AlbumPage> { route ->
-            Surface(Modifier.fillMaxSize()) {
-                albumPage(route.albumId)?.let { AlbumScreen(it, { navigator.pop() }, ::openAlbum) }
-            }
-        }
-        entry<AppRoute.Accounts> {
+                        Surface(Modifier.fillMaxSize()) {
+                            albumPage(route.albumId)?.let { vm ->
+                                AlbumScreen(vm, { navigator.pop() }, ::openAlbum) { uid ->
+                                    if (uid != null) openAnchor(uid)
+                                    else navigator.push(AppRoute.AnchorPage(route.albumId, resolveFromAlbum = true))
+                                }
+                            }
+                        }
+                    }
+                    entry<AppRoute.AnchorPage>(clazzContentKey = { it.contentKey }) { route ->
+                        Surface(Modifier.fillMaxSize()) {
+                            anchorPage(route)?.let { AnchorScreen(it, ::openAlbum) { navigator.pop() } }
+                        }
+                    }
+                    entry<AppRoute.Accounts> {
                         Surface(Modifier.fillMaxSize()) {
                             AccountsContent(accountState, accounts?.busy == true, accounts?.errorCode,
                                 { navigator.pop() }, ::openPhone, { accounts?.setPrimary(it) }, { accounts?.remove(it) },
