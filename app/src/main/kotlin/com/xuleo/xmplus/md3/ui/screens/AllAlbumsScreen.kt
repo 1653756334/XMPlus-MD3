@@ -74,7 +74,9 @@ internal fun AllAlbumsContent(
                     stringResource(R.string.browse_empty), Modifier.fillMaxSize().padding(XmLayout.FormPadding).wrapContentSize(),
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
                 )
-                else -> PullToRefreshBox(state.refreshing, onRefresh) { AlbumGrid(state, onLoadMore, onRetry) }
+                else -> PullToRefreshBox(state.refreshing, onRefresh) {
+                    AlbumGrid(state.albums, state.stats, state.page, state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onLoadMore, onRetry)
+                }
             }
         }
     }
@@ -87,26 +89,6 @@ private fun Chips(content: androidx.compose.foundation.lazy.LazyListScope.() -> 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
     )
-}
-
-@Composable
-private fun AlbumGrid(state: AllAlbumsState, onLoadMore: () -> Unit, onRetry: () -> Unit) {
-    val grid = rememberLazyGridState()
-    LoadMoreEffect({ grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { grid.layoutInfo.totalItemsCount }, grid, state.page, state.loading,
-        onLoadMore = onLoadMore)
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyVerticalGrid(
-            GridCells.Adaptive(112.dp), Modifier.widthIn(max = 960.dp).fillMaxSize(), grid,
-            contentPadding = PaddingValues(XmLayout.PagePadding),
-            horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
-            verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap - 8.dp),
-        ) {
-            items(state.albums, key = { it.id }) { AlbumCard(it, state.stats[it.id], Modifier.fillMaxWidth()) }
-            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) {
-                PagingFooter(state.loading && !state.refreshing, state.errorCode != null, state.hasMore, onRetry)
-            }
-        }
-    }
 }
 
 private val sampleCategories = listOf(BrowseCategory(1, "Books"), BrowseCategory(2, "Music"))

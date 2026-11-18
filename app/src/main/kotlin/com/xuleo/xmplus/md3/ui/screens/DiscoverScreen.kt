@@ -1,5 +1,7 @@
 package com.xuleo.xmplus.md3.ui.screens
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +14,8 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -22,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.ChannelState
 import com.xuleo.xmplus.md3.browse.ChannelsState
 import com.xuleo.xmplus.md3.browse.DiscoverState
@@ -51,42 +56,71 @@ internal class DiscoverActions(
     val onFullRanking: (pageId: Int) -> Unit = {},
 )
 
-@Composable
-fun DiscoverScreen(
-    viewModel: DiscoverViewModel,
-    hotWords: List<HotWord>,
-    onSearch: () -> Unit,
-    onAllAlbums: (categoryId: Int) -> Unit,
-    onFullRanking: (pageId: Int) -> Unit,
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val actions = remember(viewModel, onSearch, onAllAlbums, onFullRanking) {
-        DiscoverActions(onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, onAllAlbums, onFullRanking)
-    }
-    DiscoverContent(state, hotWords, actions)
+/** Where 发现 can send the user. */
+internal class DiscoverLinks(
+    val onSearch: () -> Unit = {},
+    val onAllAlbums: (categoryId: Int) -> Unit = {},
+    val onFullRanking: (pageId: Int) -> Unit = {},
+    val onCategory: OpenCategory = { _, _ -> },
+)
+
+internal enum class DiscoverMode(@StringRes val label: Int) {
+    Recommend(R.string.discover_mode_recommend),
+    Categories(R.string.discover_mode_categories),
 }
 
+@Composable
+internal fun DiscoverScreen(viewModel: DiscoverViewModel, categories: CategoriesViewModel, hotWords: List<HotWord>, links: DiscoverLinks) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val actions = remember(viewModel, links) {
+        DiscoverActions(links.onSearch, viewModel::reload, viewModel::load, viewModel::selectTab, viewModel::retryRanking, links.onAllAlbums, links.onFullRanking)
+    }
+    DiscoverContent(state, hotWords, actions) { mode ->
+        when (mode) {
+            DiscoverMode.Categories -> CategoriesView(categories, links.onCategory)
+            else -> Unit
+        }
+    }
+}
+
+/** 发现: the search bar, a switch between the modes, and the mode's content. [other] draws every mode but 推荐. */
 @Composable
 internal fun DiscoverContent(
     state: DiscoverState,
     hotWords: List<HotWord>,
     actions: DiscoverActions,
+    other: @Composable (DiscoverMode) -> Unit = {},
 ) {
+    var mode by rememberSaveable { mutableStateOf(DiscoverMode.Recommend) }
+    val holder = rememberSaveableStateHolder()
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         SearchEntry(hotWords, actions.onSearch)
-        when (val channels = state.channels) {
-            ChannelsState.Loading -> {
-                Row(Modifier.fillMaxWidth().padding(XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-                    repeat(4) { Box(Modifier.size(width = 56.dp, height = 20.dp).skeleton()) }
-                }
-                PageSkeleton(Modifier.weight(1f))
+        PrimaryTabRow(selectedTabIndex = mode.ordinal, containerColor = MaterialTheme.colorScheme.surface, divider = {}) {
+            DiscoverMode.entries.forEach { entry ->
+                Tab(selected = entry == mode, onClick = { mode = entry }, text = { Text(stringResource(entry.label), maxLines = 1) })
             }
-            is ChannelsState.Failed -> ErrorState(channels.code, actions.onReload, Modifier.weight(1f))
-            is ChannelsState.Ready -> ChannelPager(channels.channels, state.pages, actions)
+        }
+        Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
+            holder.SaveableStateProvider(current.name) {
+                if (current == DiscoverMode.Recommend) Column(Modifier.fillMaxSize()) { Recommendations(state, actions) } else other(current)
+            }
         }
     }
 }
 
+@Composable
+private fun ColumnScope.Recommendations(state: DiscoverState, actions: DiscoverActions) {
+    when (val channels = state.channels) {
+        ChannelsState.Loading -> {
+            Row(Modifier.fillMaxWidth().padding(XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+                repeat(4) { Box(Modifier.size(width = 56.dp, height = 20.dp).skeleton()) }
+            }
+            PageSkeleton(Modifier.weight(1f))
+        }
+        is ChannelsState.Failed -> ErrorState(channels.code, actions.onReload, Modifier.weight(1f))
+        is ChannelsState.Ready -> ChannelPager(channels.channels, state.pages, actions)
+    }
+}
 @Composable
 private fun ColumnScope.ChannelPager(
     channels: List<HomeChannel>,

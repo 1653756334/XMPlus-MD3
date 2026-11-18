@@ -155,4 +155,13 @@
     <string name="sort_recent">Recently updated</string>
     <string name="sort_plays">Most played</string>
     <string name="ranking_full">Full chart</string>
+    <string name="discover_mode_recommend">For you</string>
+    <string name="discover_mode_categories">Categories</string>
+    <string name="category_featured">%s picks</string>
+    <string name="category_filter">Filter</string>
+    <string name="category_filter_count">Filter · %d</string>
+    <string name="category_filter_retry">Retry filter</string>
+    <string name="filter_reset">Reset</string>
+    <string name="filter_apply">Apply</string>
+    <string name="sort_newest">Newest</string>
 </resources>

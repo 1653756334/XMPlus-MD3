@@ -26,10 +26,14 @@ import androidx.navigation3.ui.NavDisplay
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
+import com.xuleo.xmplus.md3.browse.CategoriesViewModel
+import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
 import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
+import com.xuleo.xmplus.md3.core.model.CategoryChannel
+import com.xuleo.xmplus.md3.core.model.CategoryGroup
 import com.xuleo.xmplus.md3.core.model.HotWord
 import com.xuleo.xmplus.md3.ui.screens.*
 
@@ -40,8 +44,10 @@ fun XmApp() {
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
     val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
     val allAlbums: AllAlbumsViewModel = viewModel(factory = AllAlbumsViewModel.factory(application.browse))
+    val categories: CategoriesViewModel = viewModel(factory = CategoriesViewModel.factory(application.discovery))
+    val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums)
+    XmAppContent(selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums)
 }
 
 @Composable
@@ -52,6 +58,8 @@ internal fun XmAppContent(
     discover: DiscoverViewModel? = null,
     search: SearchViewModel? = null,
     allAlbums: AllAlbumsViewModel? = null,
+    categories: CategoriesViewModel? = null,
+    categoryAlbums: CategoryAlbumsViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -59,7 +67,7 @@ internal fun XmAppContent(
             when (removed) {
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
-                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.HotRanking -> Unit
+                AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -92,6 +100,11 @@ internal fun XmAppContent(
         allAlbums?.start(categoryId)
         navigator.push(AppRoute.AllAlbums(categoryId))
     }
+    fun openCategory(group: CategoryGroup, channel: CategoryChannel?) {
+        categoryAlbums?.start(group.id, channel?.relationMetadataValueId)
+        navigator.push(AppRoute.CategoryAlbums(group.id, group.title, channel?.relationMetadataValueId, channel?.title))
+    }
+    val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory)
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
         navigator.push(AppRoute.ImportLogin(identity))
@@ -151,7 +164,7 @@ internal fun XmAppContent(
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
-                                TabContent(tab, stateHolder, accounts, discover, hotWords, ::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) },
+                                TabContent(tab, stateHolder, accounts, discover, categories, hotWords, links,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive)
                             }
                         }
@@ -161,6 +174,13 @@ internal fun XmAppContent(
                     }
                     entry<AppRoute.AllAlbums> { route ->
                         Surface(Modifier.fillMaxSize()) { if (allAlbums != null) AllAlbumsScreen(allAlbums, route.categoryId) { navigator.pop() } }
+                    }
+                    entry<AppRoute.CategoryAlbums> { route ->
+                        Surface(Modifier.fillMaxSize()) {
+                            if (categoryAlbums != null) {
+                                CategoryAlbumsScreen(categoryAlbums, route.groupId, route.groupTitle, route.channelId, route.channelTitle) { navigator.pop() }
+                            }
+                        }
                     }
                     entry<AppRoute.HotRanking> { route ->
                         Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId) { navigator.pop() } }
@@ -205,10 +225,10 @@ internal fun XmAppContent(
 
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
-    hotWords: List<HotWord>, onSearch: () -> Unit, onAllAlbums: (Int) -> Unit, onFullRanking: (Int) -> Unit, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
+    categories: CategoriesViewModel?, hotWords: List<HotWord>, links: DiscoverLinks, onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
-            Destination.Discover -> if (discover != null) DiscoverScreen(discover, hotWords, onSearch, onAllAlbums, onFullRanking) else EmptyTab(destination.label, destination.icon)
+            Destination.Discover -> if (discover != null && categories != null) DiscoverScreen(discover, categories, hotWords, links) else EmptyTab(destination.label, destination.icon)
             Destination.Library -> LibraryScreen()
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup)
