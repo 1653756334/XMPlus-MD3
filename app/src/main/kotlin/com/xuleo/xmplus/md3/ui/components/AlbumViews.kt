@@ -73,11 +73,10 @@ fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.wi
             Cover(album.coverUrl, Modifier.matchParentSize())
             stats?.playCount?.let { PlayCountBadge(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }
         }
-        Text(album.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (album.artist.isNotEmpty()) {
-            Text(album.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        // Two title lines and one artist line are always reserved, so cards in a shelf or grid line up whatever their text.
+        Text(album.title, style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(album.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            minLines = 1, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -11,25 +11,32 @@ import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 
 /**
- * Chrome above a list that scrolls away with it. Scrolling takes the chrome first, so it shrinks to nothing
- * before the content moves, and scrolling back brings it back. Whatever sits below the chrome stays put.
+ * Chrome above a list that scrolls away with it. Scrolling takes the chrome first, so it shrinks before the content moves,
+ * and scrolling back brings it back. Whatever sits below the chrome stays put. When fully hidden the chrome still keeps
+ * [minHeight] pixels, so content below it starts clear of something drawn over the top.
  */
-class CollapsingChrome {
+class CollapsingChrome(private val minHeight: Float = 0f) {
     /** The chrome natural height in pixels, measured on screen. */
     var height by mutableFloatStateOf(0f)
 
-    /** 0 when fully shown, down to minus [height] when fully hidden. */
+    /** 0 when fully shown, down to minus the travel when fully hidden. */
     var offset by mutableFloatStateOf(0f)
         private set
 
+    /** How far the chrome can move: its height less what it keeps. */
+    private val travel: Float get() = (height - minHeight).coerceAtLeast(0f)
+
     val connection: NestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            val target = (offset + available.y).coerceIn(-height, 0f)
+            val target = (offset + available.y).coerceIn(-travel, 0f)
             val consumed = target - offset
             offset = target
             return Offset(0f, consumed)
         }
     }
+
+    /** The shift the content takes for a chrome measured at [measured] pixels. */
+    fun shiftFor(measured: Float): Int = offset.coerceIn(-(measured - minHeight).coerceAtLeast(0f), 0f).roundToInt()
 
     fun expand() {
         offset = 0f
@@ -39,6 +46,6 @@ class CollapsingChrome {
 /** Shows the part of the content that the chrome still leaves, so the layout below moves up with it. */
 fun Modifier.collapsing(chrome: CollapsingChrome): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    val shift = chrome.offset.coerceIn(-placeable.height.toFloat(), 0f).roundToInt()
+    val shift = chrome.shiftFor(placeable.height.toFloat())
     layout(placeable.width, placeable.height + shift) { placeable.place(0, shift) }
 }
