@@ -14,6 +14,8 @@ data class PlaybackQueueState(
     val errorCode: String? = null,
     /** Episodes the last check for new ones added; null before any check. */
     val addedCount: Int? = null,
+    /** The list ends where the album ends, so a check for new episodes belongs under the last row. */
+    val reachedEnd: Boolean = false,
 )
 
 internal const val PlaybackAlbumPageSize = 200

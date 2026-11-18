@@ -78,20 +78,6 @@ internal fun PlayerQueueSheet(
                     Text(stringResource(R.string.player_queue_locate))
                 }
             }
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onCheckNew, enabled = !queue.isLoading) { Text(stringResource(R.string.player_queue_check)) }
-                queue.addedCount?.let { added ->
-                    Text(
-                        if (added > 0) stringResource(R.string.player_queue_check_added, added) else stringResource(R.string.player_queue_check_none),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
             if (queue.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
             queue.errorCode?.let { code ->
                 Text(
@@ -125,7 +111,22 @@ internal fun PlayerQueueSheet(
                         Text(track.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-            }
+                if (queue.reachedEnd) item(key = "check-new") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = onCheckNew, enabled = !queue.isLoading) { Text(stringResource(R.string.player_queue_check)) }
+                        queue.addedCount?.let { added ->
+                            Text(
+                                if (added > 0) stringResource(R.string.player_queue_check_added, added) else stringResource(R.string.player_queue_check_none),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }            }
         }
     }
 }

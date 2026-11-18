@@ -343,6 +343,7 @@ class PlaybackController(
             items = choice.queue.items, currentTrackId = currentId,
             hasNext = currentId != null && choice.queue.hasNext(currentId),
             addedCount = choice.added,
+            reachedEnd = !choice.queue.hasLaterPage,
         )
         if (target == null) return
         val album = choice.queue.detail.album
