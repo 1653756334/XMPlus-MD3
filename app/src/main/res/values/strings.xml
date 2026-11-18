@@ -8,12 +8,14 @@
     <string name="tab_me">Me</string>
 
     <string name="mini_player_idle">Nothing playing</string>
-    <string name="player_title">Now playing</string>
     <string name="player_open">Open player</string>
-    <string name="player_seek_back">15 s</string>
-    <string name="player_seek_forward">30 s</string>
-    <string name="player_rewind">Back</string>
-    <string name="player_fast_forward">Forward</string>
+    <string name="player_minimize">Minimize player</string>
+    <string name="player_seek_back">Back %1$d seconds</string>
+    <string name="player_seek_forward">Forward %1$d seconds</string>
+    <string name="player_more">More</string>
+    <string name="player_view_album">View album</string>
+    <string name="player_view_anchor">View creator</string>
+    <string name="player_go_to_start">Go to start</string>
     <string name="player_progress">Playback position</string>
     <string name="player_insufficient_quota">Not enough listening time.</string>
     <string name="player_login_required">Sign in to play this episode.</string>

@@ -171,7 +171,14 @@ class PlaybackController(
         if (current.canSeek) engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
     }
 
-    fun seekBy(deltaMs: Long) = seekTo(mutableState.value.positionMs + deltaMs)
+    fun skipBack() = skipBy(-PlaybackSkipMillis)
+
+    fun skipForward() = skipBy(PlaybackSkipMillis)
+
+    private fun skipBy(deltaMs: Long) {
+        val player = engine.value ?: return
+        seekTo(player.currentPosition + deltaMs)
+    }
 
     fun stop() {
         val request = supersede()

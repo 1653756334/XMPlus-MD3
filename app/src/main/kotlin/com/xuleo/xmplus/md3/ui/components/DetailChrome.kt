@@ -110,20 +110,25 @@ internal fun DetailHero(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val surface = MaterialTheme.colorScheme.surface
     Box(modifier.fillMaxWidth()) {
-        Box(Modifier.matchParentSize().clipToBounds()) {
-            Cover(artwork, Modifier.fillMaxSize().blur(BackdropBlur), RectangleShape)
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(surface.copy(alpha = 0.6f), surface.copy(alpha = 0.85f), surface)),
-                ),
-            )
-        }
+        DetailArtworkBackdrop(artwork, Modifier.matchParentSize())
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             DetailTopBarSpace()
             content()
         }
+    }
+}
+
+@Composable
+internal fun DetailArtworkBackdrop(artwork: String?, modifier: Modifier = Modifier) {
+    val surface = MaterialTheme.colorScheme.surface
+    Box(modifier.clipToBounds()) {
+        Cover(artwork, Modifier.matchParentSize().blur(BackdropBlur), RectangleShape)
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(listOf(surface.copy(alpha = 0.6f), surface.copy(alpha = 0.85f), surface)),
+            ),
+        )
     }
 }
 

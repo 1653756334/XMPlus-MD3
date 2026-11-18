@@ -97,7 +97,9 @@ internal fun XmAppContent(
             }
         }
     }
-    val isHome = stack.lastOrNull() == AppRoute.Home
+    // Keep the underlying page and mini player in place while the player slides over them.
+    val pages = stack.filterNot { it == AppRoute.Player }
+    val isHome = pages.lastOrNull() == AppRoute.Home
     val isPlayer = stack.lastOrNull() == AppRoute.Player
     val stateHolder = rememberSaveableStateHolder()
     val security = rememberSensitiveWindow()
@@ -106,7 +108,7 @@ internal fun XmAppContent(
     val accountState = accounts?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
     val hotWords = search?.state?.collectAsStateWithLifecycle()?.value?.hotWords.orEmpty()
 
-    BackHandler(enabled = isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
+    BackHandler(enabled = !isPlayer && isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
     LaunchedEffect(isHome) { if (isHome) suite.show() else suite.hide() }
     LaunchedEffect(accounts?.importCompleted) {
         if (accounts?.importCompleted == true) {
@@ -135,6 +137,16 @@ internal fun XmAppContent(
     }
     fun openAnchor(uid: String) {
         navigator.push(AppRoute.AnchorPage(uid))
+    }
+    fun openAlbumAnchor(albumId: String, uid: String?) {
+        if (uid != null) openAnchor(uid)
+        else navigator.push(AppRoute.AnchorPage(albumId, resolveFromAlbum = true))
+    }
+    fun openPlayer() {
+        if (stack.lastOrNull() == AppRoute.Player) return
+        // An older saved stack may have left the player under an account page.
+        stack.remove(AppRoute.Player)
+        navigator.push(AppRoute.Player)
     }
     val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory, ::openAlbum, ::openAnchor)
     fun openImport(identity: String? = null) {
@@ -176,8 +188,8 @@ internal fun XmAppContent(
         // One player on every page, outside every entry transition. IME insets move it above the keyboard.
         Column(Modifier.fillMaxSize().imePadding()) {
             NavDisplay(
-                backStack = stack,
-                onBack = { navigator.pop() },
+                backStack = pages,
+                onBack = { if (!isPlayer) navigator.pop() },
                 modifier = Modifier.weight(1f).clipToBounds(),
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), anchorDecorator),
                 transitionSpec = {
@@ -223,10 +235,7 @@ internal fun XmAppContent(
                             albumPage(route.albumId)?.let { vm ->
                                 AlbumScreen(
                                     vm, { navigator.pop() }, ::openAlbum,
-                                    onOpenAnchor = { uid ->
-                                        if (uid != null) openAnchor(uid)
-                                        else navigator.push(AppRoute.AnchorPage(route.albumId, resolveFromAlbum = true))
-                                    },
+                                    onOpenAnchor = { uid -> openAlbumAnchor(route.albumId, uid) },
                                     onPlayEpisode = { album, track -> playback?.play(PlaybackSelection(track, album)) },
                                 )
                             }
@@ -235,13 +244,6 @@ internal fun XmAppContent(
                     entry<AppRoute.AnchorPage>(clazzContentKey = { it.contentKey }) { route ->
                         Surface(Modifier.fillMaxSize()) {
                             anchorPage(route)?.let { AnchorScreen(it, ::openAlbum) { navigator.pop() } }
-                        }
-                    }
-                    entry<AppRoute.Player> {
-                        Surface(Modifier.fillMaxSize()) {
-                            if (playback != null) PlayerScreen(
-                                playback, { navigator.pop() }, { navigator.push(AppRoute.Accounts) },
-                            )
                         }
                     }
                     entry<AppRoute.Accounts> {
@@ -274,8 +276,17 @@ internal fun XmAppContent(
                     }
                 },
             )
-            if (!isPlayer) MiniPlayer(playback, onOpen = { navigator.push(AppRoute.Player) })
+            MiniPlayer(playback, onOpen = ::openPlayer)
         }
+    }
+    if (isPlayer && playback != null) {
+        PlayerSheet(
+            playback,
+            onDismiss = { stack.remove(AppRoute.Player) },
+            onOpenAlbum = ::openAlbum,
+            onOpenAnchor = ::openAlbumAnchor,
+            onAccounts = { navigator.push(AppRoute.Accounts) },
+        )
     }
     accounts?.archive?.let {
         ArchiveDialog(it, accounts.busy, accounts.errorCode, accounts::confirmArchive, accounts::dismissArchive)

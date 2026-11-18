@@ -43,8 +43,8 @@ internal fun createPlayer(context: Context): ExoPlayer {
         .setAudioAttributes(AudioAttributes.DEFAULT, true)
         .setHandleAudioBecomingNoisy(true)
         .setWakeMode(C.WAKE_MODE_NETWORK)
-        .setSeekBackIncrementMs(15_000)
-        .setSeekForwardIncrementMs(30_000)
+        .setSeekBackIncrementMs(PlaybackSkipMillis)
+        .setSeekForwardIncrementMs(PlaybackSkipMillis)
         .build()
 }
 

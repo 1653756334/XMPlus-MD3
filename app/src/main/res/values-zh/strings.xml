@@ -6,12 +6,14 @@
     <string name="tab_me">我的</string>
 
     <string name="mini_player_idle">未在播放</string>
-    <string name="player_title">正在播放</string>
     <string name="player_open">打开播放器</string>
-    <string name="player_seek_back">15 秒</string>
-    <string name="player_seek_forward">30 秒</string>
-    <string name="player_rewind">后退</string>
-    <string name="player_fast_forward">前进</string>
+    <string name="player_minimize">收起播放器</string>
+    <string name="player_seek_back">后退 %1$d 秒</string>
+    <string name="player_seek_forward">前进 %1$d 秒</string>
+    <string name="player_more">更多</string>
+    <string name="player_view_album">查看专辑</string>
+    <string name="player_view_anchor">查看主播</string>
+    <string name="player_go_to_start">回到开头</string>
     <string name="player_progress">播放进度</string>
     <string name="player_insufficient_quota">听时不足。</string>
     <string name="player_login_required">登录后可播放此节目。</string>
