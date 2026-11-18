@@ -217,7 +217,7 @@ Rules:
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
 - Queue sheet: reverse, drag handles, 回到当前.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
-- Sleep timer sheet: the same slider for 1–120 minutes in whole minutes, with 15 / 30 / 60 / 90 / 120 as snap points; 开始计时 starts it. Episode end and 关闭定时 act at once. The countdown replaces the 定时关闭 label.
+- Sleep timer sheet: the same slider for 1–120 minutes in whole minutes, with 15 / 30 / 60 / 90 / 120 as snap points; 开始计时 starts it. Below the slider, 本集播完后 is a chip that acts at once; 关闭定时 and 开始计时 sit side by side, 关闭定时 enabled only while a timer is running. The countdown replaces the 定时关闭 label.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
 
 ### 听过 Library
