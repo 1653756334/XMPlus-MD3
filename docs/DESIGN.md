@@ -72,13 +72,13 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Queue editing: drag to reorder, reverse, remove, clear, check the album for new episodes
 - [ ] Modes: sequential, list loop, single loop, shuffle without repeats
 - [ ] Speed (global and per album), master volume and mute, per-album volume, seek intervals
-- [ ] Intro/outro skip, set per album (see Episode end)
+- [ ] Intro/outro skip, per album only and never global, seeded from the server's suggestion (see Intro and outro skip)
 - [ ] Sleep timer: after a duration or at the end of the episode; then pause or exit; optionally keep downloading
 - [ ] Like, favorite, with counts
 - [ ] Comments: replies, likes, posting, deleting your own
 - [ ] Transcript (文稿)
 - [x] Bookmarks with notes
-- [x] Resume from local and cloud progress; optional upload with consent; the finished-episode rules below (the code still uses a 95% position until they are built)
+- [x] Resume from local and cloud progress; optional upload with consent; an episode that played to its end is recorded as finished (see Episode end)
 - [ ] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
 - [ ] System controls: notification, lock screen, Bluetooth, headset
@@ -213,7 +213,7 @@ Rules:
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
   - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the configured interval (default 15 s each way).
   - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 for now; 列表循环 and 单集循环 join when they are built.
-- 更多 sheet: view album, view anchor, go to start. Volume and intro/outro skip join it in Phase 6.
+- 更多 sheet: view album, view anchor, go to start. 跳过片头片尾 (see Intro and outro skip) and volume join it in Phase 6.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
 - Queue sheet: reverse, drag handles, 回到当前.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×.
@@ -223,8 +223,13 @@ Rules:
   - When it finishes, in this order: 本集播完后 is on → pause, clear the timer, stay on the episode; otherwise there is a next episode → play it; otherwise → pause at the end.
   - Progress of a finished episode is saved as finished, not as an end position. Opening it again starts from the beginning (after the intro skip), and so does tapping it in the album or queue.
   - The play button on a finished episode plays the next episode when there is one, and replays the last one from the beginning.
-  - Intro/outro skip is set per album: the intro skip moves the start of an episode that begins at 0 and never a resumed position; the outro skip ends the episode early by the rule above. Both are off by default and live in the 更多 sheet.
-  - Nothing here replaces the user's own seeking: a bookmark or a drag to the end plays from that point, and the 95% position rule goes away once finished is a recorded state.
+  - Finished is a recorded state, not a position: playing to the end saves the episode as finished, and the next listen clears it. A position the user only seeks to, such as the last seconds, is never finished. There is no percentage threshold.
+  - A bookmark or a drag to the end plays from that point and does not change this.
+- Intro and outro skip. Per album only; there is no global setting. The values are the album's 片头 and 片尾 in whole seconds, 0 to 3600, and 0 means off.
+  - Seeding: as in XMPlus, the server's suggestion for the album comes from `/mobile-settings/v1/skipsegment/get/{ts}` with `albumId` and `isShowRecommend=true`. `recommendSkip.recommendHeadSkip` and `recommendHeadTail` are milliseconds, rounded to seconds; a missing `recommendSkip` means there is no suggestion. The suggestion is only offered, never applied by itself.
+  - Playback rules, from XMPlus: an episode that starts at the beginning, or resumes before the intro skip point, starts at the skip point; a resumed position past it is kept. At or after `duration − outro` the episode counts as finished by the rule above. If intro + outro is not shorter than the episode, skipping is off for that episode and the sheet says so. A deliberate seek or replay turns skipping off for that episode until it is opened again, and changing the intro while listening never overrides a position the user chose.
+  - UI, in the 更多 sheet: a 跳过片头片尾 row, icon on the left, the current setting under it (片头 30 秒 · 片尾 15 秒, or 未设置) and in the accent color when set. It opens a sheet in the style of the speed and sleep sheets: two sliders, 片头 and 片尾, from 0 to 180 s in 1 s steps with 0 / 15 / 30 / 60 / 90 as snap points and the value above each, applied when the finger lifts. Above them, when the server has a suggestion that differs from the current values, a card reads 喜马拉雅建议 片头 X 秒 · 片尾 Y 秒 with a 使用建议 button; with no suggestion the card is absent, and a failed lookup shows a short retry line without blocking the sliders. 恢复为不跳过 sets both to 0. The sheet applies to every episode of the album and says so.
+  - On the progress bar, the skipped spans are drawn as tonal sections at both ends once a value is set, so the user can see what will be skipped.
 - Tablets and landscape: cover and controls on the left, transcript or comments on the right.
 
 ### 听过 Library
