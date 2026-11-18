@@ -139,9 +139,40 @@ Source: XMPlus `lib/storage/config_archive.dart`.
 
 ## Phase 2 — Browsing
 
+### Search
+
 - BR-01 Search with an empty keyword or over 200 characters is not sent and shows a message.
 - BR-02 Search results switch between 全部, 专辑, 声音 and 主播, each with its own paging.
 - BR-03 Hot words turned off in settings → no hot words on 发现 or in search.
+- BR-04 The same album, track or anchor never appears twice on a page; the last page shows there is nothing more.
+
+### 发现, categories and rankings
+
+- BR-10 发现 shows the server's channel tabs; switching tabs keeps each tab's scroll position; a channel with sub-tabs shows them and switching works.
+- BR-11 A section row shows cover, title, anchor and, when the server gives them, play count and score; a section that has a category opens 全部专辑 for it.
+- BR-12 Ranking preview highlights the top 3 numbers; 完整榜单 opens the full rankings.
+- BR-13 全部专辑: category chips and 综合 / 最近更新 / 最多播放; changing either returns to the first page; 加载更多 appends without duplicates; the end of the list says so.
+- BR-14 Categories: group → channel → albums, 60 per page, with sort. Choosing a filter that has sub-filters shows its child rows; clearing or changing the parent removes the children's selection.
+- BR-15 Rankings: each category lists its own tabs; an albums chart shows numbered albums, an anchors chart shows numbered anchors.
+- BR-16 Signed in or not, 发现 loads; switching the primary account reloads it.
+
+### Loading and errors (all browsing screens)
+
+- BR-20 While loading, a list shows placeholder rows, not a lone spinner; content already on screen stays while a refresh runs.
+- BR-21 Network down or server error → a short message with a retry button; retrying works and nothing half-filled is shown.
+- BR-22 Rate limited (429) → the message asks to wait; nothing retries on its own faster than the server allows.
+- BR-23 Pull down refreshes the current list.
+- BR-24 Rotation and window resize keep the tab, scroll position and paging.
+- BR-25 A response with the wrong shape (page number not the one asked for, more rows than the page size, a duplicated id in a ranking, a missing list) is rejected whole and shows the generic error.
+
+### 专辑 and 主播
+
+- BR-30 Album header shows cover, title, anchor, stats, 连载 / 完结 and paid labels; the intro shows the full text.
+- BR-31 Episodes: sort order is remembered per album; range chips follow the sort; jump to a page; search inside the album; 定位 finds a track's own place in the list.
+- BR-32 Similar albums are listed and open their own pages.
+- BR-33 Reviews: score, sort, replies and copy; an album with no reviews says so.
+- BR-34 Anchor page: profile, verification badge, albums and tracks tabs sorted by 默认 / 最新 / 最早 / 最多播放, and paging.
+- BR-35 Controls that need playback, download, subscribe or follow are hidden until those features exist.
 
 ## Phase 3 — Playback rules
 
