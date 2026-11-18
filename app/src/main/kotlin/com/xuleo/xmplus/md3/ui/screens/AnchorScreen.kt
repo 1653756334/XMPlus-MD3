@@ -3,7 +3,6 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.LocalOverscrollFactory
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -19,17 +18,12 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +41,6 @@ import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.AnchorContentPage
 import com.xuleo.xmplus.md3.core.model.AnchorProfile
 import com.xuleo.xmplus.md3.ui.components.*
-import kotlinx.coroutines.launch
 
 private val AnchorTabs = listOf(R.string.search_kind_album, R.string.album_tab_episodes)
 
@@ -59,57 +52,52 @@ internal fun AnchorScreen(viewModel: AnchorViewModel, onOpenAlbum: (String) -> U
     val pager = rememberPagerState { AnchorTabs.size }
     val albumList = rememberLazyListState()
     val trackList = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val chrome = remember { CollapsingChrome(expandOnlyAtTop = true) }
-    val headerCollapsed by remember { derivedStateOf { chrome.height > 0f && -chrome.offset >= chrome.height * 0.9f } }
-    val title = header.profile?.nickname?.takeIf { headerCollapsed } ?: stringResource(R.string.anchor_title)
     LaunchedEffect(viewModel) { viewModel.start() }
     LaunchedEffect(header.uid, pager.settledPage) {
         if (header.uid != null) (if (pager.settledPage == 0) viewModel.albums else viewModel.tracks).ensureLoaded()
     }
 
-    BrowsePage(title, onBack) {
-        if (header.uid == null) {
+    if (header.uid == null) {
+        DetailPage(onBack) {
             if (header.loading) ListSkeleton()
             else ErrorState(header.errorCode.orEmpty(), viewModel::retryProfile)
-        } else {
-            val active = if (pager.settledPage == 0) viewModel.albums else viewModel.tracks
-            PullToRefreshBox(
-                isRefreshing = if (pager.settledPage == 0) albums.refreshing else tracks.refreshing,
-                onRefresh = { viewModel.retryProfile(); active.refresh() },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Column(Modifier.fillMaxSize().clipToBounds().nestedScroll(chrome.connection), horizontalAlignment = Alignment.CenterHorizontally) {
-                    val profile = header.profile
-                    if (profile != null) {
-                        Box(Modifier.clipToBounds().collapsing(chrome)) {
-                            AnchorHero(profile, Modifier.onSizeChanged { chrome.height = it.height.toFloat() })
-                        }
+        }
+        return
+    }
+
+    val profile = header.profile
+    val hero: (@Composable () -> Unit)? = if (profile != null) ({ AnchorHero(profile) }) else null
+    val refreshing = if (pager.settledPage == 0) albums.refreshing else tracks.refreshing
+    val refreshState = rememberPullToRefreshState()
+    // Collapsing chrome is inside the refresh box so it expands before a downward drag can trigger a refresh.
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = {
+            viewModel.retryProfile()
+            (if (pager.settledPage == 0) viewModel.albums else viewModel.tracks).refresh()
+        },
+        modifier = Modifier.fillMaxSize(),
+        state = refreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = refreshState, isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.statusBars).padding(top = DetailTopBarHeight),
+            )
+        },
+    ) {
+        DetailPage(onBack, title = profile?.nickname.orEmpty(), header = hero) {
+            header.errorCode?.let { InlineError(it, viewModel::retryProfile) }
+            DetailTabs(pager, AnchorTabs, Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth())
+            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+                if (index == 0) {
+                    AnchorWorks(albums, albumList, viewModel.albums, R.string.anchor_no_albums, { it.album.id }) { item ->
+                        AlbumRow(item.album, playCount = item.playCount, showArtist = false) { onOpenAlbum(item.album.id) }
                     }
-                    header.errorCode?.let { InlineError(it, viewModel::retryProfile) }
-                    PrimaryTabRow(
-                        selectedTabIndex = pager.currentPage, modifier = Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth(),
-                        containerColor = Color.Transparent, divider = {},
-                    ) {
-                        AnchorTabs.forEachIndexed { index, label ->
-                            Tab(
-                                selected = index == pager.currentPage,
-                                onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                                text = { Text(stringResource(label), maxLines = 1) },
-                            )
-                        }
-                    }
-                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
-                        if (index == 0) {
-                            AnchorWorks(albums, albumList, viewModel.albums, R.string.anchor_no_albums, { it.album.id }) { item ->
-                                AlbumRow(item.album) { onOpenAlbum(item.album.id) }
-                            }
-                        } else {
-                            AnchorWorks(tracks, trackList, viewModel.tracks, R.string.anchor_no_tracks, { it.id }, showTrackLimit = true) { track ->
-                                val open: (() -> Unit)? = track.albumId.takeIf(String::isNotEmpty)?.let { id -> { onOpenAlbum(id) } }
-                                TrackRow(track, onClick = open)
-                            }
-                        }
+                } else {
+                    AnchorWorks(tracks, trackList, viewModel.tracks, R.string.anchor_no_tracks, { it.id }, showTrackLimit = true) { track ->
+                        val open: (() -> Unit)? = track.albumId.takeIf(String::isNotEmpty)?.let { id -> { onOpenAlbum(id) } }
+                        TrackRow(track, onClick = open)
                     }
                 }
             }
@@ -118,17 +106,8 @@ internal fun AnchorScreen(viewModel: AnchorViewModel, onOpenAlbum: (String) -> U
 }
 
 @Composable
-private fun AnchorHero(profile: AnchorProfile, modifier: Modifier = Modifier) {
-    val surface = MaterialTheme.colorScheme.surface
-    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        (profile.backgroundUrl ?: profile.avatarUrl)?.let { backdrop ->
-            Box(Modifier.matchParentSize().clipToBounds()) {
-                Cover(backdrop, Modifier.fillMaxSize().blur(40.dp), RectangleShape)
-                Box(Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(surface.copy(alpha = 0.68f), surface.copy(alpha = 0.88f), surface)),
-                ))
-            }
-        }
+private fun AnchorHero(profile: AnchorProfile) {
+    DetailHero(profile.backgroundUrl ?: profile.avatarUrl) {
         Column(
             Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth().padding(XmLayout.PagePadding),
             verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),

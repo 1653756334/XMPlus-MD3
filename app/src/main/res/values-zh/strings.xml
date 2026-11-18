@@ -128,7 +128,6 @@
     <string name="search_kind_track">声音</string>
     <string name="search_kind_anchor">主播</string>
     <string name="anchor_verified">已认证</string>
-    <string name="anchor_title">主播</string>
     <string name="anchor_no_albums">暂无公开专辑</string>
     <string name="anchor_no_tracks">暂无公开节目</string>
     <string name="anchor_track_limit">仅可查看前 %1$d 条节目</string>
@@ -201,5 +200,5 @@
     <string name="album_ratio_not">不行</string>
     <string name="album_replies_title">评价回复</string>
     <string name="album_unavailable">专辑暂时无法收听</string>
-    <string name="album_show_header">展开头部</string>
+    <string name="detail_show_header">展开头部</string>
 </resources>

@@ -33,18 +33,28 @@ import java.util.Locale
 private val RowPadding = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp)
 
 @Composable
-fun AlbumRow(album: Album, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+fun AlbumRow(
+    album: Album,
+    modifier: Modifier = Modifier,
+    playCount: Long? = null,
+    showArtist: Boolean = true,
+    onClick: () -> Unit = {},
+) {
     Row(modifier.clickable(onClick = onClick).then(RowPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
         Cover(album.coverUrl, Modifier.size(72.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(album.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (album.artist.isNotEmpty()) {
+            if (showArtist && album.artist.isNotEmpty()) {
                 Text(album.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (album.trackCount > 0) {
-                Text(pluralStringResource(R.plurals.episode_count, album.trackCount, album.trackCount),
-                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            val details = listOfNotNull(
+                playCount?.let { stringResource(R.string.rank_plays, formatCount(it)) },
+                album.trackCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.episode_count, it, it) },
+            ).joinToString(" · ")
+            if (details.isNotEmpty()) {
+                Text(details, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

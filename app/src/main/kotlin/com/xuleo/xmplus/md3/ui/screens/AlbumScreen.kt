@@ -16,14 +16,12 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,8 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,21 +55,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -90,19 +80,14 @@ import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.ui.components.*
-import kotlinx.coroutines.launch
 
 /** The pages of an album, in the order of their tabs. */
 private object AlbumTab {
-    const val Introduction = 0
     const val Episodes = 1
     const val Reviews = 2
-    const val Count = 3
 }
 
-/** The top bar starts to show once the header has moved this far, and is fully shown [RevealSpan] further on. */
-private val RevealStart = 24.dp
-private val RevealSpan = 72.dp
+private val AlbumTabs = listOf(R.string.album_tab_introduction, R.string.album_tab_episodes, R.string.album_tab_reviews)
 
 /** The toolbar over the episodes, and the search field that takes its place. */
 private val ToolbarHeight = 48.dp
@@ -117,57 +102,29 @@ private val SearchHeight = 44.dp
 internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAlbum: (String) -> Unit, onOpenAnchor: (String?) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
-    val density = LocalDensity.current
-    val statusBar = WindowInsets.statusBars.getTop(density).toFloat()
-    val barHeight = with(density) { AlbumTopBarHeight.toPx() }
-    val chrome = remember(statusBar, barHeight) {
-        CollapsingChrome(minHeight = statusBar + barHeight, expandOnlyAtTop = true)
-    }
-    val revealStart = with(density) { RevealStart.toPx() }
-    val revealSpan = with(density) { RevealSpan.toPx() }
-    val reveal = { ((-chrome.offset - revealStart) / revealSpan).coerceIn(0f, 1f) }
-    val motion = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val pager = rememberPagerState(pageCount = { AlbumTab.Count })
-    val scope = rememberCoroutineScope()
+    val pager = rememberPagerState { AlbumTabs.size }
     // The lists live here rather than in their pages, so each keeps its place while its tab is off screen or search is open.
     val introList = rememberLazyListState()
     val episodesList = rememberLazyListState()
     val reviewsList = rememberLazyListState()
-    // Brings the header back and leaves the list where it is, so the page stays put under the header.
-    val showHeader: () -> Unit = { scope.launch { chrome.animateExpand(motion) } }
     var showRange by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(pager.currentPage) { if (pager.currentPage == AlbumTab.Reviews) viewModel.ensureReviews() }
     val detail = state.detail
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        if (detail == null) {
-            Column(Modifier.fillMaxSize()) {
-                AlbumTopBar(title = "", progress = { 0f }, onBack = onBack, onShowHeader = {})
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    if (state.headerLoading) ListSkeleton(Modifier.fillMaxSize())
-                    else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
+    if (detail == null) {
+        DetailPage(onBack) {
+            if (state.headerLoading) ListSkeleton(Modifier.fillMaxSize())
+            else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
+        }
+    } else {
+        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail) { onOpenAnchor(detail.album.anchorUid) } }) {
+            DetailTabs(pager, AlbumTabs)
+            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
+                when (page) {
+                    AlbumTab.Episodes -> EpisodesPage(state, detail, viewModel, episodesList) { showRange = true }
+                    AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
+                    else -> IntroductionPage(state, viewModel, onOpenAlbum, introList)
                 }
             }
-        } else {
-            Column(Modifier.fillMaxSize().clipToBounds().nestedScroll(chrome.connection)) {
-                Box(Modifier.collapsing(chrome)) {
-                    AlbumHero(detail, Modifier.onSizeChanged { chrome.height = it.height.toFloat() }) { onOpenAnchor(detail.album.anchorUid) }
-                }
-                AlbumTabRow(pager.currentPage) { index -> scope.launch { pager.animateScrollToPage(index) } }
-                HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
-                    when (page) {
-                        AlbumTab.Episodes -> EpisodesPage(state, detail, viewModel, episodesList) { showRange = true }
-                        AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
-                        else -> IntroductionPage(state, viewModel, onOpenAlbum, introList)
-                    }
-                }
-            }
-            AlbumTopBar(
-                title = detail.album.title,
-                progress = reveal,
-                onBack = onBack,
-                onShowHeader = showHeader,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
         }
     }
     if (showRange && detail != null) {
@@ -179,16 +136,6 @@ internal fun AlbumScreen(viewModel: AlbumViewModel, onBack: () -> Unit, onOpenAl
         )
     }
     if (state.replyTo != null) RepliesSheet(state, viewModel)
-}
-
-/** The tabs, without a divider, so the pages run straight on from them. */
-@Composable
-private fun AlbumTabRow(selected: Int, onSelect: (Int) -> Unit) {
-    PrimaryTabRow(selectedTabIndex = selected, containerColor = Color.Transparent, divider = {}) {
-        listOf(R.string.album_tab_introduction, R.string.album_tab_episodes, R.string.album_tab_reviews).forEachIndexed { index, label ->
-            Tab(selected = selected == index, onClick = { onSelect(index) }, text = { Text(stringResource(label), maxLines = 1) })
-        }
-    }
 }
 
 /** A page's list, filling the space under the tab row and kept to the content column on wide windows. */

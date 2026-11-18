@@ -132,7 +132,6 @@
     <string name="search_kind_track">Sounds</string>
     <string name="search_kind_anchor">Anchors</string>
     <string name="anchor_verified">Verified</string>
-    <string name="anchor_title">Anchor</string>
     <string name="anchor_no_albums">No public albums yet</string>
     <string name="anchor_no_tracks">No public episodes yet</string>
     <string name="anchor_track_limit">Only the first %1$d episodes are available.</string>
@@ -209,5 +208,5 @@
     <string name="album_ratio_not">Not recommended</string>
     <string name="album_replies_title">Replies</string>
     <string name="album_unavailable">This album isn\'t available right now.</string>
-    <string name="album_show_header">Show header</string>
+    <string name="detail_show_header">Show header</string>
 </resources>
