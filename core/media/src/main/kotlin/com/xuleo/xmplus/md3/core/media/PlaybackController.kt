@@ -11,8 +11,12 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.UsageLedger
+import com.xuleo.xmplus.md3.core.model.AlbumDetail
+import com.xuleo.xmplus.md3.core.model.Credentials
+import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.PlaybackAuthorization
+import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +47,7 @@ class PlaybackController(
     private val accounts: AccountRepository,
     private val ledger: UsageLedger,
     private val resolver: XmlyPlayback,
+    private val catalogue: XmlyAlbum,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private data class OpenSource(
@@ -51,14 +56,21 @@ class PlaybackController(
         var refreshes: Int,
     )
 
+    private data class QueueChoice(val queue: AlbumPlaybackQueue, val target: Track?, val keepLoaded: Boolean = false)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val ordered = Mutex()
     private val engine = MutableStateFlow<ExoPlayer?>(null)
     private val mutableState = MutableStateFlow(PlaybackState())
     val state = mutableState.asStateFlow()
+    private val mutableQueue = MutableStateFlow(PlaybackQueueState())
+    val queue = mutableQueue.asStateFlow()
 
     private var revision = 0L
     private var command: Job? = null
+    private var albumQueue: AlbumPlaybackQueue? = null
+    private var queueWork: Job? = null
+    private var queueIntent = 0L
     private var clock: Job? = null
     private var sampling: Job? = null
     private var opened: OpenSource? = null
@@ -104,6 +116,7 @@ class PlaybackController(
 
     internal fun detach(player: ExoPlayer) {
         if (engine.value !== player) return
+        cancelQueueWork()
         val position = if (isCurrent(player)) player.currentPosition.coerceAtLeast(0) else mutableState.value.positionMs
         val request = supersede()
         player.removeListener(listener)
@@ -117,18 +130,147 @@ class PlaybackController(
         completeCommand(request) { settleCurrent(keepUnsettled = true) }
     }
 
-    fun play(selection: PlaybackSelection) {
+    fun playAlbum(detail: AlbumDetail, track: Track) {
         if (accountChanges > 0) return
         val current = mutableState.value
-        if (current.selection?.track?.id == selection.track.id) {
+        val loaded = current.selection?.takeIf { it.track.id == track.id && it.album.id == detail.album.id } != null
+        // With a failed queue, tapping the loaded episode rebuilds the queue and keeps it playing.
+        if (loaded && mutableQueue.value.errorCode == null) {
+            cancelQueueWork()
             if (!current.wantsToPlay) resume()
+            return
+        }
+        // Resolve the official page before replacing the queue or stopping current audio.
+        readQueue { credentials ->
+            val hint = if (track.officialPosition == null && track.orderNo == null) {
+                resolver.trackMetadata(track.id, credentials)
+            } else track
+            val page = AlbumPlaybackQueue.pageFor(hint)
+            val result = readAlbumPage(detail, page, credentials)
+            val queue = AlbumPlaybackQueue.start(detail, hint, page, result)
+            QueueChoice(queue, queue.items.first { it.id == track.id }, keepLoaded = loaded)
+        }
+    }
+
+    fun playQueued(trackId: String) {
+        if (accountChanges > 0) return
+        val snapshot = albumQueue ?: return
+        val target = snapshot.items.firstOrNull { it.id == trackId } ?: return
+        cancelQueueWork()
+        if (mutableState.value.selection?.track?.id == trackId) {
+            if (!mutableState.value.wantsToPlay) resume()
         } else {
-            open(selection, position = 0)
+            applyQueueChoice(QueueChoice(snapshot, target))
+        }
+    }
+
+    fun previousEpisode() = moveEpisode(forward = false)
+
+    fun nextEpisode() = moveEpisode(forward = true)
+
+    private fun moveEpisode(forward: Boolean) {
+        if (accountChanges > 0 || queueWork != null) return
+        val snapshot = albumQueue ?: return
+        val current = mutableState.value.selection?.track ?: return
+        snapshot.neighbor(current.id, forward)?.let { next ->
+            cancelQueueWork()
+            applyQueueChoice(QueueChoice(snapshot, next))
+            return
+        }
+        if (!forward && current.officialPosition == 1) {
+            cancelQueueWork()
+            applyQueueChoice(QueueChoice(snapshot, current))
+            return
+        }
+        readQueue { credentials ->
+            var window = snapshot.recheckEdge(forward)
+            if (forward && window.refreshTailFirst) {
+                val tail = window.lastPage
+                window = window.merge(tail, readAlbumPage(window.detail, tail, credentials))
+            } else if (!forward) {
+                val head = AlbumPlaybackQueue.pageFor(window.items.first())
+                window = window.refreshHead(readAlbumPage(window.detail, head, credentials))
+            }
+            var target = window.neighbor(current.id, forward)
+            while (target == null && if (forward) window.hasLaterPage else window.hasEarlierPage) {
+                val page = if (forward) window.lastPage + 1 else window.firstPage - 1
+                window = window.merge(page, readAlbumPage(window.detail, page, credentials))
+                target = window.neighbor(current.id, forward)
+            }
+            QueueChoice(window, if (forward) target else target ?: current)
+        }
+    }
+
+    private suspend fun readAlbumPage(detail: AlbumDetail, page: Int, credentials: Credentials?) =
+        catalogue.episodePage(detail.album.id, page, ascending = true, recordDescending = detail.recordDescending, credentials = credentials)
+
+    private fun readQueue(read: suspend (Credentials?) -> QueueChoice) {
+        cancelQueueWork()
+        val intent = queueIntent
+        mutableQueue.value = mutableQueue.value.copy(isLoading = true)
+        queueWork = scope.launch(Dispatchers.Main) {
+            try {
+                awaitLedger()
+                val credentials = accounts.primaryCredentials()
+                val choice = read(credentials)
+                val currentCredentials = accounts.primaryCredentials()
+                currentCoroutineContext().ensureActive()
+                if (intent != queueIntent) return@launch
+                if (credentials?.cacheIdentity != currentCredentials?.cacheIdentity) throw XmlyException("account_mismatch")
+                queueWork = null
+                applyQueueChoice(choice)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (intent == queueIntent) {
+                    queueWork = null
+                    mutableQueue.value = mutableQueue.value.copy(isLoading = false, errorCode = errorCode(failure))
+                }
+            } finally {
+                if (intent == queueIntent && queueWork != null) {
+                    queueWork = null
+                    mutableQueue.value = mutableQueue.value.copy(isLoading = false)
+                }
+            }
+        }
+    }
+
+    private fun cancelQueueWork() {
+        queueIntent++
+        queueWork?.cancel()
+        queueWork = null
+        val state = mutableQueue.value
+        if (state.isLoading || state.errorCode != null) mutableQueue.value = state.copy(isLoading = false, errorCode = null)
+    }
+
+    private fun clearQueue() {
+        cancelQueueWork()
+        albumQueue = null
+        mutableQueue.value = PlaybackQueueState()
+    }
+
+    private fun applyQueueChoice(choice: QueueChoice) {
+        albumQueue = choice.queue
+        val target = choice.target
+        val currentId = target?.id ?: mutableState.value.selection?.track?.id
+        mutableQueue.value = PlaybackQueueState(
+            items = choice.queue.items,
+            currentTrackId = currentId,
+            hasNext = currentId != null && choice.queue.hasNext(currentId),
+        )
+        if (target == null) return
+        val album = choice.queue.detail.album
+        val loaded = mutableState.value.selection?.takeIf { it.track.id == target.id && it.album.id == album.id }
+        if (choice.keepLoaded && loaded != null) {
+            if (!mutableState.value.wantsToPlay) resume()
+        } else {
+            open(PlaybackSelection(target, album), position = 0)
         }
     }
 
     fun toggle() {
-        if (mutableState.value.wantsToPlay) pause() else resume()
+        val current = mutableState.value
+        if (current.wantsToPlay || queueWork != null) pause() else resume()
     }
 
     fun resume() {
@@ -136,6 +278,7 @@ class PlaybackController(
         val current = mutableState.value
         val selection = current.selection ?: return
         if (current.wantsToPlay) return
+        cancelQueueWork()
         val player = engine.value
         val source = opened
         if (player == null || source == null || player.playbackState == Player.STATE_IDLE || current.phase == PlaybackPhase.Failed) {
@@ -159,8 +302,9 @@ class PlaybackController(
     }
 
     fun pause() {
+        cancelQueueWork()
         val current = mutableState.value
-        if (current.selection == null || !current.wantsToPlay) return
+        if (current.selection == null || (!current.wantsToPlay && !admitted)) return
         val request = supersede()
         mutableState.value = mutableState.value.copy(phase = PlaybackPhase.Paused, wantsToPlay = false)
         completeCommand(request) { settleCurrent() }
@@ -168,7 +312,10 @@ class PlaybackController(
 
     fun seekTo(positionMs: Long) {
         val current = mutableState.value
-        if (current.canSeek) engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
+        if (current.canSeek) {
+            if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
+            engine.value?.seekTo(positionMs.coerceIn(0, current.durationMs))
+        }
     }
 
     fun skipBack() = skipBy(-PlaybackSkipMillis)
@@ -181,6 +328,7 @@ class PlaybackController(
     }
 
     fun stop() {
+        clearQueue()
         val request = supersede()
         clearSource()
         mutableState.value = PlaybackState()
@@ -192,6 +340,7 @@ class PlaybackController(
         withContext(Dispatchers.Main.immediate) {
             accountChanges++
             try {
+                clearQueue()
                 supersede()
                 clearSource()
                 mutableState.value = PlaybackState()
@@ -335,12 +484,19 @@ class PlaybackController(
     }
 
     private fun finishEpisode() {
+        val advanceIntent = queueIntent
+        val shouldAdvance = queueWork == null
         val request = supersede()
         val current = mutableState.value
         mutableState.value = current.copy(
             phase = PlaybackPhase.Ended, wantsToPlay = false, positionMs = current.durationMs,
         )
-        completeCommand(request) { settleCurrent() }
+        completeCommand(request) {
+            settleCurrent(keepUnsettled = true)
+            if (shouldAdvance) scope.launch(Dispatchers.Main) {
+                if (revision == request && queueIntent == advanceIntent) moveEpisode(forward = true)
+            }
+        }
     }
 
     private fun handleSourceError(player: Player, error: PlaybackException) {

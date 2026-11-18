@@ -37,7 +37,6 @@ import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
 import com.xuleo.xmplus.md3.core.media.PlaybackController
-import com.xuleo.xmplus.md3.core.media.PlaybackSelection
 import com.xuleo.xmplus.md3.core.model.CategoryChannel
 import com.xuleo.xmplus.md3.core.model.CategoryGroup
 import com.xuleo.xmplus.md3.core.model.HotWord
@@ -236,7 +235,7 @@ internal fun XmAppContent(
                                 AlbumScreen(
                                     vm, { navigator.pop() }, ::openAlbum,
                                     onOpenAnchor = { uid -> openAlbumAnchor(route.albumId, uid) },
-                                    onPlayEpisode = { album, track -> playback?.play(PlaybackSelection(track, album)) },
+                                    onPlayEpisode = { album, track -> playback?.playAlbum(album, track) },
                                 )
                             }
                         }

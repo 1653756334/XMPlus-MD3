@@ -186,6 +186,14 @@ Playback integration
 - PB-00d Unavailable or preview-only audio never starts. An expired stream is reauthorized for the same account and track and resumes at the current position.
 - PB-00e During a settlement retry cooldown, pausing or stopping still saves every final local listening sample. Retrying an unknown debit must not resend it.
 
+Album playback queue
+
+- PB-04 Select an episode from a descending album or its search results. The queue starts at that exact episode and follows ascending official episode numbers.
+- PB-05 From the first or last episode of a page, Previous or Next reads the adjacent page without duplicating rows. Next is disabled on the album's last episode. Natural completion still re-reads the last page, so an episode appended since the queue was built plays on.
+- PB-06 Reject a moved catalogue anchor or a repeated episode ID. A failed page read leaves the current episode and queue intact; selecting a different episode or changing the primary account cancels a pending read. After a failed read, tapping the loaded episode rebuilds the queue without restarting playback.
+- PB-07 Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The two 15-second controls seek within the current episode; the adjacent episode buttons change episodes.
+- PB-08 Let a metered episode end at the page boundary; the next episode opens through normal authorization, and a free next episode does not start a meter. Pause while the page or settlement is pending; the next episode must not start.
+
 Settings
 
 - PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 30 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.

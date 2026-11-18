@@ -59,7 +59,7 @@ class XmApplication : Application(), PlaybackOwner {
         }
     }
     override val playback by lazy {
-        PlaybackController(accounts, usage, XmlyPlayback(http)) { usageReady.await() }
+        PlaybackController(accounts, usage, XmlyPlayback(http), album) { usageReady.await() }
     }
 
     /** One login session per process: it owns the SMS cooldowns and the pending challenge. */

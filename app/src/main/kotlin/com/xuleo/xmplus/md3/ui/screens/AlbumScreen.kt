@@ -105,7 +105,7 @@ internal fun AlbumScreen(
     onBack: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenAnchor: (String?) -> Unit,
-    onPlayEpisode: (Album, Track) -> Unit,
+    onPlayEpisode: (AlbumDetail, Track) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
@@ -129,7 +129,7 @@ internal fun AlbumScreen(
                 when (page) {
                     AlbumTab.Episodes -> EpisodesPage(
                         state, detail, viewModel, episodesList, { showRange = true },
-                        onPlay = { onPlayEpisode(detail.album, it) },
+                        onPlay = { onPlayEpisode(detail, it) },
                     )
                     AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
                     else -> IntroductionPage(state, viewModel, onOpenAlbum, introList)

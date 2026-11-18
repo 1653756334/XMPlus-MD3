@@ -13,6 +13,13 @@
     <string name="player_seek_back">Back %1$d seconds</string>
     <string name="player_seek_forward">Forward %1$d seconds</string>
     <string name="player_skip_interval">%1$d s</string>
+    <string name="player_previous_episode">Previous episode</string>
+    <string name="player_next_episode">Next episode</string>
+    <string name="player_queue">Play queue</string>
+    <string name="player_queue_locate">Jump to current</string>
+    <string name="player_queue_current">Current episode</string>
+    <string name="player_queue_changed">The album has changed. Refresh it and try again.</string>
+    <string name="player_queue_limit">The album queue supports up to 5,000 episodes.</string>
     <string name="player_more">More</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>

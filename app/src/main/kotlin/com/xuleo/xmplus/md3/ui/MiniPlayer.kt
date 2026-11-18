@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,8 +47,10 @@ import com.xuleo.xmplus.md3.ui.screens.playbackMessage
 @Composable
 fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, modifier: Modifier = Modifier) {
     val state = playback?.state?.collectAsStateWithLifecycle()?.value ?: PlaybackState()
+    val queue = playback?.queue?.collectAsStateWithLifecycle()?.value
     val selection = state.selection
     val openLabel = stringResource(R.string.player_open)
+    val cancelLabel = stringResource(R.string.action_cancel)
     Surface(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
@@ -86,7 +91,7 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val error = state.errorCode
+                val error = state.errorCode ?: queue?.errorCode
                 val supporting = if (error != null) stringResource(playbackMessage(error)) else selection?.subtitle.orEmpty()
                 if (supporting.isNotEmpty()) {
                     Text(
@@ -97,10 +102,14 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
             }
             IconButton(onClick = { playback?.toggle() }, enabled = selection != null) {
                 val retry = state.phase == PlaybackPhase.Failed
-                Icon(
-                    imageVector = if (retry) Icons.Filled.Refresh else if (state.wantsToPlay) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = stringResource(if (retry) R.string.action_retry else if (state.wantsToPlay) R.string.action_pause else R.string.action_play),
-                )
+                if (queue?.isLoading == true && !state.wantsToPlay) {
+                    CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelLabel }, strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = if (retry) Icons.Filled.Refresh else if (state.wantsToPlay) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(if (retry) R.string.action_retry else if (state.wantsToPlay) R.string.action_pause else R.string.action_play),
+                    )
+                }
             }
         }
     }

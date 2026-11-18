@@ -35,8 +35,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.ButtonDefaults
@@ -80,6 +83,7 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackPhase
+import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
 import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
@@ -99,6 +103,7 @@ internal fun PlayerSheet(
     onAccounts: () -> Unit,
 ) {
     val state by playback.state.collectAsStateWithLifecycle()
+    val queue by playback.queue.collectAsStateWithLifecycle()
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -128,6 +133,7 @@ internal fun PlayerSheet(
     ) {
         val episode = state.selection
         var showActions by remember(episode?.album?.id, episode?.track?.id) { mutableStateOf(false) }
+        var showQueue by remember(episode?.album?.id) { mutableStateOf(false) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -165,7 +171,9 @@ internal fun PlayerSheet(
                         PlayerControls(
                             episode = episode,
                             state = state,
+                            queue = queue,
                             playback = playback,
+                            onOpenQueue = { showQueue = true },
                             onAccounts = { closeThen(onAccounts) },
                         )
                     }
@@ -183,6 +191,9 @@ internal fun PlayerSheet(
                     if (playback.state.value.selection == episode) playback.seekTo(0)
                 },
             )
+        }
+        if (showQueue && episode != null) {
+            PlayerQueueSheet(queue, onSelect = playback::playQueued, onDismiss = { showQueue = false })
         }
     }
 }
@@ -225,7 +236,9 @@ private fun PlayerLayout(artwork: String?, modifier: Modifier = Modifier, contro
 private fun PlayerControls(
     episode: PlaybackSelection,
     state: PlaybackState,
+    queue: PlaybackQueueState,
     playback: PlaybackController,
+    onOpenQueue: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -242,14 +255,15 @@ private fun PlayerControls(
             }
         }
         PositionControl(state, playback::seekTo)
-        Row(
-            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 264.dp).fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SkipButton(forward = false, enabled = state.canSeek, modifier = Modifier.weight(1f), onClick = playback::skipBack)
-            MainPlaybackButton(state, playback::toggle)
-            SkipButton(forward = true, enabled = state.canSeek, modifier = Modifier.weight(1f), onClick = playback::skipForward)
+        PlaybackControls(state, queue, playback, onOpenQueue)
+        queue.errorCode?.let { error ->
+            Text(
+                stringResource(playbackMessage(error)),
+                Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
         }
         state.errorCode?.let { error ->
             Column(
@@ -260,6 +274,51 @@ private fun PlayerControls(
                 if (error in AccountErrors) TextButton(onAccounts) { Text(stringResource(R.string.account_manage)) }
             }
         }
+    }
+}
+
+@Composable
+private fun PlaybackControls(
+    state: PlaybackState,
+    queue: PlaybackQueueState,
+    playback: PlaybackController,
+    onOpenQueue: () -> Unit,
+) {
+    val canChange = queue.currentTrackId != null && !queue.isLoading
+    val canNext = canChange && queue.hasNext
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.TopCenter) {
+        val inlineChapters = maxWidth >= 288.dp
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                Modifier.widthIn(max = if (inlineChapters) 320.dp else 264.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(if (inlineChapters) 4.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (inlineChapters) EpisodeButton(false, canChange, playback::previousEpisode)
+                SkipButton(false, state.canSeek, Modifier.weight(1f), playback::skipBack)
+                MainPlaybackButton(state, queue.isLoading, playback::toggle)
+                SkipButton(true, state.canSeek, Modifier.weight(1f), playback::skipForward)
+                if (inlineChapters) EpisodeButton(true, canNext, playback::nextEpisode)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!inlineChapters) EpisodeButton(false, canChange, playback::previousEpisode)
+                TextButton(onOpenQueue, enabled = queue.items.isNotEmpty()) {
+                    Icon(Icons.Filled.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text(stringResource(R.string.player_queue), Modifier.padding(start = 6.dp))
+                }
+                if (!inlineChapters) EpisodeButton(true, canNext, playback::nextEpisode)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(onClick, enabled = enabled) {
+        Icon(
+            if (forward) Icons.Filled.SkipNext else Icons.Filled.SkipPrevious,
+            stringResource(if (forward) R.string.player_next_episode else R.string.player_previous_episode),
+        )
     }
 }
 
@@ -378,10 +437,12 @@ private fun SkipButton(forward: Boolean, enabled: Boolean, modifier: Modifier, o
 }
 
 @Composable
-private fun MainPlaybackButton(state: PlaybackState, onClick: () -> Unit) {
+private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onClick: () -> Unit) {
     val retry = state.phase == PlaybackPhase.Failed
-    val loading = state.phase == PlaybackPhase.Preparing || state.phase == PlaybackPhase.Buffering
+    val waitingForQueue = loadingQueue && !state.wantsToPlay
+    val loading = state.phase == PlaybackPhase.Preparing || state.phase == PlaybackPhase.Buffering || waitingForQueue
     val label = stringResource(when {
+        waitingForQueue -> R.string.action_cancel
         retry -> R.string.action_retry
         state.wantsToPlay -> R.string.action_pause
         else -> R.string.action_play
@@ -457,6 +518,8 @@ internal fun playbackMessage(code: String): Int = when (code) {
     "permission_denied", "preview_only" -> R.string.player_permission_denied
     "network", "network_error" -> R.string.error_network
     "rate_limited" -> R.string.error_rate_limited
+    "catalogue_changed", "duplicate_page", "missing_track" -> R.string.player_queue_changed
+    "catalogue_limit" -> R.string.player_queue_limit
     "usage_uncertain", "uncertain" -> R.string.account_uncertain
     "account_read_failed", "invalid_ledger" -> R.string.account_read_error
     else -> R.string.player_unavailable

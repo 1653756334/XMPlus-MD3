@@ -33,6 +33,19 @@ class XmlyPlayback(
 ) {
     private val reader = Reader("invalid_authorization")
 
+    /** Catalogue placement for a search result, without resolving a stream or querying listening time. */
+    suspend fun trackMetadata(trackId: String, credentials: Credentials?): Track {
+        val id = xmlyIdentifier(trackId)
+        val info = if (credentials == null) publicInfo(id) else try {
+            accountInfo(id, credentials)
+        } catch (failure: XmlyException) {
+            if (failure.code != "login_expired") throw failure
+            publicInfo(id)
+        }
+        checkId(info, id)
+        return reader.trackOf(info)
+    }
+
     suspend fun resolve(
         trackId: String,
         credentials: Credentials?,
