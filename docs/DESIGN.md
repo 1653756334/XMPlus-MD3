@@ -70,7 +70,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 - [ ] Queue built from an album or the updates feed, continuing across album pages
 - [ ] Queue: check the album for new episodes. No drag to reorder, reverse, remove or clear: the app is for novels, which play in order
-- [ ] Modes: sequential and shuffle without repeats. No list loop or single loop, for the same reason
+- [ ] Order: sequential only. No shuffle, list loop or single loop, for the same reason
 - [ ] Speed and volume remembered per album, a mute switch, the phone's keys as master volume; the skip interval stays 15 s with no setting
 - [ ] Intro/outro skip, per album only and never global, seeded from the server's suggestion (see Intro and outro skip)
 - [ ] Sleep timer: after a duration or at the end of the episode; then pause or exit; optionally keep downloading
@@ -211,11 +211,11 @@ Rules:
   - Episode title (two lines), then the album name, which opens the album.
   - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载, with counts once they are connected.
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
-  - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the configured interval (default 15 s each way).
-  - Listening tools, icon over label: 播放列表 · play mode · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (随机播放, 1.5×, the sleep countdown). Play mode switches 顺序播放 / 随机播放 only. 列表循环 and 单集循环 are left out on purpose: this is for listening to novels, not music.
-- 更多 sheet: one list of rows, each a round icon, a title and, where it helps, a line under it: 查看专辑, 查看主播, 跳过片头片尾 (showing its current setting, see Intro and outro skip) 音量 (the album's volume, or 已静音) and 回到开头 (dimmed when already at the start). Rows that open something end in a chevron. Volume joins the list in Phase 6.
+  - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the fixed 15 s interval.
+  - Listening tools, icon over label: 播放列表 · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (1.5×, the sleep countdown). There is no play mode: episodes play in order, and 随机播放, 列表循环 and 单集循环 are left out on purpose, because this is for listening to novels, not music.
+- 更多 sheet: one list of rows, each a round icon, a title and, where it helps, a line under it: 查看专辑, 查看主播, 跳过片头片尾 (showing its current setting, see Intro and outro skip) 音量 (the album's volume, or 已静音) and 回到开头 (dimmed when already at the start). Rows that open something end in a chevron.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
-- Queue sheet: reverse, drag handles, 回到当前.
+- Queue sheet: the album's episodes in episode-number order with the current one marked, and 回到当前 to scroll back to it. No reverse or drag handles.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×. The speed is remembered for the album; an album that was never adjusted starts at the speed used last, so a listener who hears every novel at 1.5× sets it once.
   - Volume sheet: the album's volume from 0 to 100% in 5% steps, applied when the finger lifts, remembered per album, plus a switch that mutes every album until the app is closed. The phone's volume keys stay the master volume, so there is no second master slider; there is no boost above 100%.
   - Playlist sheet: when the list reaches the end of the album, 检查新节目 sits under the last row (nothing is offered earlier, since there is nothing to check for) and re-reads the end of the album and adds episodes published since the queue was built, then says 新增 N 集 or 没有新节目. Playing continues undisturbed.

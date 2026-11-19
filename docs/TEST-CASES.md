@@ -196,34 +196,31 @@ Album playback queue
 
 Settings
 
-Moved to Phase 6 with the settings store: volume and master volume, and the album and global defaults. Speed stays in Phase 3 as a session value until settings land.
+Speed and volume are per album, and mute covers every album, all in Phase 3. There are no global defaults and no master volume slider: the phone's volume keys are the master volume.
 
-- PB-01 Album settings override global ones; global overrides defaults. Defaults: speed 1.0, intro 0, outro 0, back 15 s, forward 15 s, auto-next on, sequential order, listen-while-downloading off, volume 100, master volume 100, not muted.
-- PB-02 Ranges: speed 0.5–3.0; intro and outro 0–3600 whole seconds; back and forward 1–300 whole seconds; volume and master volume 0–100. Invalid input is rejected and the old value kept.
-- PB-03 Output volume is 0 when muted, otherwise album volume × master volume / 100.
+- PB-01 Speed and volume are remembered per album. An album never adjusted starts at the speed used last and at volume 100. Mute covers every album until the app is closed. Back and forward are a fixed 15 s with no setting; episodes always play in order and the next one follows automatically.
+- PB-02 Ranges: speed 0.5–3.0 in 0.1 steps, and a speed outside it is rejected with the old value kept; volume 0–100 % in 5 % steps; intro and outro 0–3600 whole seconds (the sliders reach 180 s).
+- PB-03 Output volume is 0 when muted, otherwise the album's volume.
 
 Intro and outro
 
-Moved to Phase 6 with the settings store.
+Per album only, with no global setting.
 
 - PB-10 Starting at 0 with a 30 s intro → playback starts at 30 s.
 - PB-11 Resuming at 10 s with a 30 s intro → starts at 30 s; resuming at 45 s → starts at 45 s.
 - PB-12 Intro + outro ≥ episode length → nothing is skipped in that episode and a notice is shown.
 - PB-13 Reaching length − outro completes the episode exactly once, even if the real end follows.
-- PB-14 After a manual seek or replay, intro and outro skipping stop for the rest of that episode.
-- PB-15 Raising the intro setting while playing before the new intro point (with no manual seek) jumps to it.
+- PB-14 A seek into the outro, or a start inside it such as a bookmark, keeps the outro for the rest of that episode. A seek anywhere earlier, or a start earlier such as a retry, a resume after the playback service restarted or a bookmark, leaves the outro skip on. A replay from the beginning skips both again.
+- PB-15 Raising the intro setting while playing before the new intro point (with no manual seek) jumps to it. A start the listener chose, such as a bookmark or a retry, is not moved.
 
 Cloud resume
 
-- PB-20 Cloud progress beyond 95% of the playable length (length − outro when skipping applies) → start from the beginning, then intro skipping applies. Local progress is not affected by this rule.
-- PB-21 A manual replay ignores the 95% rule.
+- PB-20 Cloud progress is used only when it is newer than the local progress. Cloud progress at or past the end of the episode → start from the beginning, then intro skipping applies. There is no percentage threshold.
+- PB-21 A position the listener chooses (a replay, a bookmark, a seek) is never replaced by cloud progress.
 
-Shuffle
+Play order
 
-- PB-30 No episode repeats until every other episode has played; then it reshuffles, excluding the current one.
-- PB-31 Previous returns to the episode actually played before; next then moves forward through that history before picking new ones.
-- PB-32 Changing the queue resets shuffle history; a single-item queue keeps playing that item.
-- PB-33 Shuffle history keeps at most 5,000 entries.
+- PB-30 Episodes play in official episode-number order only; there is no shuffle, list loop or single loop. (PB-31–PB-33, shuffle history, were dropped with shuffle.)
 
 Sleep timer
 
