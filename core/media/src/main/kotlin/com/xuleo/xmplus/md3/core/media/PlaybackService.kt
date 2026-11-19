@@ -10,6 +10,13 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 interface PlaybackOwner {
     val playback: PlaybackController
@@ -19,13 +26,16 @@ interface PlaybackOwner {
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private lateinit var player: ExoPlayer
+    private lateinit var sessionPlayer: SessionPlayer
     private lateinit var session: MediaSession
     private val playback get() = (application as PlaybackOwner).playback
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
         player = createPlayer(this)
-        val builder = MediaSession.Builder(this, SessionPlayer(player, playback))
+        sessionPlayer = SessionPlayer(player, playback)
+        val builder = MediaSession.Builder(this, sessionPlayer)
         packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
             val openApp = PendingIntent.getActivity(
                 this, 0, intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -35,12 +45,15 @@ class PlaybackService : MediaSessionService() {
         }
         session = builder.build()
         playback.attach(player)
+        // Whether a next episode exists comes from the album, not the player, so the session is told when that changes.
+        scope.launch { playback.queue.map { it.hasNext }.distinctUntilChanged().collect { sessionPlayer.refreshCommands() } }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         if (controllerInfo.isTrusted || controllerInfo.packageName == packageName) session else null
 
     override fun onDestroy() {
+        scope.cancel()
         playback.detach(player)
         session.release()
         player.release()
@@ -67,6 +80,9 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
         }
         return current.buildUpon().setAvailableCommands(commands.build()).build()
     }
+
+    /** Asks the session to read the state again. Forwarded player events do not cover a change in the album's queue. */
+    fun refreshCommands() = invalidateState()
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         if (playWhenReady) playback.resume() else playback.pause()
