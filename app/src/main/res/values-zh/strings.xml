@@ -35,7 +35,6 @@
     <string name="bookmark_empty">本集暂无书签</string>
     <string name="bookmark_no_note">无备注</string>
     <string name="bookmark_edit_note">编辑备注</string>
-    <string name="bookmark_options">%1$s 的书签操作</string>
     <string name="bookmark_note">备注（选填）</string>
     <string name="bookmark_note_limit">备注最多 %1$d 字</string>
     <string name="bookmark_save">保存</string>

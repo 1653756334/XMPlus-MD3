@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,12 +23,9 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -302,7 +300,7 @@ private fun BookmarkRow(
                 )
             }
         },
-        trailingContent = { BookmarkOptions(time, busy, onEdit, onDelete) },
+        trailingContent = { BookmarkOptions(busy, onEdit, onDelete) },
     ) {
         if (bookmark.note.isEmpty()) {
             Text(stringResource(R.string.bookmark_no_note), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -313,24 +311,14 @@ private fun BookmarkRow(
 }
 
 @Composable
-private fun BookmarkOptions(time: String, busy: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val colors = MaterialTheme.colorScheme
-    Box {
-        IconButton(onClick = { expanded = true }, enabled = !busy) {
-            Icon(Icons.Outlined.MoreVert, stringResource(R.string.bookmark_options, time), tint = colors.onSurfaceVariant)
+private fun BookmarkOptions(busy: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    Row {
+        IconButton(onClick = onEdit, enabled = !busy) {
+            Icon(Icons.Outlined.Edit, stringResource(R.string.bookmark_edit_note), tint = tint)
         }
-        DropdownMenu(expanded = expanded && !busy, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.bookmark_edit_note)) },
-                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                onClick = { expanded = false; onEdit() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.bookmark_delete_action), color = colors.error) },
-                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = colors.error) },
-                onClick = { expanded = false; onDelete() },
-            )
+        IconButton(onClick = onDelete, enabled = !busy) {
+            Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.bookmark_delete_action), tint = tint)
         }
     }
 }
