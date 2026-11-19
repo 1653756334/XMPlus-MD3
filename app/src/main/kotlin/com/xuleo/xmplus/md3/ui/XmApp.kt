@@ -1,6 +1,5 @@
 package com.xuleo.xmplus.md3.ui
 
-import androidx.activity.BackEventCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -168,6 +167,7 @@ internal fun XmAppContent(
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     val routeDecorator = remember(onRoutePopped) { NavEntryDecorator<NavKey>(onPop = onRoutePopped) { it.Content() } }
+    val backCardDecorator = remember { NavEntryDecorator<NavKey> { BackCard { it.Content() } } }
     NavigationSuiteScaffold(
         state = suite,
         navigationSuiteType = navigationType,
@@ -192,20 +192,14 @@ internal fun XmAppContent(
                 backStack = pages,
                 onBack = { if (!isPlayer) navigator.pop() },
                 modifier = Modifier.weight(1f).clipToBounds(),
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator),
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator, backCardDecorator),
                 transitionSpec = {
                     (slideInHorizontally(spatial) { it * direction } + fadeIn(effects)) togetherWith
                         (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
                 },
-                popTransitionSpec = {
-                    (slideInHorizontally(spatial) { -it * direction / 3 } + fadeIn(effects)) togetherWith
-                        (slideOutHorizontally(spatial) { it * direction } + fadeOut(effects))
-                },
-                predictivePopTransitionSpec = { edge ->
-                    val sign = if (edge == BackEventCompat.EDGE_RIGHT) -1 else 1
-                    (slideInHorizontally(spatial) { -it * sign / 3 } + fadeIn(effects)) togetherWith
-                        (slideOutHorizontally(spatial) { it * sign } + fadeOut(effects))
-                },
+                // Every back, by gesture or button, is the same card pulled away (see BackMotion.kt).
+                popTransitionSpec = { backTransform(direction) },
+                predictivePopTransitionSpec = { edge -> backTransform(backDirection(edge, direction)) },
                 entryProvider = entryProvider {
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
