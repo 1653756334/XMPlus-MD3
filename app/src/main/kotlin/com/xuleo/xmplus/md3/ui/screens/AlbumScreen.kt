@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,7 +37,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
@@ -74,7 +72,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
-import com.xuleo.xmplus.md3.browse.AlbumEpisodeChunk
 import com.xuleo.xmplus.md3.browse.AlbumState
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
@@ -114,7 +111,6 @@ internal fun AlbumScreen(
     val introList = rememberLazyListState()
     val episodesList = rememberLazyListState()
     val reviewsList = rememberLazyListState()
-    var showRange by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(pager.currentPage) { if (pager.currentPage == AlbumTab.Reviews) viewModel.ensureReviews() }
     val detail = state.detail
     if (detail == null) {
@@ -128,7 +124,7 @@ internal fun AlbumScreen(
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {
                     AlbumTab.Episodes -> EpisodesPage(
-                        state, detail, viewModel, episodesList, { showRange = true },
+                        state, detail, viewModel, episodesList,
                         onPlay = { onPlayEpisode(detail, it) },
                     )
                     AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
@@ -136,14 +132,6 @@ internal fun AlbumScreen(
                 }
             }
         }
-    }
-    if (showRange && detail != null) {
-        RangeSheet(
-            total = detail.album.trackCount,
-            chunkStart = state.chunkStart,
-            onSelect = { showRange = false; viewModel.selectChunk(it) },
-            onDismiss = { showRange = false },
-        )
     }
     if (state.replyTo != null) RepliesSheet(state, viewModel)
 }
@@ -171,13 +159,12 @@ private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpe
 
 @Composable
 private fun EpisodesPage(
-    state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState,
-    onRange: () -> Unit, onPlay: (Track) -> Unit,
+    state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState, onPlay: (Track) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         // The toolbar sits above the list rather than inside it. A field inside a list is scrolled into view when it takes
         // focus, which would pull the list back to its first row every time search opens.
-        EpisodeToolbar(state, detail.album.trackCount, viewModel, onRange)
+        EpisodeToolbar(state, detail.album.trackCount, viewModel)
         if (searchResultsShown(state)) SearchResults(state, viewModel, onPlay)
         else EpisodeList(state, viewModel, list, onPlay)
     }
@@ -197,16 +184,28 @@ private fun ReviewsPage(state: AlbumState, viewModel: AlbumViewModel, list: Lazy
 private fun searchResultsShown(state: AlbumState): Boolean =
     state.searchOpen && (state.hitPage > 0 || state.hitsLoading || state.hitsErrorCode != null)
 
-/** The episodes of the chunk on show. Its list keeps its place while search results take its space. */
+/**
+ * The episodes loaded so far. The next page loads as the end comes into view. The list keeps its place while search
+ * results take its space.
+ */
 @Composable
 private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState, onPlay: (Track) -> Unit) {
+    LoadMoreEffect(
+        { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
+        state.episodePage, state.episodesLoading, state.ascending, onLoadMore = viewModel::loadMoreEpisodes,
+    )
     AlbumListPage(list) {
         when {
-            state.episodesLoading -> item(key = "episodes-loading") { SkeletonRow() }
-            state.episodesErrorCode != null ->
-                item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryChunk) }
+            state.episodes.isEmpty() && state.episodesLoading -> item(key = "episodes-loading") { SkeletonRow() }
+            state.episodes.isEmpty() && state.episodesErrorCode != null ->
+                item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryEpisodes) }
             state.episodes.isEmpty() -> item(key = "episodes-empty") { EmptyText(R.string.album_episodes_empty) }
-            else -> items(state.episodes, key = { it.id }) { track -> EpisodeRow(track) { onPlay(track) } }
+            else -> {
+                items(state.episodes, key = { it.id }) { track -> EpisodeRow(track) { onPlay(track) } }
+                item(key = "episodes-footer") {
+                    PagingFooter(state.episodesLoading, state.episodesErrorCode != null, state.episodesHasMore, viewModel::retryEpisodes)
+                }
+            }
         }
     }
 }
@@ -287,9 +286,9 @@ private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) 
     }
 }
 
-/** The sort, search and chunk controls. Search opens in place of them, on the same strip. */
+/** The sort, count and search controls. Search opens in place of them, on the same strip. */
 @Composable
-private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel, onRange: () -> Unit) {
+private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     AnimatedContent(
         targetState = state.searchOpen,
@@ -305,14 +304,13 @@ private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewMo
                 total = total,
                 onOrder = { viewModel.selectOrder(!state.ascending) },
                 onSearch = viewModel::openSearch,
-                onRange = onRange,
             )
         }
     }
 }
 
 @Composable
-private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit, onRange: () -> Unit) {
+private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onOrder) {
             Icon(Icons.Filled.Sort, contentDescription = null, Modifier.size(18.dp))
@@ -320,11 +318,11 @@ private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSe
             Text(stringResource(if (ascending) R.string.album_order_oldest else R.string.album_order_newest), maxLines = 1)
         }
         Spacer(Modifier.weight(1f))
+        Text(
+            stringResource(R.string.album_total, total),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+        )
         IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.album_search_hint)) }
-        TextButton(onClick = onRange, enabled = total > 0) {
-            Text(stringResource(R.string.album_total, total), maxLines = 1)
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp))
-        }
     }
 }
 
@@ -403,28 +401,6 @@ private fun ReviewSort(newest: Boolean, onSelect: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(selected = !newest, onClick = { onSelect(false) }, label = { Text(stringResource(R.string.album_review_top)) })
         FilterChip(selected = newest, onClick = { onSelect(true) }, label = { Text(stringResource(R.string.album_review_newest)) })
-    }
-}
-
-@Composable
-private fun RangeSheet(total: Int, chunkStart: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding).padding(bottom = XmLayout.SectionGap),
-            verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
-        ) {
-            Text(stringResource(R.string.album_choose_range), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (start in 1..total step AlbumEpisodeChunk) {
-                    val end = minOf(start + AlbumEpisodeChunk - 1, total)
-                    FilterChip(
-                        selected = start == chunkStart,
-                        onClick = { onSelect(start) },
-                        label = { Text(stringResource(R.string.album_range, start, end)) },
-                    )
-                }
-            }
-        }
     }
 }
 

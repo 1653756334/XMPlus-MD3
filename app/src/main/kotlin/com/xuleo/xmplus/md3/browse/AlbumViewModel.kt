@@ -11,7 +11,6 @@ import com.xuleo.xmplus.md3.core.model.AlbumReply
 import com.xuleo.xmplus.md3.core.model.AlbumReview
 import com.xuleo.xmplus.md3.core.model.AlbumScore
 import com.xuleo.xmplus.md3.core.model.AlbumSimilar
-import com.xuleo.xmplus.md3.core.model.Credentials
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
@@ -24,9 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/** Episodes are read this many at a time: 1–200, 201–400 and so on. */
-internal const val AlbumEpisodeChunk = 200
 
 /** Everything one album page shows. Each part loads and fails on its own. */
 data class AlbumState(
@@ -41,9 +37,10 @@ data class AlbumState(
     val similarErrorCode: String? = null,
     /** True for episode-number order, oldest first. */
     val ascending: Boolean = true,
-    /** The first episode number of the chunk on screen. */
-    val chunkStart: Int = 1,
+    /** The episodes loaded so far, in the order on screen. Each page is added when the list asks for it. */
     val episodes: List<Track> = emptyList(),
+    val episodePage: Int = 0,
+    val episodesHasMore: Boolean = false,
     val episodesLoading: Boolean = false,
     val episodesErrorCode: String? = null,
     val searchOpen: Boolean = false,
@@ -70,7 +67,7 @@ data class AlbumState(
 )
 
 /**
- * One album's page. The header loads first, with the introduction, similar albums and the first episode chunk. Reviews
+ * One album's page. The header loads first, with the introduction, similar albums and the first page of episodes. Reviews
  * load when their tab opens; search results and replies page on demand.
  */
 class AlbumViewModel(
@@ -84,7 +81,7 @@ class AlbumViewModel(
     private var headerJob: Job? = null
     private var introductionJob: Job? = null
     private var similarJob: Job? = null
-    private var chunkJob: Job? = null
+    private var episodesJob: Job? = null
     private var hitsJob: Job? = null
     private var reviewsJob: Job? = null
     private var repliesJob: Job? = null
@@ -107,7 +104,7 @@ class AlbumViewModel(
                 mutable.update { it.copy(detail = detail, headerLoading = false) }
                 loadIntroduction()
                 loadSimilar()
-                loadChunk()
+                loadEpisodes(1)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -150,66 +147,56 @@ class AlbumViewModel(
         }
     }
 
-    /** Episodes are shown oldest first or newest first; either way the chunk starts again from its first page. */
+    /** Episodes are shown oldest first or newest first. Either way the whole album is listed again from its first page. */
     fun selectOrder(ascending: Boolean) {
         if (mutable.value.ascending == ascending) return
-        mutable.update { it.copy(ascending = ascending, chunkStart = 1) }
-        loadChunk()
+        mutable.update { it.copy(ascending = ascending, episodes = emptyList(), episodePage = 0, episodesHasMore = false) }
+        loadEpisodes(1)
     }
 
-    fun selectChunk(start: Int) {
-        if (mutable.value.chunkStart == start) return
-        mutable.update { it.copy(chunkStart = start) }
-        loadChunk()
+    fun loadMoreEpisodes() {
+        val state = mutable.value
+        if (state.episodePage > 0 && state.episodesHasMore && !state.episodesLoading && state.episodesErrorCode == null) {
+            loadEpisodes(state.episodePage + 1)
+        }
     }
 
-    fun retryChunk() = loadChunk()
+    fun retryEpisodes() {
+        val state = mutable.value
+        if (!state.episodesLoading) loadEpisodes(state.episodePage + 1)
+    }
 
-    /** Reads the chunk the state points at, in the order it asks for. */
-    private fun loadChunk() {
+    /** Reads one page in the order the state asks for. Page 1 starts the list; later pages are added to its end. */
+    private fun loadEpisodes(page: Int) {
         val state = mutable.value
         val detail = state.detail ?: return
-        val start = state.chunkStart
-        val end = minOf(start + AlbumEpisodeChunk - 1, detail.album.trackCount)
         val ascending = state.ascending
-        chunkJob?.cancel()
-        mutable.update { it.copy(episodes = emptyList(), episodesLoading = true, episodesErrorCode = null) }
-        chunkJob = viewModelScope.launch {
+        episodesJob?.cancel()
+        mutable.update { it.copy(episodesLoading = true, episodesErrorCode = null) }
+        episodesJob = viewModelScope.launch {
             try {
-                val tracks = withContext(Dispatchers.Default) {
-                    readChunk(detail, start, end, ascending, accounts.primaryCredentials())
+                val read = withContext(Dispatchers.Default) {
+                    album.episodePage(albumId, page, ascending, detail.recordDescending, accounts.primaryCredentials())
                 }
-                mutable.update { it.copy(episodes = tracks, episodesLoading = false) }
+                // A page whose total has moved means the album changed under us.
+                if (read.total != detail.album.trackCount) throw XmlyException("catalogue_changed")
+                val tracks = read.items.sortedWith(
+                    if (ascending) compareBy { it.officialPosition } else compareByDescending { it.officialPosition },
+                )
+                mutable.update { now ->
+                    now.copy(
+                        episodes = (if (page == 1) emptyList() else now.episodes) + tracks,
+                        episodePage = page,
+                        episodesHasMore = page * read.pageSize < read.total,
+                        episodesLoading = false,
+                    )
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
                 mutable.update { it.copy(episodesLoading = false, episodesErrorCode = codeOf(failure)) }
             }
         }
-    }
-
-    /**
-     * The episodes numbered [start]..[end]. The server pages are chosen in the order it lists them, so a descending
-     * album may need two pages to cover one chunk. A page whose total has moved means the album changed under us.
-     */
-    private suspend fun readChunk(
-        detail: AlbumDetail,
-        start: Int,
-        end: Int,
-        ascending: Boolean,
-        credentials: Credentials?,
-    ): List<Track> {
-        val total = detail.album.trackCount
-        if (start > end) return emptyList()
-        val first = (if (ascending) start - 1 else total - end) / AlbumEpisodeChunk + 1
-        val last = (if (ascending) end - 1 else total - start) / AlbumEpisodeChunk + 1
-        val rows = (first..last).flatMap { page ->
-            val read = album.episodePage(albumId, page, ascending, detail.recordDescending, credentials)
-            if (read.total != total) throw XmlyException("catalogue_changed")
-            read.items
-        }
-        return rows.filter { (it.officialPosition ?: 0) in start..end }
-            .sortedWith(if (ascending) compareBy { it.officialPosition } else compareByDescending { it.officialPosition })
     }
 
     fun openSearch() = mutable.update { it.copy(searchOpen = true) }

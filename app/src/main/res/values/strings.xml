@@ -271,8 +271,6 @@
     <string name="album_order_oldest">Oldest first</string>
     <string name="album_order_newest">Newest first</string>
     <string name="album_total">%1$d episodes</string>
-    <string name="album_choose_range">Choose episodes</string>
-    <string name="album_range">%1$d–%2$d</string>
     <string name="album_search_hint">Search this album</string>
     <string name="album_episodes_empty">No episodes yet</string>
     <string name="album_intro_empty">No introduction yet</string>

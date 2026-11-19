@@ -263,8 +263,6 @@
     <string name="album_order_oldest">从旧到新</string>
     <string name="album_order_newest">从新到旧</string>
     <string name="album_total">共%1$d集</string>
-    <string name="album_choose_range">选集</string>
-    <string name="album_range">%1$d–%2$d</string>
     <string name="album_search_hint">搜索本专辑</string>
     <string name="album_episodes_empty">暂无节目</string>
     <string name="album_intro_empty">暂无专辑简介</string>
