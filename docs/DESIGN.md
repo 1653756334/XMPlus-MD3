@@ -41,12 +41,12 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 ### 发现 Discover
 
-- [ ] Channels with tabs and recommended sections
-- [ ] Ranking preview and full rankings with all tabs
-- [ ] 全部专辑 per channel, sortable (综合 / 最多播放 / 最近更新)
-- [ ] Categories: groups → channels → albums with filters and sort
+- [x] Channels with tabs and recommended sections
+- [x] Ranking preview and full rankings with all tabs
+- [x] 全部专辑 per channel, sortable (综合 / 最多播放 / 最近更新)
+- [x] Categories: groups → channels → albums with filters and sort
 - [ ] Hot words, can be turned off in settings
-- [ ] Search: all, albums, tracks, anchors, with paging
+- [x] Search: all, albums, tracks, anchors, with paging
 - [ ] Locate a track inside its album (定位)
 
 ### 专辑 Album
@@ -58,13 +58,13 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Reviews: score, sort, replies, copy
 - [ ] Subscribe, play, play next, add to queue
 - [ ] Download one episode, a range such as `1,3,5-8`, or the whole album (up to 5,000 episodes), with multi-select
-- [ ] Per-album speed, volume and intro/outro skip, with the server's suggestion
+- [x] Per-album speed, volume and intro/outro skip, with the server's suggestion
 
 ### 主播 Anchor
 
-- [ ] Profile, verification badge, follow / unfollow
-- [ ] Albums and tracks tabs, sorted by 默认 / 最新 / 最早 / 最多播放
-- [ ] Followed anchors list
+- [x] Profile, verification badge, follow / unfollow
+- [x] Albums and episodes tabs in server order, loading the next page as the list is scrolled. The albums tab has a search bar for that anchor's albums only. Episodes are the anchor's sounds, newest first, up to 5,000
+- [x] Followed anchors list
 
 ### 播放 Player
 
@@ -72,21 +72,22 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Queue: check the album for new episodes. No drag to reorder, reverse, remove or clear: the app is for novels, which play in order
 - [ ] Order: sequential only. No shuffle, list loop or single loop, for the same reason
 - [ ] Speed and volume remembered per album, a mute switch, the phone's keys as master volume; the skip interval stays 15 s with no setting
-- [ ] Intro/outro skip, per album only and never global, seeded from the server's suggestion (see Intro and outro skip)
+- [x] Intro/outro skip, per album only and never global, seeded from the server's suggestion (see Intro and outro skip)
 - [ ] Sleep timer: after a duration or at the end of the episode; then pause or exit; optionally keep downloading
-- [ ] Like, favorite, with counts
-- [ ] Comments: replies, likes, posting, deleting your own
-- [ ] Transcript (文稿)
+- [x] Like and favorite; the counts are not shown yet
+- [x] Comments: reading, posting, liking, deleting your own; replies are not built yet
+- [x] Transcript (文稿)
 - [x] Bookmarks with notes
 - [x] Resume from local and cloud progress; optional upload with consent; an episode that played to its end is recorded as finished (see Episode end)
 - [ ] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
-- [ ] System controls: notification, lock screen, Bluetooth, headset (see Full player)
+- [x] System controls: notification, lock screen, Bluetooth, headset (see Full player)
 
 ### 听过 Library
 
-- [ ] Tabs: 听更新, 订阅, 历史 (cloud), 收藏, 书签, 关注的主播
-- [ ] Combined across all accounts, searchable, removal from the owning account
+- [x] Seven swipeable tabs: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签, 关注的主播
+- [ ] Combined across all accounts; the account lists read the primary account only
+- [ ] Searchable
 
 ### 下载 Downloads
 
@@ -107,7 +108,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 - [x] SMS login with Geetest verification
 - [x] Cookie / request-header import (verified by a listening-time query before saving)
-- [ ] Multiple accounts, primary account, restore and remove
+- [x] Multiple accounts, primary account, restore and remove
 - [x] 听时 balance, claim once
 - [ ] Auto-claim: top up to 4 h when below 2 h; pauses after an uncertain result until confirmed manually
 - [ ] Usage ledger: charges for playback and download prepayment; states prepared, submitting, confirmed, uncertain, rejected; settles before switching account or exiting; no charge while the balance is above 20 h
@@ -205,11 +206,11 @@ Rules:
 ### Full player
 
 - Color scheme taken from the cover, changing smoothly between episodes.
-- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 文稿 and 评论 become swipeable pages when they are built.
+- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 文稿 is a page of the cover area that swipes with it; 评论 replaces the cover area with the track's comments.
 - The cover takes the largest square left above the controls and shrinks slightly with a spring when paused.
 - Under the cover, top to bottom:
   - Episode title (two lines), then the album name, which opens the album.
-  - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载, with counts once they are connected.
+  - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载. 点赞 and 收藏 are connected; 下载 is not yet (Phase 5).
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
   - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the fixed 15 s interval.
   - Listening tools, icon over label: 播放列表 · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (1.5×, the sleep countdown). There is no play mode: episodes play in order, and 随机播放, 列表循环 and 单集循环 are left out on purpose, because this is for listening to novels, not music.
@@ -240,9 +241,11 @@ Rules:
 
 ### 听过 Library
 
-- The 6 tabs, with account filter chips.
-- History grouped 今天 / 昨天 / 更早 with sticky headers.
-- Swipe to remove, with an undo snackbar.
+- Seven sections that swipe left and right: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签 and 关注的主播.
+- 历史 is this device's own record, one row per album: the latest episode, where playback stopped and when. 选择 in the top bar selects rows (全选 selects all) and removes them with an undo snackbar. Swiping never removes, so the tabs still swipe.
+- Account sections load the first time they are shown. Subscriptions and favourites can be removed in place; other rows open their album or anchor page.
+- 书签 lists the device's bookmarks across all albums, whichever account is signed in, with the album and episode names kept when each bookmark was made. Tapping one plays its episode from the saved position in the player. Bookmarks made before the names were kept are completed from the catalogue, cover included, once per launch.
+- 历史, 云历史 and 书签 rows play their episode from the saved position. A finished episode starts from the beginning. Other rows open their album or anchor page.
 
 ### 下载 Downloads
 
@@ -293,8 +296,8 @@ Each phase ends with a side-by-side check against XMPlus on the same account.
 1. Protocol and accounts: API layer port; SMS / Geetest / Cookie login; quota, rewards, usage ledger; XMPlus backup import so testers can bring their accounts.
 2. Browsing: discover, categories, rankings, search, album, anchor, reading reviews and comments.
 3. Playback: Media3 service, mini and full player, queue, settings, sleep timer, bookmarks, progress, 听时 metering.
-4. Library and interactions: the 6 tabs; like, favorite, subscribe, follow; posting, liking and deleting comments.
-5. Downloads: shared cache, billing receipts, FFmpeg (source-built in CI, reusing `tool/build_android_media.sh` and the XMPlus workflow), background work, auto-download, offline library.
+4. Library and interactions: 听过 with its seven sections; like, favorite, subscribe, follow; comments in the player.
+5. Downloads, all of it: the 下载 tab, the download buttons and the download engine (until then they are placeholders): shared cache, billing receipts, FFmpeg (source-built in CI, reusing `tool/build_android_media.sh` and the XMPlus workflow), background work, auto-download, offline library.
 6. System: settings, backup export and restore, in-app update, logs and feedback, about.
 7. Polish: motion pass, tablets and foldables, TalkBack, startup performance, translation review, full comparison against XMPlus.
 

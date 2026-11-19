@@ -7,7 +7,7 @@ Status: Draft · 2026-11-17
 - Each case gives an input or action and the expected result.
 - Logic cases are run as temporary unit tests once the code exists, then deleted (see `AGENTS.md`). UI cases are checked by hand on a device or emulator.
 - Sections marked with an XMPlus source must behave exactly like that source. If the source and this document disagree, the source wins and this document is corrected.
-- Cases for phases 4, 6 and 7 are added when those phases start.
+- Cases for phases 6 and 7 are added when those phases start.
 
 ## Shared standards (every phase)
 
@@ -171,8 +171,8 @@ Source: XMPlus `lib/storage/config_archive.dart`.
 - BR-31 Episodes: sort order reverses the whole album, from the first episode or the last; the list loads the next page as it is scrolled down until the last episode; search inside the album; 定位 waits for playback.
 - BR-32 Similar albums are listed and open their own pages.
 - BR-33 Reviews: score, sort, replies and copy; an album with no reviews says so.
-- BR-34 Anchor page: profile, verification badge, albums and tracks tabs sorted by 默认 / 最新 / 最早 / 最多播放, and paging.
-- BR-35 Controls that need playback, download, subscribe or follow are hidden until those features exist.
+- BR-34 Anchor page: profile, verification badge, albums and episodes tabs in server order, loading the next page as the list is scrolled; episodes stop at the first 5,000. The albums search shows only that anchor's albums, never another anchor's, and a blank search shows the whole list again.
+- BR-35 Controls that need download or multi-select stay hidden until those features exist. 订阅 and 关注 show only for a signed-in account.
 
 ## Phase 3 — Playback rules
 
@@ -191,7 +191,7 @@ Album playback queue
 - PB-04 Select an episode from a descending album or its search results. The queue starts at that exact episode and follows ascending official episode numbers.
 - PB-05 From the first or last episode of a page, Previous or Next reads the adjacent page without duplicating rows. Next is disabled on the album's last episode. Natural completion still re-reads the last page, so an episode appended since the queue was built plays on.
 - PB-06 Reject a moved catalogue anchor or a repeated episode ID. A failed page read leaves the current episode and queue intact; selecting a different episode or changing the primary account cancels a pending read. After a failed read, tapping the loaded episode rebuilds the queue without restarting playback.
-- PB-07 Top to bottom the player reads: 播放 / 文稿 / 评论 at the top; the cover; the title and the album name (tapping it opens the album); 点赞 · 收藏 · 书签 · 下载 · 更多 (更多 opens the 更多 sheet); the progress bar with the time pill; seek back · previous · play/pause · next · seek forward; 播放列表 · 倍速 · 定时关闭. Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode. Dragging the pill or tapping the bar seeks, and the pill shows the drag position before release. 文稿, 评论, 点赞, 收藏 and 下载 say 即将推出 and change nothing.
+- PB-07 Top to bottom the player reads: 播放 / 文稿 / 评论 at the top; the cover; the title and the album name (tapping it opens the album); 点赞 · 收藏 · 书签 · 下载 · 更多 (更多 opens the 更多 sheet); the progress bar with the time pill; seek back · previous · play/pause · next · seek forward; 播放列表 · 倍速 · 定时关闭. Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode. Dragging the pill or tapping the bar seeks, and the pill shows the drag position before release. 文稿 is a page of the cover area that swipes with it. 点赞 and 收藏 are connected for a signed-in account; 评论 shows the track's comments; 下载 says 即将推出 and changes nothing.
 - PB-08 Let a metered episode end at the page boundary; the next episode opens through normal authorization, and a free next episode does not start a meter. Pause while the page or settlement is pending; the next episode must not start.
 - PB-09 Pause mid-episode, then swipe the app away from recents (also: force-stop, let the system kill it, reboot) and reopen. The mini player shows the same episode paused at the same position, with the same queue, speed, volume and intro/outro skip. Nothing plays, resolves or uses 听时 until play, and play continues from that spot. Before play the seek buttons, the seek bar, 回到开头 and bookmarks work as they do while playing; a position set before play is where play starts. A finished episode comes back finished and play moves to the next. Changing the primary account clears it.
 
@@ -234,7 +234,55 @@ Phase 3 (player sheet): 15, 30, 60 or 90 minutes, or the end of this episode, th
 - PB-44 Timer and episode end arriving together → the action happens once and the next episode does not start.
 - PB-45 Cancelling clears the timer. The preset (minutes, action, mode) is saved, but a running timer is not restored after a restart.
 
+## Phase 4 — Library and interactions
+
+### 听过 (this device's history and the account's lists)
+
+- LH-01 Playing an episode records its album on this device, with the episode last played from it, where playback stopped and when. Pausing, stopping or moving to another episode saves the latest position.
+- LH-02 Each album appears once, most recently played first, with its cover, album title, the latest episode, the progress (听到 x / y, or 已听完) and the date. Playing another episode of the album moves the entry to that episode.
+- LH-03 Tapping a row plays its episode from the saved position, in the player, without opening the album. An episode that finished starts from the beginning.
+- LH-04 选择 in the top bar selects rows: tapping a row selects it instead of playing it, 全选 selects every row, and the delete button removes the selected albums and shows 已从听过中移除 with 撤销. Undo restores them with their episodes, positions and times, unless an album has been played again since; then the newer entry stays. Swiping a row does not remove it, so the tabs still swipe. The back button or 关闭 ends selection.
+- LH-05 There is no separate clear action: selecting every row and deleting clears this device's history, with the same undo. Cloud history is not changed.
+- LH-06 At most 5,000 albums are kept; the least recently played are dropped first.
+- LH-07 With no history the tab shows the empty message.
+- LH-08 Interrupted playback (app killed mid-episode) may lose up to about five seconds of position; the last saved position is shown.
+- LH-09 The seven sections swipe left and right, and their tabs follow. An account section is read the first time it is shown. Signed out, it says 登录后查看 and asks the server for nothing.
+- LH-10 云历史 lists the account's cloud history, one row per episode, newest first, a page at a time as the list is scrolled. An episode played again appears once, at its latest listen. Tapping plays that episode from its saved position, as LH-03 does.
+- LH-11 听更新 lists episodes published by followed albums, newest first, with the album name and date. Tapping opens the album.
+- LH-12 订阅 lists the subscribed albums with the latest episode and the unplayed count. 取消订阅 removes the row once the server confirms. A refused change shows 操作失败，请重试 and keeps the row.
+- LH-13 收藏 lists favourite episodes. 取消收藏 works as in LH-12.
+- LH-14 书签 lists this device's bookmarks across all albums, newest first, with the album and episode names, position and note. Bookmarks are the same whichever account is signed in. Bookmarks made before the names were kept get their album, episode and cover from the catalogue the first time 书签 is opened in each launch. Tapping a bookmark plays that episode from its saved position in the player, without opening the album.
+- LH-15 关注的主播 lists the anchors the account follows. Tapping opens the anchor page.
+- LH-16 A section that fails shows the error with 重试. Scrolling to the end loads the next page once; a failed page is not retried in a loop.
+
+### 文稿 transcript
+
+- TR-01 文稿 shows the episode's official manuscript: the lyric, or else the draft. An episode without one says 这一集没有文稿.
+- TR-02 The promotional introduction is never shown as the transcript.
+- TR-03 A failed read shows the error with 重试; retry reads the transcript again.
+- TR-04 文稿 is the second page of the cover area. Swiping left or right moves between the cover and 文稿, the top tabs follow the swipe, and tapping a tab slides to its page.
+
+### 评论 comments (player)
+
+- CM-01 评论 lists the track's comments, newest first, 20 at a time. Scrolling to the end loads the next page.
+- CM-02 Reading needs no account. Posting, liking and deleting need one; without it the player says 登录后评论 and changes nothing.
+- CM-03 Blank text is not sent. A posted comment appears once the server confirms it.
+- CM-04 A like changes the icon and count only after the server confirms; a second tap takes it back.
+- CM-05 Only the account's own comments show 删除, and deleting asks first.
+- CM-06 A failed write shows 评论操作失败，请重试 and leaves the list as it was.
+- CM-07 Not built yet: replies, sorting, and the replies under a comment.
+
+### 点赞, 收藏, 订阅, 关注
+
+- IN-01 点赞 toggles the like for the episode. It starts off for each episode, as in XMPlus, and does not read the server's state.
+- IN-02 收藏 is off until the account's favourites are read, then shows the true state. A tap changes the button only after the server confirms.
+- IN-03 订阅 sits beside the album title and appears only for a signed-in account. Its state comes from the subscription list. An "already subscribed" answer counts as done.
+- IN-04 关注 sits beside the anchor's name and appears only for a signed-in account, never on the account's own page. Its state comes from the anchor's card.
+- IN-05 A failed change shows 操作失败，请重试 and leaves the state as it was.
+- IN-06 Each change is sent once; a failure is not retried automatically.
 ## Phase 5 — Downloads
+
+All download work waits for this phase: until it ships, the 下载 tab and the download buttons are placeholders that change nothing.
 
 Source: XMPlus `lib/api/xmly_catalogue.dart`, `lib/services/download_paths.dart`, `lib/services/download_service.dart`.
 
