@@ -11,7 +11,9 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class AllAlbums(val categoryId: Int = 0) : AppRoute
     @Serializable data class CategoryAlbums(val groupId: Int, val groupTitle: String, val channelId: Int? = null, val channelTitle: String? = null) : AppRoute
     @Serializable data class HotRanking(val pageId: Int) : AppRoute
-    @Serializable data class AlbumPage(val albumId: String) : AppRoute
+    @Serializable data class AlbumPage(val albumId: String) : AppRoute {
+        val contentKey: String get() = "album:$albumId"
+    }
     @Serializable data class AnchorPage(val id: String, val resolveFromAlbum: Boolean = false) : AppRoute {
         val contentKey: String get() = "anchor:${if (resolveFromAlbum) "album" else "uid"}:$id"
     }

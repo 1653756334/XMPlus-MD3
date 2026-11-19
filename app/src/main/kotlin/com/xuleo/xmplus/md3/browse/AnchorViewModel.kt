@@ -2,8 +2,6 @@ package com.xuleo.xmplus.md3.browse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -220,21 +218,3 @@ internal class AnchorViewModel(
     }
 }
 
-/** Keep a catalogue while its route is on the stack, not for the entire life of the activity. */
-internal class AnchorRouteStores : ViewModel() {
-    private val stores = mutableMapOf<Any, ViewModelStoreOwner>()
-    fun owner(contentKey: String): ViewModelStoreOwner = stores.getOrPut(contentKey) {
-        object : ViewModelStoreOwner {
-            override val viewModelStore = ViewModelStore()
-        }
-    }
-
-    fun remove(contentKey: Any) {
-        stores.remove(contentKey)?.viewModelStore?.clear()
-    }
-
-    override fun onCleared() {
-        stores.values.forEach { it.viewModelStore.clear() }
-        stores.clear()
-    }
-}

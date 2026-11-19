@@ -27,12 +27,12 @@ import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.browse.AllAlbumsViewModel
-import com.xuleo.xmplus.md3.browse.AnchorRouteStores
 import com.xuleo.xmplus.md3.browse.AnchorViewModel
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
 import com.xuleo.xmplus.md3.browse.DiscoverViewModel
 import com.xuleo.xmplus.md3.browse.RankingsViewModel
+import com.xuleo.xmplus.md3.browse.RouteStores
 import com.xuleo.xmplus.md3.browse.SearchViewModel
 import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.designsystem.*
@@ -56,16 +56,17 @@ fun XmApp() {
     val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))
     val rankings: RankingsViewModel = viewModel(factory = RankingsViewModel.factory(application.discovery))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
-    val albumPage: @Composable (String) -> AlbumViewModel = { id ->
-        viewModel(key = "album:$id", factory = AlbumViewModel.factory(id, application.album, application.accounts))
+    // Album and anchor pages live as long as their route is on the stack.
+    val routeStores: RouteStores = viewModel()
+    val albumPage: @Composable (AppRoute.AlbumPage) -> AlbumViewModel = { route ->
+        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AlbumViewModel.factory(route.albumId, application.album, application.accounts))
     }
-    val anchorStores: AnchorRouteStores = viewModel()
     val anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel = { route ->
-        viewModel(viewModelStoreOwner = anchorStores.owner(route.contentKey), factory = AnchorViewModel.factory(route, application.anchor, application.accounts))
+        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AnchorViewModel.factory(route, application.anchor, application.accounts))
     }
     XmAppContent(
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
-        anchorPage = anchorPage, onAnchorPopped = anchorStores::remove, playback = application.playback,
+        anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback,
     )
 }
 
@@ -80,9 +81,9 @@ internal fun XmAppContent(
     categories: CategoriesViewModel? = null,
     categoryAlbums: CategoryAlbumsViewModel? = null,
     rankings: RankingsViewModel? = null,
-    albumPage: @Composable (String) -> AlbumViewModel? = { null },
+    albumPage: @Composable (AppRoute.AlbumPage) -> AlbumViewModel? = { null },
     anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel? = { null },
-    onAnchorPopped: (Any) -> Unit = {},
+    onRoutePopped: (Any) -> Unit = {},
     playback: PlaybackController? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
@@ -166,7 +167,7 @@ internal fun XmAppContent(
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
-    val anchorDecorator = remember(onAnchorPopped) { NavEntryDecorator<NavKey>(onPop = onAnchorPopped) { it.Content() } }
+    val routeDecorator = remember(onRoutePopped) { NavEntryDecorator<NavKey>(onPop = onRoutePopped) { it.Content() } }
     NavigationSuiteScaffold(
         state = suite,
         navigationSuiteType = navigationType,
@@ -191,7 +192,7 @@ internal fun XmAppContent(
                 backStack = pages,
                 onBack = { if (!isPlayer) navigator.pop() },
                 modifier = Modifier.weight(1f).clipToBounds(),
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), anchorDecorator),
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator),
                 transitionSpec = {
                     (slideInHorizontally(spatial) { it * direction } + fadeIn(effects)) togetherWith
                         (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
@@ -230,9 +231,9 @@ internal fun XmAppContent(
                     entry<AppRoute.HotRanking> { route ->
                         Surface(Modifier.fillMaxSize()) { if (discover != null) HotRankingScreen(discover, route.pageId, ::openAlbum) { navigator.pop() } }
                     }
-                    entry<AppRoute.AlbumPage> { route ->
+                    entry<AppRoute.AlbumPage>(clazzContentKey = { it.contentKey }) { route ->
                         Surface(Modifier.fillMaxSize()) {
-                            albumPage(route.albumId)?.let { vm ->
+                            albumPage(route)?.let { vm ->
                                 AlbumScreen(
                                     vm, { navigator.pop() }, ::openAlbum,
                                     onOpenAnchor = { uid -> openAlbumAnchor(route.albumId, uid) },
