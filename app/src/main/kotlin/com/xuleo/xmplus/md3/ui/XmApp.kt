@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.*
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
@@ -166,6 +167,7 @@ internal fun XmAppContent(
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
+    val backDispatcher = LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
     val routeDecorator = remember(onRoutePopped) { NavEntryDecorator<NavKey>(onPop = onRoutePopped) { it.Content() } }
     val backCardDecorator = remember { NavEntryDecorator<NavKey> { BackCard { it.Content() } } }
     NavigationSuiteScaffold(
@@ -190,7 +192,7 @@ internal fun XmAppContent(
         Column(Modifier.fillMaxSize().imePadding()) {
             NavDisplay(
                 backStack = pages,
-                onBack = { if (!isPlayer) navigator.pop() },
+                onBack = { if (!isPlayer) navigator.pop(backDispatcher.committingBackEdge()) },
                 modifier = Modifier.weight(1f).clipToBounds(),
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator, backCardDecorator),
                 transitionSpec = {
@@ -198,7 +200,7 @@ internal fun XmAppContent(
                         (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
                 },
                 // Every back, by gesture or button, is the same card pulled away (see BackMotion.kt).
-                popTransitionSpec = { backTransform(direction) },
+                popTransitionSpec = { backTransform(backDirection(navigator.popSwipeEdge, direction)) },
                 predictivePopTransitionSpec = { edge -> backTransform(backDirection(edge, direction)) },
                 entryProvider = entryProvider {
                     entry<AppRoute.Home> {
