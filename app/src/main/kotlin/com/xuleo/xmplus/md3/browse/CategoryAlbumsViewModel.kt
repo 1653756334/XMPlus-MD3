@@ -45,6 +45,8 @@ class CategoryAlbumsViewModel(private val discovery: XmlyDiscovery) : ViewModel(
     private val mutable = MutableStateFlow(CategoryAlbumsState())
     val state: StateFlow<CategoryAlbumsState> = mutable.asStateFlow()
     private var generation = 0
+    /** Album loads bump [generation]; the filter rows only go stale when another channel opens. */
+    private var infoGeneration = 0
     private var job: Job? = null
     private var infoJob: Job? = null
     private var groupId = 0
@@ -55,6 +57,7 @@ class CategoryAlbumsViewModel(private val discovery: XmlyDiscovery) : ViewModel(
         started = true
         this.groupId = groupId
         this.channelId = channelId
+        infoGeneration++
         infoJob?.cancel()
         mutable.value = CategoryAlbumsState()
         if (channelId != null) loadInfo()
@@ -95,15 +98,15 @@ class CategoryAlbumsViewModel(private val discovery: XmlyDiscovery) : ViewModel(
         val id = channelId ?: return
         if (infoJob?.isActive == true) return
         mutable.update { it.copy(infoFailed = false) }
-        val current = generation
+        val current = infoGeneration
         infoJob = viewModelScope.launch {
             try {
                 val info = withContext(Dispatchers.Default) { discovery.categoryInfo(id) }
-                if (current == generation) mutable.update { it.copy(info = info) }
+                if (current == infoGeneration) mutable.update { it.copy(info = info) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (current == generation) mutable.update { it.copy(infoFailed = true) }
+                if (current == infoGeneration) mutable.update { it.copy(infoFailed = true) }
             }
         }
     }
