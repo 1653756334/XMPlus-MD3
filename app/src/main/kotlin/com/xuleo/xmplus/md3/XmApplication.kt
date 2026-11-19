@@ -14,6 +14,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackBookmarkStore
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
+import com.xuleo.xmplus.md3.core.media.PlaybackSessionStore
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
@@ -70,7 +71,7 @@ class XmApplication : Application(), PlaybackOwner {
         PlaybackController(
             accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this), history,
             HistoryUploader(this, accounts, history), PlaybackBookmarkStore(this),
-            AlbumSkipStore(this), AlbumAudioStore(this), XmlySkip(http),
+            AlbumSkipStore(this), AlbumAudioStore(this), XmlySkip(http), PlaybackSessionStore(this),
         ) { usageReady.await() }
     }
 

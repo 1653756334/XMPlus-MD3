@@ -59,6 +59,7 @@ class PlaybackController(
     private val skips: AlbumSkipStore,
     private val audio: AlbumAudioStore,
     private val skipSource: XmlySkip,
+    private val sessions: PlaybackSessionStore,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -124,6 +125,7 @@ class PlaybackController(
     private var admitted = false
     private var wasPlaying = false
     private var accountChanges = 0
+    private var sessionVersion = 0L
 
     private val listener = object : Player.Listener {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -155,6 +157,8 @@ class PlaybackController(
             }
         }
     }
+
+    init { restoreSession() }
 
     internal fun attach(player: ExoPlayer) {
         check(engine.value == null)
@@ -344,6 +348,7 @@ class PlaybackController(
         albumQueue = choice.queue
         val target = choice.target
         val currentId = target?.id ?: mutableState.value.selection?.track?.id
+        if (currentId != null) rememberSession(choice.queue, currentId)
         mutableQueue.value = PlaybackQueueState(
             items = choice.queue.items, currentTrackId = currentId,
             hasNext = currentId != null && choice.queue.hasNext(currentId),
@@ -357,6 +362,75 @@ class PlaybackController(
             resumeAt()
         } else {
             open(PlaybackSelection(target, album), position = choice.positionMs)
+        }
+    }
+
+    /** Remembers what is loaded, so that it comes back after the app is swiped away, killed or the phone restarts. */
+    private fun rememberSession(queue: AlbumPlaybackQueue, trackId: String) {
+        val version = ++sessionVersion
+        scope.launch {
+            // The same identity the source is authorized under, and its saved progress is filed under.
+            val account = accounts.primaryCredentials()?.identity ?: "anonymous"
+            sessions.save(version, PlaybackSession(account, trackId, queue.detail, queue.items, queue.firstPage, queue.lastPage, queue.total))
+        }
+    }
+
+    private fun forgetSession() {
+        val version = ++sessionVersion
+        scope.launch { sessions.save(version, null) }
+    }
+
+    /**
+     * Brings back, paused, what was loaded when the app last ran. Nothing is resolved or charged until play. Anything
+     * the listener starts in the meantime wins.
+     */
+    private fun restoreSession() {
+        val version = sessionVersion
+        val request = revision
+        val intent = queueIntent
+        scope.launch {
+            try {
+                awaitLedger()
+                val saved = sessions.read() ?: return@launch
+                // Another account's episode stays saved for that account; it is not shown under this one.
+                if (saved.account != (accounts.primaryCredentials()?.identity ?: "anonymous")) return@launch
+                val queue = AlbumPlaybackQueue.restore(saved.detail, saved.items, saved.firstPage, saved.lastPage, saved.total)
+                    ?: return@launch
+                val track = queue.items.firstOrNull { it.id == saved.trackId } ?: return@launch
+                val local = progress.latest(saved.account, track.id)
+                if (version != sessionVersion || request != revision || intent != queueIntent || queueWork != null ||
+                    accountChanges > 0 || mutableState.value.selection != null
+                ) return@launch
+                val album = queue.detail.album
+                val duration = (track.durationSeconds * 1000).toLong().coerceAtLeast(0)
+                val finished = local != null && (local.finished || (duration > 0 && local.positionMs >= duration))
+                albumQueue = queue
+                mutableQueue.value = PlaybackQueueState(
+                    items = queue.items, currentTrackId = track.id, hasNext = queue.hasNext(track.id), reachedEnd = !queue.hasLaterPage,
+                )
+                mutableSkip.value = skips.get(album.id)
+                audio.get(album.id).let {
+                    mutableSpeed.value = it.speed
+                    mutableVolume.value = it.volume
+                }
+                // Play reads the saved progress again, so newer cloud progress from another device still applies.
+                restoreProgressOnRetry = true
+                mutableState.value = PlaybackState(
+                    PlaybackSelection(track, album),
+                    if (finished) PlaybackPhase.Ended else PlaybackPhase.Paused,
+                    positionMs = when {
+                        finished -> duration
+                        local == null -> 0
+                        duration > 0 -> local.positionMs.coerceAtMost(duration)
+                        else -> local.positionMs
+                    },
+                    durationMs = duration,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Nothing to bring back; the player starts empty.
+            }
         }
     }
 
@@ -637,6 +711,7 @@ class PlaybackController(
             historyUpload.beginAccountChange()
             try {
                 clearQueue()
+                forgetSession()
                 cancelSleepTimer()
                 supersede()
                 clearSource()

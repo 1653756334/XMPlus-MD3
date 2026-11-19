@@ -27,7 +27,7 @@ internal class AlbumPlaybackQueue private constructor(
     val items: List<Track>,
     val firstPage: Int,
     val lastPage: Int,
-    private val total: Int,
+    val total: Int,
 ) {
     val hasEarlierPage: Boolean get() = firstPage > 1
     val hasLaterPage: Boolean get() = lastPage * PlaybackAlbumPageSize < total
@@ -106,6 +106,21 @@ internal class AlbumPlaybackQueue private constructor(
                 (track.officialPosition != null && track.officialPosition != selected.officialPosition)
             ) changed()
             return AlbumPlaybackQueue(detail, rows, page, page, result.total)
+        }
+
+        /** A window saved by an earlier run; null when it no longer holds together. */
+        fun restore(detail: AlbumDetail, items: List<Track>, firstPage: Int, lastPage: Int, total: Int): AlbumPlaybackQueue? {
+            val pages = 1..(MaxAlbumEpisodes / PlaybackAlbumPageSize)
+            if (items.isEmpty() || firstPage !in pages || lastPage !in firstPage..pages.last || total !in 0..MaxAlbumEpisodes) return null
+            var previous = (firstPage - 1) * PlaybackAlbumPageSize
+            val end = minOf(lastPage * PlaybackAlbumPageSize, total)
+            val ids = HashSet<String>()
+            for (track in items) {
+                val position = track.officialPosition ?: return null
+                if (position <= previous || position > end || track.albumId != detail.album.id || !ids.add(track.id)) return null
+                previous = position
+            }
+            return AlbumPlaybackQueue(detail, items, firstPage, lastPage, total)
         }
 
         private fun checkedRows(albumId: String, page: Int, result: Page<Track>): List<Track> {
