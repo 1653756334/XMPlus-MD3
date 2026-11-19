@@ -252,7 +252,7 @@ internal fun PlayerSheet(
                 canGoToStart = state.canSeek && state.positionMs > 0,
                 onGoToStart = {
                     // Playback may have changed while the sheet was closing.
-                    if (playback.state.value.selection == episode) playback.seekTo(0)
+                    if (playback.state.value.selection == episode) playback.goToStart()
                 },
             )
         }

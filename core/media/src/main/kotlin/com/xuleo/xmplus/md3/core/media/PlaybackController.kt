@@ -122,6 +122,8 @@ class PlaybackController(
     private var cloudRestore: Job? = null
     private var cloudIntent = 0L
     private var restoreProgressOnRetry = false
+    /** The account of an episode that is not loaded (restored, or left by a detached service). Its bookmarks stay with it until play. */
+    private var pendingAccount: String? = null
     private var admitted = false
     private var wasPlaying = false
     private var accountChanges = 0
@@ -195,12 +197,13 @@ class PlaybackController(
         val request = supersede()
         player.removeListener(listener)
         engine.value = null
+        pendingAccount = opened?.authorization?.accountIdentity ?: pendingAccount
         opened = null
         clock?.cancel()
         val current = mutableState.value
         if (current.phase != PlaybackPhase.Failed && current.selection != null) {
             val phase = if (current.phase == PlaybackPhase.Ended) PlaybackPhase.Ended else PlaybackPhase.Paused
-            mutableState.value = current.copy(phase = phase, wantsToPlay = false, positionMs = position, canSeek = false)
+            mutableState.value = current.copy(phase = phase, wantsToPlay = false, positionMs = position, canSeek = true)
         }
         completeCommand(request) { settleCurrent(keepUnsettled = true) }
     }
@@ -340,6 +343,7 @@ class PlaybackController(
 
     private fun clearQueue() {
         cancelQueueWork()
+        pendingAccount = null
         albumQueue = null
         mutableQueue.value = PlaybackQueueState()
     }
@@ -415,6 +419,7 @@ class PlaybackController(
                 }
                 // Play reads the saved progress again, so newer cloud progress from another device still applies.
                 restoreProgressOnRetry = true
+                pendingAccount = saved.account
                 mutableState.value = PlaybackState(
                     PlaybackSelection(track, album),
                     if (finished) PlaybackPhase.Ended else PlaybackPhase.Paused,
@@ -425,6 +430,7 @@ class PlaybackController(
                         else -> local.positionMs
                     },
                     durationMs = duration,
+                    canSeek = true,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -543,6 +549,15 @@ class PlaybackController(
             cancelCloudRestore()
             if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
             val target = positionMs.coerceIn(0, current.durationMs)
+            if (opened == null) {
+                // Nothing is loaded until play. The position chosen here is where play starts, in place of the saved progress.
+                restoreProgressOnRetry = false
+                mutableState.value = current.copy(
+                    positionMs = target,
+                    phase = if (current.phase == PlaybackPhase.Ended) PlaybackPhase.Paused else current.phase,
+                )
+                return
+            }
             // Only a seek into the outro keeps it. Anywhere earlier, the outro still ends the episode.
             opened?.let { source ->
                 source.chosenStartMs = null
@@ -552,10 +567,14 @@ class PlaybackController(
         }
     }
 
+    /** Back to where an episode begins: past its intro, as when it starts. */
+    fun goToStart() = seekTo(introStart(0L, mutableState.value.durationMs))
+
     fun bookmarkEpisode(): BookmarkEpisode? {
-        if (accountChanges > 0 || engine.value?.let(::isCurrent) != true) return null
-        val source = opened ?: return null
+        if (accountChanges > 0) return null
         val selection = mutableState.value.selection ?: return null
+        val source = opened ?: return pendingAccount?.let { BookmarkEpisode(it, selection.album.id, selection.track.id) }
+        if (engine.value?.let(::isCurrent) != true) return null
         return BookmarkEpisode(source.authorization.accountIdentity, selection.album.id, selection.track.id)
     }
 
@@ -605,7 +624,8 @@ class PlaybackController(
     private fun bookmarkPosition(episode: BookmarkEpisode): Long? {
         val current = mutableState.value
         if (!current.canSeek || bookmarkEpisode() != episode) return null
-        return engine.value?.currentPosition?.coerceIn(0, current.durationMs)
+        val position = if (opened == null) current.positionMs else engine.value?.currentPosition
+        return position?.coerceIn(0, current.durationMs)
     }
 
     private fun checkBookmarkEpisode(episode: BookmarkEpisode) {
@@ -617,8 +637,8 @@ class PlaybackController(
     fun skipForward() = skipBy(PlaybackSkipMillis)
 
     private fun skipBy(deltaMs: Long) {
-        val player = engine.value ?: return
-        seekTo(player.currentPosition + deltaMs)
+        val position = if (opened == null) mutableState.value.positionMs else (engine.value?.currentPosition ?: return)
+        seekTo(position + deltaMs)
     }
 
     private fun skipApplies(durationMs: Long, skip: AlbumSkip = mutableSkip.value) =
@@ -748,6 +768,7 @@ class PlaybackController(
         requiredAccount: String? = null,
     ) {
         val request = supersede()
+        pendingAccount = null
         val restoreIntent = cloudIntent
         mutableSkip.value = skips.get(selection.album.id)
         audio.get(selection.album.id).let {
