@@ -8,8 +8,10 @@ import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
 import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
+import com.xuleo.xmplus.md3.core.media.SleepTimerStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
+import com.xuleo.xmplus.md3.core.media.ListenHistoryStore
 import com.xuleo.xmplus.md3.core.media.PlaybackBookmarkStore
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
@@ -18,16 +20,22 @@ import com.xuleo.xmplus.md3.core.media.PlaybackSessionStore
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
+import com.xuleo.xmplus.md3.core.protocol.XmlyComments
 import com.xuleo.xmplus.md3.core.protocol.XmlyDiscovery
 import com.xuleo.xmplus.md3.core.protocol.XmlyHistory
 import com.xuleo.xmplus.md3.core.protocol.XmlyHome
 import com.xuleo.xmplus.md3.core.protocol.XmlyHttp
+import com.xuleo.xmplus.md3.core.protocol.XmlyLibrary
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
 import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
 import com.xuleo.xmplus.md3.core.protocol.XmlyQuotaClient
 import com.xuleo.xmplus.md3.core.protocol.XmlyRewards
 import com.xuleo.xmplus.md3.core.protocol.XmlySearch
 import com.xuleo.xmplus.md3.core.protocol.XmlySkip
+import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
+import com.xuleo.xmplus.md3.library.BookmarkNames
+import com.xuleo.xmplus.md3.library.CommentActions
+import com.xuleo.xmplus.md3.library.LibraryActions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,7 +55,25 @@ class XmApplication : Application(), PlaybackOwner {
     val discovery by lazy { XmlyDiscovery(http) }
     val search by lazy { XmlySearch(http) }
     val album by lazy { XmlyAlbum(http) }
+    val playbackApi by lazy { XmlyPlayback(http) }
     val anchor by lazy { XmlyAnchor(http) }
+    val transcript by lazy { XmlyTranscript(http) }
+    val library by lazy { XmlyLibrary(http) }
+    val libraryActions by lazy { LibraryActions(accounts, library) }
+    val comments by lazy { XmlyComments(http) }
+    val commentActions by lazy { CommentActions(accounts, comments) }
+
+    /** Cloud listening history; it reads and writes progress and never spends listening time. */
+    val history by lazy { XmlyHistory(http) }
+
+    /** 听过 on this device; written by playback and read by the Library tab. */
+    val listens by lazy { ListenHistoryStore(this) }
+
+    /** Bookmarks on this device, shared by playback and the 书签 list. */
+    val bookmarks by lazy { PlaybackBookmarkStore(this) }
+
+    /** Fills in the names of bookmarks made before they were kept, one lookup per episode for each launch. */
+    val bookmarkNames by lazy { BookmarkNames(bookmarks, album, playbackApi) }
 
     /** Claims and debits change the same balance, so they share one lock per account. */
     private val balanceLocks = BalanceLocks()
@@ -67,11 +93,10 @@ class XmApplication : Application(), PlaybackOwner {
         }
     }
     override val playback by lazy {
-        val history = XmlyHistory(http)
         PlaybackController(
-            accounts, usage, XmlyPlayback(http), album, PlaybackProgressStore(this), history,
-            HistoryUploader(this, accounts, history), PlaybackBookmarkStore(this),
-            AlbumSkipStore(this), AlbumAudioStore(this), XmlySkip(http), PlaybackSessionStore(this),
+            accounts, usage, playbackApi, album, PlaybackProgressStore(this), history,
+            HistoryUploader(this, accounts, history), bookmarks,
+            AlbumSkipStore(this), AlbumAudioStore(this), SleepTimerStore(this), XmlySkip(http), PlaybackSessionStore(this), listens,
         ) { usageReady.await() }
     }
 

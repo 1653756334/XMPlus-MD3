@@ -41,6 +41,10 @@ import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.model.CategoryChannel
 import com.xuleo.xmplus.md3.core.model.CategoryGroup
 import com.xuleo.xmplus.md3.core.model.HotWord
+import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
+import com.xuleo.xmplus.md3.library.CommentActions
+import com.xuleo.xmplus.md3.library.LibraryActions
+import com.xuleo.xmplus.md3.library.LibraryViewModel
 import com.xuleo.xmplus.md3.ui.screens.*
 
 @Composable
@@ -55,18 +59,20 @@ fun XmApp() {
     val categories: CategoriesViewModel = viewModel(factory = CategoriesViewModel.factory(application.discovery))
     val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))
     val rankings: RankingsViewModel = viewModel(factory = RankingsViewModel.factory(application.discovery))
+    val library: LibraryViewModel = viewModel(factory = LibraryViewModel.factory(application))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
     // Album and anchor pages live as long as their route is on the stack.
     val routeStores: RouteStores = viewModel()
     val albumPage: @Composable (AppRoute.AlbumPage) -> AlbumViewModel = { route ->
-        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AlbumViewModel.factory(route.albumId, application.album, application.accounts))
+        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AlbumViewModel.factory(route.albumId, application.album, application.accounts, application.libraryActions))
     }
     val anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel = { route ->
-        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AnchorViewModel.factory(route, application.anchor, application.accounts))
+        viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = AnchorViewModel.factory(route, application.anchor, application.accounts, application.libraryActions))
     }
     XmAppContent(
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
-        anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback,
+        anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library,
+        transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
     )
 }
 
@@ -85,6 +91,10 @@ internal fun XmAppContent(
     anchorPage: @Composable (AppRoute.AnchorPage) -> AnchorViewModel? = { null },
     onRoutePopped: (Any) -> Unit = {},
     playback: PlaybackController? = null,
+    library: LibraryViewModel? = null,
+    transcript: XmlyTranscript? = null,
+    libraryActions: LibraryActions? = null,
+    comments: CommentActions? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -207,7 +217,7 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
-                                    { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload)
+                                    { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload, library, ::openAlbum, ::openAnchor, { albumId, trackId, positionMs -> playback?.playSaved(albumId, trackId, positionMs) })
                             }
                         }
                     }
@@ -283,6 +293,9 @@ internal fun XmAppContent(
             onOpenAlbum = ::openAlbum,
             onOpenAnchor = ::openAlbumAnchor,
             onAccounts = { navigator.push(AppRoute.Accounts) },
+            transcript = transcript,
+            libraryActions = libraryActions,
+            comments = comments,
         )
     }
     accounts?.archive?.let {
@@ -293,11 +306,12 @@ internal fun XmAppContent(
 @Composable
 private fun TabContent(destination: Destination, holder: SaveableStateHolder, accounts: AccountViewModel?, discover: DiscoverViewModel?,
     categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks,
-    onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?) {
+    onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
+    library: LibraryViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit) {
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
-            Destination.Library -> LibraryScreen()
+            Destination.Library -> if (library != null) LibraryScreen(library, onAlbum, onAnchor, onPlay) else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> DownloadsScreen()
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload)
         }

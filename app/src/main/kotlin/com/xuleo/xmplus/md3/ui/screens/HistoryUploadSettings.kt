@@ -48,13 +48,13 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
             state.feedback == HistoryUploadFeedback.Uploaded -> R.string.history_upload_done
             state.feedback == HistoryUploadFeedback.Failed -> R.string.history_upload_failed
             state.feedback == HistoryUploadFeedback.SignIn -> R.string.history_upload_sign_in
-            else -> null
+            else -> R.string.history_upload_waiting
         }
         ListItem(
             onClick = uploader::retry,
             enabled = !state.sending,
             leadingContent = { Icon(Icons.Outlined.Sync, contentDescription = null) },
-            supportingContent = feedback?.let { message -> { Text(stringResource(message)) } },
+            supportingContent = { Text(stringResource(feedback)) },
         ) { Text(stringResource(R.string.history_upload_retry)) }
     }
 

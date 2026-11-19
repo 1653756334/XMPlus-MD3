@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.library.LibraryToggle
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
@@ -46,7 +48,13 @@ private const val MaxTags = 6
  * is short and every line has a fixed height.
  */
 @Composable
-fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier, onOpenAnchor: (() -> Unit)? = null) {
+fun AlbumHero(
+    detail: AlbumDetail,
+    modifier: Modifier = Modifier,
+    subscription: LibraryToggle = LibraryToggle(),
+    onSubscribe: () -> Unit = {},
+    onOpenAnchor: (() -> Unit)? = null,
+) {
     val album = detail.album
     val shape = MaterialTheme.shapes.large
     DetailHero(album.coverUrl, modifier) {
@@ -54,13 +62,18 @@ fun AlbumHero(detail: AlbumDetail, modifier: Modifier = Modifier, onOpenAnchor: 
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Cover(album.coverUrl, Modifier.size(HeaderCover).shadow(elevation = 10.dp, shape = shape), shape)
                 Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f).height(HeaderCover)) {
+                Column(Modifier.weight(1f).heightIn(min = HeaderCover)) {
                     Text(
                         album.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(10.dp))
                     AnchorLine(album.artist, album.anchorAvatarUrl, detail.anchorVerified, onOpenAnchor)
+                    // Beside the title it belongs to, rather than on a row of its own under the tags.
+                    if (subscription.signedIn) {
+                        Spacer(Modifier.height(10.dp))
+                        LibraryToggleButton(subscription, R.string.album_subscribed, R.string.album_subscribe, onSubscribe, compact = true)
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))

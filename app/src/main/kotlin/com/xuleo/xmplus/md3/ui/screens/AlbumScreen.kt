@@ -119,7 +119,7 @@ internal fun AlbumScreen(
             else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
         }
     } else {
-        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail) { onOpenAnchor(detail.album.anchorUid) } }) {
+        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription) { onOpenAnchor(detail.album.anchorUid) } }) {
             DetailTabs(pager, AlbumTabs)
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {

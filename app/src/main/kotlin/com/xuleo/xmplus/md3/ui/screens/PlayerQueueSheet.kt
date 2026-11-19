@@ -126,7 +126,8 @@ internal fun PlayerQueueSheet(
                             )
                         }
                     }
-                }            }
+                }
+            }
         }
     }
 }

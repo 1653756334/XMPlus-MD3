@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,9 +35,12 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.AlbumSkip
 import com.xuleo.xmplus.md3.core.model.XmlyException
+import com.xuleo.xmplus.md3.ui.components.SheetActions
+import com.xuleo.xmplus.md3.ui.components.SheetSetting
 import com.xuleo.xmplus.md3.ui.components.SnapSlider
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /** The common lengths, labelled under each slider. */
 private val SkipMarkers = listOf(0f, 15f, 30f, 60f, 90f)
@@ -52,7 +56,8 @@ private sealed interface Suggestion {
 
 /**
  * The intro and outro skipped for every episode of the album. Each slider applies when the finger lifts. Ximalaya's
- * suggestion is offered when it differs from what is set, and never applied by itself.
+ * suggestion is offered when it differs from what is set, and never applied by itself. The footer clears the album's
+ * skipping, or closes the sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +76,7 @@ internal fun PlayerSkipSheet(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
+    val scope = rememberCoroutineScope()
     val limit = maxOf(SkipSliderSeconds, skip.introSeconds, skip.outroSeconds).toFloat()
 
     LaunchedEffect(attempt) {
@@ -91,6 +97,13 @@ internal fun PlayerSkipSheet(
         if (value != skip) onSkip(value)
     }
 
+    fun finish() {
+        scope.launch {
+            sheet.hide()
+            onDismiss()
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheet,
@@ -100,27 +113,20 @@ internal fun PlayerSkipSheet(
         Column(
             Modifier.fillMaxWidth()
                 .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding, bottom = XmLayout.ItemGap),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.player_skip_title),
-                    Modifier.weight(1f).semantics { heading() },
-                    style = MaterialTheme.typography.titleMedium,
+                    Modifier.semantics { heading() },
+                    style = MaterialTheme.typography.titleLarge,
                 )
-                if (!skip.isOff) TextButton(onClick = {
-                    intro = 0f
-                    outro = 0f
-                    onSkip(AlbumSkip())
-                }) {
-                    Text(stringResource(R.string.player_skip_reset))
-                }
+                Text(
+                    stringResource(R.string.player_skip_scope),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text(
-                stringResource(R.string.player_skip_scope),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             when (val found = suggestion) {
                 is Suggestion.Found -> if (!found.skip.isOff && found.skip != skip) {
                     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.secondaryContainer) {
@@ -161,8 +167,8 @@ internal fun PlayerSkipSheet(
                 }
                 Suggestion.Loading, Suggestion.None -> Unit
             }
-            SkipSlider(R.string.player_skip_intro, intro, limit, { intro = it }, ::commit)
-            SkipSlider(R.string.player_skip_outro, outro, limit, { outro = it }, ::commit)
+            SkipSetting(R.string.player_skip_intro, intro, limit, { intro = it }, ::commit)
+            SkipSetting(R.string.player_skip_outro, outro, limit, { outro = it }, ::commit)
             if (durationMs > 0 && (intro.roundToInt() + outro.roundToInt()) * 1_000L >= durationMs) {
                 Text(
                     stringResource(R.string.player_skip_too_long),
@@ -170,28 +176,25 @@ internal fun PlayerSkipSheet(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            SheetActions(
+                secondary = stringResource(R.string.player_skip_reset),
+                secondaryEnabled = !skip.isOff,
+                onSecondary = {
+                    intro = 0f
+                    outro = 0f
+                    onSkip(AlbumSkip())
+                },
+                primary = stringResource(R.string.player_done),
+                onPrimary = ::finish,
+            )
         }
     }
 }
 
 @Composable
-private fun SkipSlider(
-    label: Int,
-    seconds: Float,
-    limit: Float,
-    onChange: (Float) -> Unit,
-    onFinished: () -> Unit,
-) {
+private fun SkipSetting(label: Int, seconds: Float, limit: Float, onChange: (Float) -> Unit, onFinished: () -> Unit) {
     val name = stringResource(label)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-            Text(
-                stringResource(R.string.player_skip_seconds, seconds.roundToInt()),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+    SheetSetting(name, stringResource(R.string.player_skip_seconds, seconds.roundToInt())) {
         SnapSlider(
             value = seconds,
             onValueChange = onChange,

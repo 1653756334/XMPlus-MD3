@@ -14,6 +14,8 @@ import com.xuleo.xmplus.md3.core.model.AlbumSimilar
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
+import com.xuleo.xmplus.md3.library.LibraryActions
+import com.xuleo.xmplus.md3.library.LibraryToggle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,6 +66,7 @@ data class AlbumState(
     val repliesHasMore: Boolean = false,
     val repliesLoading: Boolean = false,
     val repliesErrorCode: String? = null,
+    val subscription: LibraryToggle = LibraryToggle(),
 )
 
 /**
@@ -74,6 +77,7 @@ class AlbumViewModel(
     private val albumId: String,
     private val album: XmlyAlbum,
     private val accounts: AccountRepository,
+    private val library: LibraryActions,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(AlbumState())
     val state: StateFlow<AlbumState> = mutable.asStateFlow()
@@ -91,9 +95,43 @@ class AlbumViewModel(
         if (started) return
         started = true
         loadHeader()
+        loadSubscription()
     }
 
     fun retryHeader() = loadHeader()
+
+    /** 订阅 shows only for a signed-in account; a failed read leaves the switch off until the page is opened again. */
+    private fun loadSubscription() {
+        viewModelScope.launch {
+            if (accounts.primaryCredentials() == null) return@launch
+            mutable.update { it.copy(subscription = LibraryToggle(signedIn = true)) }
+            try {
+                val subscribed = library.isSubscribed(albumId)
+                mutable.update { it.copy(subscription = it.subscription.copy(on = subscribed)) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutable.update { it.copy(subscription = it.subscription.copy(failed = true)) }
+            }
+        }
+    }
+
+    fun toggleSubscription() {
+        val current = mutable.value.subscription
+        val subscribed = current.on ?: return
+        if (current.busy) return
+        mutable.update { it.copy(subscription = it.subscription.copy(busy = true, failed = false)) }
+        viewModelScope.launch {
+            try {
+                library.setSubscribed(albumId, !subscribed)
+                mutable.update { it.copy(subscription = it.subscription.copy(on = !subscribed, busy = false)) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutable.update { it.copy(subscription = it.subscription.copy(busy = false, failed = true)) }
+            }
+        }
+    }
 
     private fun loadHeader() {
         headerJob?.cancel()
@@ -353,7 +391,7 @@ class AlbumViewModel(
     }
 
     companion object {
-        fun factory(albumId: String, album: XmlyAlbum, accounts: AccountRepository): ViewModelProvider.Factory =
-            viewModelFactory { initializer { AlbumViewModel(albumId, album, accounts) } }
+        fun factory(albumId: String, album: XmlyAlbum, accounts: AccountRepository, library: LibraryActions): ViewModelProvider.Factory =
+            viewModelFactory { initializer { AlbumViewModel(albumId, album, accounts, library) } }
     }
 }

@@ -30,7 +30,6 @@
     <string name="player_page_playing">Playing</string>
     <string name="player_page_transcript">Transcript</string>
     <string name="player_page_comments">Comments</string>
-    <string name="player_like">Like</string>
     <string name="player_favorite">Favorite</string>
     <string name="player_bookmarks">Bookmarks</string>
     <string name="bookmark_add">Add bookmark</string>
@@ -57,6 +56,8 @@
     <string name="player_queue_check_none">No new episodes</string>
     <string name="player_queue_check_added">%1$d new episodes added</string>
     <string name="player_sleep_start">Start timer</string>
+    <string name="player_sleep_length">Length</string>
+    <string name="player_done">Done</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>
     <string name="player_go_to_start">Go to start</string>
@@ -89,7 +90,22 @@
     <string name="action_back">Back</string>
     <string name="action_retry">Retry</string>
     <string name="settings_general">General</string>
-    <string name="history_upload_title">Upload listening progress</string>
+    <string name="player_transcript_empty">No transcript for this episode</string>
+    <string name="library_action_failed">Couldn’t update. Try again.</string>
+    <string name="album_subscribe">Subscribe</string>
+    <string name="album_subscribed">Subscribed</string>
+    <string name="anchor_follow">Follow</string>
+    <string name="anchor_following">Following</string>
+    <string name="history_empty">Episodes you listen to will show up here</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_clear_title">Clear listening history?</string>
+    <string name="history_clear_body">This removes history from this device only. Cloud history is not changed.</string>
+    <string name="history_clear_confirm">Clear</string>
+    <string name="history_remove">Remove</string>
+    <string name="history_removed">Removed from history</string>
+    <string name="history_undo">Undo</string>
+    <string name="history_progress">Listened to %1$s of %2$s</string>
+    <string name="history_finished">Finished</string>    <string name="history_upload_title">Upload listening progress</string>
     <string name="history_upload_off_hint">Off · cloud progress is still read for resuming</string>
     <string name="history_upload_on_hint">On · your listening position syncs to your Ximalaya account</string>
     <string name="history_upload_confirm_title">Upload listening progress?</string>
@@ -100,6 +116,7 @@
     <string name="history_upload_done">Progress is up to date</string>
     <string name="history_upload_failed">Progress kept on this device. Try again later.</string>
     <string name="history_upload_sign_in">Sign in to upload progress</string>
+    <string name="history_upload_waiting">Syncs after your next listen</string>
     <string name="history_upload_setting_error">Couldn’t save the upload setting. Try again.</string>
     <string name="account_welcome">Your listening space</string>
     <string name="account_welcome_detail">Add an account to get started</string>
@@ -217,15 +234,9 @@
     <string name="anchor_verified">Verified</string>
     <string name="anchor_no_albums">No public albums yet</string>
     <string name="anchor_no_tracks">No public episodes yet</string>
+    <string name="anchor_search_hint">Search albums by this anchor</string>
+    <string name="anchor_no_matches">No albums match this search</string>
     <string name="anchor_track_limit">Only the first %1$d episodes are available.</string>
-    <string name="anchor_sort_default">Default</string>
-    <string name="anchor_sort_oldest">Oldest</string>
-    <string name="anchor_previous_page">Previous page</string>
-    <string name="anchor_next_page">Next page</string>
-    <string name="anchor_page_number">Page %1$d</string>
-    <string name="anchor_page_position">%1$d / %2$d</string>
-    <string name="anchor_page_hint">Page (1–%1$d)</string>
-    <string name="anchor_jump">Go to page</string>
     <plurals name="episode_count">
         <item quantity="one">%d episode</item>
         <item quantity="other">%d episodes</item>
@@ -290,4 +301,45 @@
     <string name="album_replies_title">Replies</string>
     <string name="album_unavailable">This album isn\'t available right now.</string>
     <string name="detail_show_header">Show header</string>
+    <string name="listen_tab_history">History</string>
+    <string name="listen_tab_cloud">Cloud history</string>
+    <string name="listen_tab_updates">Updates</string>
+    <string name="listen_tab_subscriptions">Subscriptions</string>
+    <string name="listen_tab_favorites">Favourites</string>
+    <string name="listen_tab_bookmarks">Bookmarks</string>
+    <string name="listen_tab_anchors">Following</string>
+    <string name="listen_signed_out">Sign in to see this list</string>
+    <string name="listen_empty_cloud">No cloud history yet</string>
+    <string name="listen_empty_updates">No updates yet</string>
+    <string name="listen_empty_subscriptions">No subscriptions yet</string>
+    <string name="listen_empty_favorites">No favourites yet</string>
+    <string name="listen_empty_bookmarks">No bookmarks yet</string>
+    <string name="listen_empty_anchors">You aren’t following any anchors yet</string>
+    <string name="listen_unsubscribe">Unsubscribe</string>
+    <string name="listen_unfavorite">Unfavourite</string>
+    <string name="listen_bookmark_at">At %1$s</string>
+    <string name="listen_untitled">Untitled episode</string>
+    <plurals name="listen_unplayed">
+        <item quantity="one">%1$d unplayed</item>
+        <item quantity="other">%1$d unplayed</item>
+    </plurals>
+    <string name="comment_empty">No comments yet</string>
+    <string name="comment_hint">Write a comment</string>
+    <string name="comment_sign_in">Sign in to comment</string>
+    <string name="comment_like">Like</string>
+    <string name="comment_delete">Delete comment</string>
+    <string name="comment_delete_title">Delete this comment?</string>
+    <string name="comment_delete_confirm">Delete</string>
+    <string name="comment_failed">Couldn’t update the comment. Try again.</string>
+    <plurals name="comment_count">
+        <item quantity="one">%1$d comment</item>
+        <item quantity="other">%1$d comments</item>
+    </plurals>
+    <plurals name="comment_replies">
+        <item quantity="one">%1$d reply</item>
+        <item quantity="other">%1$d replies</item>
+    </plurals>
+    <string name="history_select">Select</string>
+    <string name="history_select_all">Select all</string>
+    <string name="history_selected">%1$d selected</string>
 </resources>

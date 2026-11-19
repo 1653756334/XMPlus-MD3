@@ -127,7 +127,8 @@ internal fun DiscoverContent(
                     IconButton(actions.onSearch, Modifier.padding(end = 4.dp)) {
                         Icon(Icons.Filled.Search, stringResource(R.string.search_submit))
                     }
-                }            }
+                }
+            }
         }
         Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "discoverMode") { current ->
             holder.SaveableStateProvider(current.name) {
@@ -157,20 +158,7 @@ private fun ColumnScope.ChannelPager(
 ) {
     val pager = rememberPagerState { channels.size }
     val scope = rememberCoroutineScope()
-    SecondaryScrollableTabRow(
-        selectedTabIndex = pager.currentPage,
-        containerColor = MaterialTheme.colorScheme.surface,
-        edgePadding = XmLayout.PagePadding,
-        divider = {},
-    ) {
-        channels.forEachIndexed { index, channel ->
-            Tab(
-                selected = pager.currentPage == index,
-                onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                text = { Text(channel.title, maxLines = 1) },
-            )
-        }
-    }
+    ScrollingDetailTabs(pager.currentPage, channels.map { it.title }, { index -> scope.launch { pager.animateScrollToPage(index) } })
     LaunchedEffect(pager.currentPage, channels) { channels.getOrNull(pager.currentPage)?.let { actions.onLoad(it.pageId, false) } }
     HorizontalPager(pager, Modifier.weight(1f), key = { channels[it].pageId }) { index ->
         val channel = channels[index]

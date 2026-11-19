@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -52,14 +55,13 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Album
-import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,12 +78,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,6 +133,9 @@ import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
 import com.xuleo.xmplus.md3.core.media.SleepTimerState
 import com.xuleo.xmplus.md3.core.model.AlbumSkip
+import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
+import com.xuleo.xmplus.md3.library.CommentActions
+import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
@@ -147,6 +154,9 @@ internal fun PlayerSheet(
     onOpenAlbum: (String) -> Unit,
     onOpenAnchor: (albumId: String, uid: String?) -> Unit,
     onAccounts: () -> Unit,
+    transcript: XmlyTranscript? = null,
+    libraryActions: LibraryActions? = null,
+    comments: CommentActions? = null,
 ) {
     val state by playback.state.collectAsStateWithLifecycle()
     val queue by playback.queue.collectAsStateWithLifecycle()
@@ -184,6 +194,7 @@ internal fun PlayerSheet(
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
         val episode = state.selection
+        val episodeLibrary = rememberEpisodeLibrary(episode, libraryActions)
         val bookmarkEpisode = playback.bookmarkEpisode()
         var showActions by remember(episode?.album?.id, episode?.track?.id) { mutableStateOf(false) }
         var showQueue by remember(episode?.album?.id) { mutableStateOf(false) }
@@ -192,6 +203,16 @@ internal fun PlayerSheet(
         var showSleep by remember { mutableStateOf(false) }
         var showSkip by remember { mutableStateOf(false) }
         var showVolume by remember { mutableStateOf(false) }
+        var page by remember { mutableStateOf(PlayerPage.Playing) }
+        // The cover and 文稿 are two pages a finger can swipe between, and the top tabs follow the swipe.
+        val coverPager = rememberPagerState { CoverPages.size }
+        LaunchedEffect(page) {
+            val index = CoverPages.indexOf(page)
+            if (index >= 0 && index != coverPager.currentPage) coverPager.animateScrollToPage(index)
+        }
+        LaunchedEffect(coverPager) {
+            snapshotFlow { coverPager.settledPage }.collect { index -> page = CoverPages[index] }
+        }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -207,15 +228,26 @@ internal fun PlayerSheet(
                 PlayerTopBar(
                     hasEpisode = episode != null,
                     onMinimize = { closeThen() },
-                    onPage = { if (it != PlayerPage.Playing) comingSoon() },
+                    page = page,
+                    onPage = { target -> page = target },
                 )
                 if (episode == null) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.mini_player_idle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                } else if (page == PlayerPage.Comments) {
+                    PlayerComments(episode.track, comments, Modifier.weight(1f).fillMaxWidth())
                 } else {
                     PlayerLayout(
-                        cover = { PlayerCover(episode.coverUrl, playing = state.wantsToPlay) },
+                        cover = {
+                            HorizontalPager(coverPager, Modifier.fillMaxSize()) { index ->
+                                if (CoverPages[index] == PlayerPage.Transcript) {
+                                    if (transcript != null) TranscriptPanel(episode.track.id, transcript, Modifier.fillMaxSize())
+                                } else {
+                                    PlayerCover(episode.coverUrl, playing = state.wantsToPlay)
+                                }
+                            }
+                        },
                         controls = {
                             PlayerControls(
                                 episode = episode,
@@ -231,6 +263,7 @@ internal fun PlayerSheet(
                                 onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
                                 onMore = { showActions = true },
                                 onComingSoon = comingSoon,
+                                library = episodeLibrary,
                                 onAccounts = { closeThen(onAccounts) },
                             )
                         },
@@ -280,6 +313,7 @@ internal fun PlayerSheet(
         if (showSleep && episode != null) {
             PlayerSleepSheet(
                 timer = sleep,
+                initialMinutes = playback.lastSleepMinutes(),
                 onMinutes = playback::startSleepTimer,
                 onEpisodeEnd = playback::sleepAtEpisodeEnd,
                 onOff = playback::cancelSleepTimer,
@@ -289,12 +323,15 @@ internal fun PlayerSheet(
     }
 }
 
-/** 文稿 and 评论 become swipeable pages when they are built; for now only 播放 exists. */
+/** 文稿 is the second page of the cover pager; 评论 replaces the cover area with the track's comments. */
 private enum class PlayerPage(@StringRes val label: Int) {
     Playing(R.string.player_page_playing),
     Transcript(R.string.player_page_transcript),
     Comments(R.string.player_page_comments),
 }
+
+/** The pages a finger can swipe between in the cover area, in order. */
+private val CoverPages = listOf(PlayerPage.Playing, PlayerPage.Transcript)
 
 /** Placeholder buttons for features that are not connected yet; a new tap replaces the previous toast. */
 @Composable
@@ -315,7 +352,7 @@ private fun rememberComingSoon(): () -> Unit {
 
 /** Minimize on the left and the page headings in the middle, styled like 发现's. */
 @Composable
-private fun PlayerTopBar(hasEpisode: Boolean, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit) {
+private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -327,7 +364,7 @@ private fun PlayerTopBar(hasEpisode: Boolean, onMinimize: () -> Unit, onPage: (P
             if (hasEpisode) {
                 ModeSwitch(
                     items = PlayerPage.entries,
-                    selected = PlayerPage.Playing,
+                    selected = page,
                     label = { stringResource(it.label) },
                     onSelect = onPage,
                     textStyle = MaterialTheme.typography.titleMedium,
@@ -425,12 +462,13 @@ private fun PlayerControls(
     onOpenSleep: () -> Unit,
     onOpenBookmarks: () -> Unit,
     onComingSoon: () -> Unit,
+    library: EpisodeLibrary,
     onMore: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
-        EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
+        EpisodeActions(library, onComingSoon, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
         SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
@@ -476,6 +514,7 @@ private fun EpisodeHeading(episode: PlaybackSelection, onOpenAlbum: () -> Unit) 
 
 @Composable
 private fun EpisodeActions(
+    library: EpisodeLibrary,
     onComingSoon: () -> Unit,
     onOpenBookmarks: () -> Unit,
     bookmarksAvailable: Boolean,
@@ -483,8 +522,10 @@ private fun EpisodeActions(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.fillMaxWidth()) {
-        EpisodeAction(Icons.Outlined.ThumbUp, R.string.player_like, onComingSoon)
-        EpisodeAction(Icons.Outlined.FavoriteBorder, R.string.player_favorite, onComingSoon)
+        EpisodeAction(
+            if (library.favorite == true) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            R.string.player_favorite, library.onFavorite, enabled = library.available && library.favorite != null,
+        )
         EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
         EpisodeAction(Icons.Outlined.Download, R.string.player_download, onComingSoon)
         EpisodeAction(Icons.Outlined.MoreHoriz, R.string.player_more, onMore)

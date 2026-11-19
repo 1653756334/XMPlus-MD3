@@ -3,6 +3,7 @@ package com.xuleo.xmplus.md3.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -29,11 +30,16 @@ import com.xuleo.xmplus.md3.ui.Destination
 fun TabScaffold(
     @StringRes title: Int,
     modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
+    navigation: @Composable () -> Unit = {},
+    headline: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(title)) }) },
+        topBar = { TopAppBar(title = { Text(headline ?: stringResource(title)) }, navigationIcon = navigation, actions = actions) },
+        snackbarHost = snackbarHost,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         content = content,
     )

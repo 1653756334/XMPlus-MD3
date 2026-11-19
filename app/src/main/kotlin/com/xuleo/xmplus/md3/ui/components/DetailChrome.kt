@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -179,6 +180,22 @@ internal fun DetailTabs(pager: PagerState, labels: List<Int>, modifier: Modifier
                     selected = pager.currentPage == index,
                     onClick = { scope.launch { pager.scrollToPage(index) } },
                     text = { Text(stringResource(label), maxLines = 1) },
+                )
+            }
+        }
+    }
+}
+
+/** The album page's tab style for rows that scroll: a primary indicator, plain labels and no ripple. */
+@Composable
+internal fun ScrollingDetailTabs(selected: Int, labels: List<String>, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    PrimaryScrollableTabRow(selected, modifier, containerColor = Color.Transparent, edgePadding = XmLayout.PagePadding, divider = {}) {
+        CompositionLocalProvider(LocalRippleConfiguration provides null) {
+            labels.forEachIndexed { index, label ->
+                Tab(
+                    selected = selected == index,
+                    onClick = { onSelect(index) },
+                    text = { Text(label, maxLines = 1) },
                 )
             }
         }
