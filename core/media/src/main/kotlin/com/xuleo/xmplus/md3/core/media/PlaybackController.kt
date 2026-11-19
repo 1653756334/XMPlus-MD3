@@ -70,8 +70,13 @@ class PlaybackController(
         var observation: PlaybackProgress? = null
         var checkpoint: PlaybackProgress? = null
         var checkpointAt = SystemClock.elapsedRealtime()
-        /** Set once the listener chose to hear the outro, by seeking into it or by starting inside it. */
+        /** Set once the listener chose to hear the outro by seeking into it, or once the outro ended the episode. */
         var skipOff = false
+        /**
+         * Where the listener chose to start (a retry, a resume after the service restarted, a bookmark), until they seek.
+         * It keeps the outro only when it lies inside it, and keeps a later intro change from moving them.
+         */
+        var chosenStartMs: Long? = null
     }
 
     private data class QueueChoice(
@@ -437,7 +442,8 @@ class PlaybackController(
                 val begin = if (target == 0L) introStart(0L, current.durationMs) else target
                 source.observation = null
                 source.startPositionMs = begin
-                source.skipOff = target != 0L
+                source.skipOff = false
+                source.chosenStartMs = target.takeIf { it != 0L }
                 player.seekTo(begin)
             }
             admitted = true
@@ -464,7 +470,10 @@ class PlaybackController(
             if (current.phase == PlaybackPhase.Ended) cancelQueueWork()
             val target = positionMs.coerceIn(0, current.durationMs)
             // Only a seek into the outro keeps it. Anywhere earlier, the outro still ends the episode.
-            opened?.skipOff = target >= current.durationMs - mutableSkip.value.outroSeconds * 1_000L
+            opened?.let { source ->
+                source.chosenStartMs = null
+                source.skipOff = target >= current.durationMs - mutableSkip.value.outroSeconds * 1_000L
+            }
             engine.value?.seekTo(target)
         }
     }
@@ -552,7 +561,8 @@ class PlaybackController(
         val skip = mutableSkip.value
         val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
         if (source.skipOff || skip.outroSeconds == 0 || cloudRestore != null || !skipApplies(duration, skip)) return
-        if (player.currentPosition < duration - skip.outroSeconds * 1_000L) return
+        val outroStart = duration - skip.outroSeconds * 1_000L
+        if (source.chosenStartMs?.let { it >= outroStart } == true || player.currentPosition < outroStart) return
         source.skipOff = true
         player.seekTo(duration)
     }
@@ -565,7 +575,9 @@ class PlaybackController(
         mutableSkip.value = skip
         val player = engine.value ?: return
         val source = opened ?: return
-        if (!admitted || source.skipOff || !isCurrent(player) || player.playbackState == Player.STATE_ENDED) return
+        if (!admitted || source.skipOff || source.chosenStartMs != null || !isCurrent(player) ||
+            player.playbackState == Player.STATE_ENDED
+        ) return
         val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
         if (skipApplies(duration, skip) && player.currentPosition < skip.introSeconds * 1_000L) {
             player.seekTo(skip.introSeconds * 1_000L)
@@ -711,7 +723,12 @@ class PlaybackController(
             val item = MediaItem.Builder().setMediaId(mediaId)
                 .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
             val source = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
-            source.skipOff = refreshing?.skipOff ?: (position != null && position != 0L)
+            if (refreshing != null) {
+                source.skipOff = refreshing.skipOff
+                source.chosenStartMs = refreshing.chosenStartMs
+            } else {
+                source.chosenStartMs = position?.takeIf { it != 0L }
+            }
             opened = source
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
