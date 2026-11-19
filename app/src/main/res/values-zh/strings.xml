@@ -45,7 +45,7 @@
     <string name="player_download">下载</string>
     <string name="player_coming_soon">即将推出</string>
     <string name="player_speed_reset">恢复 1×</string>
-    <string name="player_speed_scope">倍速记在本专辑上；没调过的专辑沿用上次的倍速。</string>
+    <string name="player_speed_scope">倍速只记在本专辑上；其他专辑各用各的，没调过的按 1×播放。</string>
     <string name="player_volume">音量</string>
     <string name="player_volume_value">%1$d%%</string>
     <string name="player_volume_reset">恢复 100%%</string>

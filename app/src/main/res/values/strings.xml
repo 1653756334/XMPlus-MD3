@@ -47,7 +47,7 @@
     <string name="player_download">Download</string>
     <string name="player_coming_soon">Coming soon</string>
     <string name="player_speed_reset">Reset to 1×</string>
-    <string name="player_speed_scope">Remembered for this album. An album you haven\u2019t adjusted starts at the speed you used last.</string>
+    <string name="player_speed_scope">Remembered for this album only. Other albums keep their own speed, and one you haven\u2019t adjusted plays at 1×.</string>
     <string name="player_volume">Volume</string>
     <string name="player_volume_value">%1$d%%</string>
     <string name="player_volume_reset">Reset to 100%%</string>
