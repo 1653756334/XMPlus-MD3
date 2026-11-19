@@ -180,11 +180,7 @@ private fun ColumnScope.Results(
     fun show(kind: SearchKind) {
         scope.launch { pager.animateScrollToPage(SearchTabs.indexOf(kind)) }
     }
-    SecondaryTabRow(selectedTabIndex = pager.currentPage, containerColor = MaterialTheme.colorScheme.surface) {
-        SearchTabs.forEachIndexed { index, kind ->
-            Tab(selected = pager.currentPage == index, onClick = { show(kind) }, text = { Text(stringResource(kind.label()), maxLines = 1) })
-        }
-    }
+    DetailTabs(pager, SearchTabs.map { it.label() })
     HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), key = { SearchTabs[it].code }) { index ->
         val kind = SearchTabs[index]
         ResultPane(kind, state.results[kind], ::show, onLoadMore, { onRetry(kind) }, onOpenAlbum, onOpenAnchor)
