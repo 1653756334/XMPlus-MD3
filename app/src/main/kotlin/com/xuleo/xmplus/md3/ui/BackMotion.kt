@@ -1,6 +1,5 @@
 package com.xuleo.xmplus.md3.ui
 
-import androidx.activity.BackEventCompat
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -20,6 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import androidx.navigationevent.NavigationEvent
+import androidx.navigationevent.NavigationEventDispatcher
+import androidx.navigationevent.NavigationEventTransitionState
 import kotlin.math.roundToInt
 
 /*
@@ -53,9 +55,17 @@ internal fun backTransform(direction: Int): ContentTransform {
 
 /** The pull follows the edge the swipe began at. A press of the back button pulls toward the reading end. */
 internal fun backDirection(edge: Int, layoutDirection: Int): Int = when (edge) {
-    BackEventCompat.EDGE_LEFT -> 1
-    BackEventCompat.EDGE_RIGHT -> -1
+    NavigationEvent.EDGE_LEFT -> 1
+    NavigationEvent.EDGE_RIGHT -> -1
     else -> layoutDirection
+}
+
+/** Read inside onBack: the dispatcher publishes Idle after the completion callback returns.
+ * Unlike a value collected during composition, this also sees a swipe committed before the first preview frame. */
+internal fun NavigationEventDispatcher?.committingBackEdge(): Int {
+    val gesture = this?.transitionState?.value as? NavigationEventTransitionState.InProgress
+    return if (gesture?.direction == NavigationEventTransitionState.TRANSITIONING_BACK) gesture.latestEvent.swipeEdge
+    else NavigationEvent.EDGE_NONE
 }
 
 /** Rounds a page's corners while it leaves, so that a page pulled back looks like a card over the one below. */
