@@ -27,7 +27,7 @@ Status: Draft · 2026-11-17
 - STD-10 Light, dark and OLED black (dark only, pure black background) are all readable; body text meets WCAG AA contrast.
 - STD-11 System font size at 200%: no clipped or overlapping text on any screen.
 - STD-12 System "remove animations" on → transitions complete instantly, nothing gets stuck mid-animation.
-- STD-13 Predictive back previews the destination and can be cancelled midway with no state change.
+- STD-13 Predictive back previews the destination and can be cancelled midway with no state change. On every page the page shrinks into a rounded card and is pulled in from the edge the swipe began at (left or right), with the previous page visible behind; the back button plays the same motion.
 - STD-14 Edge-to-edge in portrait and landscape: nothing tappable sits under the status bar, navigation bar or display cutout.
 - STD-15 Touch targets are at least 48dp; every icon-only button has a TalkBack label in the current language.
 - STD-16 Rotation, window resize and dark mode changes keep the current tab, scroll position and inputs.
@@ -191,14 +191,15 @@ Album playback queue
 - PB-04 Select an episode from a descending album or its search results. The queue starts at that exact episode and follows ascending official episode numbers.
 - PB-05 From the first or last episode of a page, Previous or Next reads the adjacent page without duplicating rows. Next is disabled on the album's last episode. Natural completion still re-reads the last page, so an episode appended since the queue was built plays on.
 - PB-06 Reject a moved catalogue anchor or a repeated episode ID. A failed page read leaves the current episode and queue intact; selecting a different episode or changing the primary account cancels a pending read. After a failed read, tapping the loaded episode rebuilds the queue without restarting playback.
-- PB-07 Top to bottom the player reads: 播放 / 文稿 / 评论 with 更多 at the top right; the cover; the title and the album name (tapping it opens the album); 点赞 · 收藏 · 书签 · 下载; the progress bar with the time pill; seek back · previous · play/pause · next · seek forward; 播放列表 · play mode · 倍速 · 定时关闭. Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode. Dragging the pill or tapping the bar seeks, and the pill shows the drag position before release. 文稿, 评论, 点赞, 收藏, 书签 and 下载 say 即将推出 and change nothing.
+- PB-07 Top to bottom the player reads: 播放 / 文稿 / 评论 with 更多 at the top right; the cover; the title and the album name (tapping it opens the album); 点赞 · 收藏 · 书签 · 下载; the progress bar with the time pill; seek back · previous · play/pause · next · seek forward; 播放列表 · 倍速 · 定时关闭. Open the play queue, jump to the current row, select a different episode, and dismiss the sheet without stopping playback. The 15-second seek buttons move within the current episode; the previous and next episode buttons change episodes, and Next is disabled on the last episode. Dragging the pill or tapping the bar seeks, and the pill shows the drag position before release. 文稿, 评论, 点赞, 收藏 and 下载 say 即将推出 and change nothing.
 - PB-08 Let a metered episode end at the page boundary; the next episode opens through normal authorization, and a free next episode does not start a meter. Pause while the page or settlement is pending; the next episode must not start.
+- PB-09 Pause mid-episode, then swipe the app away from recents (also: force-stop, let the system kill it, reboot) and reopen. The mini player shows the same episode paused at the same position, with the same queue, speed, volume and intro/outro skip. Nothing plays, resolves or uses 听时 until play, and play continues from that spot. A finished episode comes back finished and play moves to the next. Changing the primary account clears it.
 
 Settings
 
 Speed and volume are per album, and mute covers every album, all in Phase 3. There are no global defaults and no master volume slider: the phone's volume keys are the master volume.
 
-- PB-01 Speed and volume are remembered per album. An album never adjusted starts at the speed used last and at volume 100. Mute covers every album until the app is closed. Back and forward are a fixed 15 s with no setting; episodes always play in order and the next one follows automatically.
+- PB-01 Speed and volume are remembered per album. Each album keeps its own: one never adjusted plays at 1× and volume 100, whatever another album is set to, and changing one album never changes another. Mute covers every album until the app is closed. Back and forward are a fixed 15 s with no setting; episodes always play in order and the next one follows automatically.
 - PB-02 Ranges: speed 0.5–3.0 in 0.1 steps, and a speed outside it is rejected with the old value kept; volume 0–100 % in 5 % steps; intro and outro 0–3600 whole seconds (the sliders reach 180 s).
 - PB-03 Output volume is 0 when muted, otherwise the album's volume.
 
