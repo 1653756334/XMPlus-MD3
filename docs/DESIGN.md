@@ -205,7 +205,7 @@ Rules:
 ### Full player
 
 - Color scheme taken from the cover, changing smoothly between episodes.
-- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings), 更多 on the right. 文稿 and 评论 become swipeable pages when they are built.
+- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 文稿 and 评论 become swipeable pages when they are built.
 - The cover takes the largest square left above the controls and shrinks slightly with a spring when paused.
 - Under the cover, top to bottom:
   - Episode title (two lines), then the album name, which opens the album.

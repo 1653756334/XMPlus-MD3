@@ -56,6 +56,7 @@ import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -207,7 +208,6 @@ internal fun PlayerSheet(
                     hasEpisode = episode != null,
                     onMinimize = { closeThen() },
                     onPage = { if (it != PlayerPage.Playing) comingSoon() },
-                    onMore = { showActions = true },
                 )
                 if (episode == null) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -229,6 +229,7 @@ internal fun PlayerSheet(
                                 onOpenSpeed = { showSpeed = true },
                                 onOpenSleep = { showSleep = true },
                                 onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
+                                onMore = { showActions = true },
                                 onComingSoon = comingSoon,
                                 onAccounts = { closeThen(onAccounts) },
                             )
@@ -312,9 +313,9 @@ private fun rememberComingSoon(): () -> Unit {
     }
 }
 
-/** Minimize on the left, the page headings in the middle (styled like 发现's), 更多 on the right. */
+/** Minimize on the left and the page headings in the middle, styled like 发现's. */
 @Composable
-private fun PlayerTopBar(hasEpisode: Boolean, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit, onMore: () -> Unit) {
+private fun PlayerTopBar(hasEpisode: Boolean, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -333,11 +334,7 @@ private fun PlayerTopBar(hasEpisode: Boolean, onMinimize: () -> Unit, onPage: (P
                 )
             }
         }
-        if (hasEpisode) {
-            IconButton(onClick = onMore) { Icon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more)) }
-        } else {
-            Spacer(Modifier.size(48.dp))
-        }
+        Spacer(Modifier.size(48.dp))
     }
 }
 
@@ -428,11 +425,12 @@ private fun PlayerControls(
     onOpenSleep: () -> Unit,
     onOpenBookmarks: () -> Unit,
     onComingSoon: () -> Unit,
+    onMore: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
-        EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, Modifier.padding(top = 4.dp))
+        EpisodeActions(onComingSoon, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
         SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
@@ -481,6 +479,7 @@ private fun EpisodeActions(
     onComingSoon: () -> Unit,
     onOpenBookmarks: () -> Unit,
     bookmarksAvailable: Boolean,
+    onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.fillMaxWidth()) {
@@ -488,6 +487,7 @@ private fun EpisodeActions(
         EpisodeAction(Icons.Outlined.FavoriteBorder, R.string.player_favorite, onComingSoon)
         EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
         EpisodeAction(Icons.Outlined.Download, R.string.player_download, onComingSoon)
+        EpisodeAction(Icons.Outlined.MoreHoriz, R.string.player_more, onMore)
     }
 }
 
