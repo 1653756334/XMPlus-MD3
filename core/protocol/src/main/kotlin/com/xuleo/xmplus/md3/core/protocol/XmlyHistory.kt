@@ -8,6 +8,8 @@ import com.xuleo.xmplus.md3.core.model.xmlyIdentifier
 import java.security.MessageDigest
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -21,46 +23,105 @@ import kotlinx.serialization.json.put
 
 data class CloudPlaybackProgress(val positionMs: Long, val observedAtMs: Long)
 
+/** A track in cloud history with the record that places it there. [durationSeconds] is 0 when the server leaves it out. */
+data class CloudListen(
+    val albumId: String,
+    val albumTitle: String,
+    val coverUrl: String?,
+    val trackId: String,
+    val trackTitle: String,
+    val durationSeconds: Long,
+    val progress: CloudPlaybackProgress,
+)
+
+/** A page of the 云历史 list: the tracks it adds, and the page to ask for next when the history has more. */
+data class CloudListingPage(val items: List<CloudListen>, val nextPage: Int?)
+
 /** XMPlus listening history. Neither operation reads or spends listening time. */
 class XmlyHistory(private val http: XmlyHttp, private val clock: () -> Long = System::currentTimeMillis) {
     private val reader = Reader("invalid_history")
 
-    private data class Record(val albumId: String, val trackId: String, val progress: CloudPlaybackProgress)
+    private data class Record(
+        val albumId: String,
+        val albumTitle: String,
+        val coverUrl: String?,
+        val trackId: String,
+        val trackTitle: String,
+        val durationSeconds: Long,
+        val progress: CloudPlaybackProgress,
+    )
 
     suspend fun progress(credentials: Credentials, albumId: String, trackId: String): CloudPlaybackProgress? {
         val album = xmlyIdentifier(albumId)
         val track = xmlyIdentifier(trackId)
         var latest: Record? = null
+        // History comes newest first, so the first record of the track is its latest listen and the read stops there.
         // A timeout may still have a usable result from a fully validated page; an invalid response may not.
         withTimeoutOrNull(ResumeScanTimeoutMs) {
             scan(credentials, track) { records ->
-                val newest = records.maxByOrNull { it.progress.observedAtMs }
-                if (newest != null && newest.progress.observedAtMs > (latest?.progress?.observedAtMs ?: -1)) latest = newest
+                latest = records.firstOrNull() ?: latest
+                latest == null
             }
         }
         // Like the original list, resolve duplicate track IDs before checking the album.
         return latest?.takeIf { it.albumId == album }?.progress
     }
 
-    /** Upload needs a complete album preflight; a timed-out or malformed scan must not authorize a write. */
-    suspend fun newestInAlbum(credentials: Credentials, albumId: String): Long? {
-        val album = xmlyIdentifier(albumId)
-        val latestByTrack = mutableMapOf<String, Record>()
-        val complete = withTimeoutOrNull(UploadScanTimeoutMs) {
-            scan(credentials) { records ->
-                for (record in records) {
-                    if (record.progress.observedAtMs > (latestByTrack[record.trackId]?.progress?.observedAtMs ?: -1)) {
-                        latestByTrack[record.trackId] = record
+    /** Cloud history for the 云历史 list, one page at a time, newest first. A list keeps the pages it has read. */
+    fun listing(): Listing = Listing()
+
+    /**
+     * The 云历史 list read a page at a time. A track is listed once, at its newest record, so a track played again on a
+     * later page is not listed twice. A page that adds nothing new is read past, until one adds a track or the history ends.
+     */
+    inner class Listing {
+        private val lock = Mutex()
+        private val listed = HashSet<String>()
+        private val pageDigests = HashSet<List<Byte>>()
+
+        /** The page [number] of the list. Page 1 starts the list again. Nothing is kept unless the whole call succeeds. */
+        suspend fun page(credentials: Credentials, number: Int): CloudListingPage = lock.withLock {
+            if (number == 1) {
+                listed.clear()
+                pageDigests.clear()
+            }
+            val items = ArrayList<CloudListen>()
+            val fresh = HashSet<String>()
+            val digests = HashSet<List<Byte>>()
+            var page = number
+            var next: Int? = null
+            while (true) {
+                if (page > MaxListingPages) throw XmlyException("history_limit")
+                val data = readPage(credentials, page)
+                val rows = data["listenModels"] as? JsonArray ?: reader.invalid()
+                val hasMore = when (val value = data["hasMore"]) {
+                    null, JsonNull -> false
+                    else -> reader.boolean(value) ?: reader.invalid()
+                }
+                if (rows.size > PageSize || (hasMore && rows.isEmpty())) reader.invalid()
+                if (rows.isNotEmpty()) {
+                    val digest = MessageDigest.getInstance("SHA-256").digest(rows.toString().encodeToByteArray()).toList()
+                    if (digest in pageDigests || !digests.add(digest)) throw XmlyException("repeated_page")
+                }
+                for (record in rows.mapNotNull { record(it, null) }) {
+                    if (record.trackId !in listed && fresh.add(record.trackId)) {
+                        items += CloudListen(
+                            record.albumId, record.albumTitle, record.coverUrl, record.trackId, record.trackTitle,
+                            record.durationSeconds, record.progress,
+                        )
                     }
                 }
+                page++
+                next = page.takeIf { hasMore }
+                if (!hasMore || items.isNotEmpty()) break
             }
-            true
+            listed += fresh
+            pageDigests += digests
+            CloudListingPage(items, next)
         }
-        if (complete != true) throw XmlyException("history_timeout")
-        return latestByTrack.values.asSequence().filter { it.albumId == album }.maxOfOrNull { it.progress.observedAtMs }
     }
 
-    private suspend fun scan(credentials: Credentials, trackId: String? = null, onPage: (List<Record>) -> Unit) {
+    private suspend fun scan(credentials: Credentials, trackId: String? = null, onPage: (List<Record>) -> Boolean) {
         val digest = MessageDigest.getInstance("SHA-256")
         val seenPages = hashSetOf<List<Byte>>()
         for (page in 1..MaxPages) {
@@ -76,8 +137,8 @@ class XmlyHistory(private val http: XmlyHttp, private val clock: () -> Long = Sy
             }
             val records = rows.mapNotNull { record(it, trackId) }
             currentCoroutineContext().ensureActive()
-            onPage(records)
-            if (!hasMore) return
+            val keepReading = onPage(records)
+            if (!keepReading || !hasMore) return
         }
         throw XmlyException("history_limit")
     }
@@ -161,16 +222,24 @@ class XmlyHistory(private val http: XmlyHttp, private val clock: () -> Long = Sy
         val duration = integer(row["length"]).coerceIn(0, MaxSeconds)
         val seconds = integer(row["breakSecond"]).coerceIn(0, duration.takeIf { it > 0 } ?: MaxSeconds)
         val observedAt = integer(row["endedAt"]).coerceIn(0, MaxObservedAtMs)
-        return Record(album, track, CloudPlaybackProgress(seconds * 1_000L, observedAt))
+        return Record(
+            albumId = album,
+            albumTitle = reader.anyText(row["itemTitle"]),
+            coverUrl = reader.image(row["itemCoverUrl"]),
+            trackId = track,
+            trackTitle = reader.anyText(row["childTitle"]),
+            durationSeconds = duration,
+            progress = CloudPlaybackProgress(seconds * 1_000L, observedAt),
+        )
     }
 
     private fun integer(value: JsonElement?): Long = reader.anyText(value).dartTrim().toLongOrNull() ?: 0L
 
     private companion object {
         const val ResumeScanTimeoutMs = 2_000L
-        const val UploadScanTimeoutMs = 15_000L
         const val PageSize = 100
         const val MaxPages = 50
+        const val MaxListingPages = 1_000
         const val MaxSeconds = Int.MAX_VALUE.toLong()
         const val MaxObservedAtMs = 2_115_354_119_000L
         const val SignatureMaterial = "23627d1451047b8d257a96af5db359538f081d651df75b4aa169508547208159"

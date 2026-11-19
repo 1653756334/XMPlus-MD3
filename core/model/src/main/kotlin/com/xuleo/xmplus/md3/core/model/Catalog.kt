@@ -1,6 +1,5 @@
 package com.xuleo.xmplus.md3.core.model
 
-import java.time.LocalDate
 
 /** An album as lists and headers show it. Covers are absolute https URLs, already checked. */
 data class Album(
@@ -72,8 +71,8 @@ data class AnchorProfile(
     val tracks: Int? = null,
 )
 
-/** Album metadata used when ordering the works of an anchor. */
-data class AnchorAlbum(val album: Album, val playCount: Long? = null, val createdOn: LocalDate? = null)
+/** An album on an anchor's page, with its play count when the server gives one. */
+data class AnchorAlbum(val album: Album, val playCount: Long? = null)
 
 /** The service can omit the total for albums and limits the track catalogue to its first 5,000 tracks. */
 data class AnchorContentPage<T>(

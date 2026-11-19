@@ -45,9 +45,11 @@ class XmlyHttp internal constructor(
         query: Map<String, String> = emptyMap(),
         trackId: String? = null,
         historyForm: Map<String, String>? = null,
+        form: Map<String, String>? = null,
     ): JsonObject {
         val historyMerge = endpoint === Endpoints.HistoryMerge
         require((historyForm != null) == historyMerge && (historyForm == null || body == null))
+        require(form == null || (body == null && historyForm == null))
         if (endpoint.login == Login.Required && credentials == null) throw XmlyException("login_required", definitive = true)
         val account = credentials.takeIf { endpoint.login != Login.Never }
         // The body is stable across attempts; an authorization read gets a fresh ticket header each time.
@@ -56,6 +58,9 @@ class XmlyHttp internal constructor(
         val requestBody = when {
             historyForm != null -> FormBody.Builder().apply {
                 for ((name, value) in historyForm) add(name, value)
+            }.build()
+            form != null -> FormBody.Builder().apply {
+                for ((name, value) in form) add(name, value)
             }.build()
             else -> body?.toString()?.toRequestBody(JsonMediaType)
         }
@@ -131,9 +136,10 @@ class XmlyHttp internal constructor(
             throw XmlyException("invalid_json")
         }
         val code = listOf(payload["ret"], payload["status"]).firstOrNull { it != null && it != JsonNull }
-        val text = (code as? JsonPrimitive)?.content ?: if (code == null) "0" else "invalid"
+        // A mutation with no ret or status has no known outcome, as the Dart client reads it; other reads count it as success.
+        val text = (code as? JsonPrimitive)?.content ?: if (code == null && !endpoint.resultRequired) "0" else "invalid"
         when {
-            text == endpoint.successCode -> return payload
+            text == endpoint.successCode || text in endpoint.acceptedCodes -> return payload
             text == "429" -> rateLimit(key, DefaultCooldown)
             text == "401" -> throw expired()
             text == "924" && endpoint.host == Host.Mobile -> throw XmlyException("content_removed", definitive = true)

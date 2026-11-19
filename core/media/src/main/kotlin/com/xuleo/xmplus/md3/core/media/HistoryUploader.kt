@@ -17,7 +17,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 enum class HistoryUploadFeedback { Uploaded, Failed, SignIn }
 
@@ -241,15 +240,11 @@ class HistoryUploader internal constructor(
                 if (!store.markAttempted(entry.id, manual)) continue
                 if (!stillAuthorized()) break
                 val observation = entry.observation
-                val newest = withContext(Dispatchers.Default) { history.newestInAlbum(credentials, observation.albumId) }
-                if (!stillAuthorized()) break
-                if (newest == null || newest <= observation.endedAtMs) {
-                    currentCoroutineContext().ensureActive()
-                    history.upload(
-                        credentials, observation.albumId, observation.trackId, observation.positionMs,
-                        observation.startedAtMs, observation.endedAtMs, observation.direction,
-                    )
-                }
+                currentCoroutineContext().ensureActive()
+                history.upload(
+                    credentials, observation.albumId, observation.trackId, observation.positionMs,
+                    observation.startedAtMs, observation.endedAtMs, observation.direction,
+                )
                 // Acknowledging one row can never erase a newer observation for the same album.
                 store.acknowledge(entry.id)
             } catch (cancelled: CancellationException) {

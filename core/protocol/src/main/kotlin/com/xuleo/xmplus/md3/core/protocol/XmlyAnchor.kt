@@ -9,11 +9,6 @@ import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.model.dartTrim
 import com.xuleo.xmplus.md3.core.model.xmlyIdentifier
-import java.time.LocalDate
-import java.time.format.DateTimeParseException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -183,64 +178,59 @@ class XmlyAnchor(private val http: XmlyHttp) {
         return AnchorContentPage(items, page, pageSize, page * pageSize < total, total, reported)
     }
 
-    suspend fun allAlbums(uid: String, credentials: Credentials?): AnchorContentPage<AnchorAlbum> =
-        all({ albums(uid, credentials, page = it, pageSize = 100) }, { it.album.id }, allowFiltered = true)
-
-    suspend fun allTracks(uid: String): AnchorContentPage<Track> = all({ tracks(uid, it, 100) }, Track::id)
-
-    /** Album listing responses lack creation dates. Fetch the album detail dates with at most four reads in flight. */
-    suspend fun withAlbumDates(uid: String, albums: List<AnchorAlbum>): List<AnchorAlbum> = coroutineScope {
+    suspend fun followings(uid: String, page: Int): AnchorContentPage<AnchorProfile> {
+        checkPage(page, FollowingPageSize)
         val id = xmlyIdentifier(uid)
-        val parallelism = minOf(4, albums.size)
-        List(parallelism) { worker ->
-            async {
-                (worker until albums.size step parallelism).map { index ->
-                    val item = albums[index]
-                    index to if (item.createdOn != null) item else item.copy(createdOn = albumDate(id, item.album.id))
-                }
-            }
-        }.awaitAll().flatten().sortedBy { it.first }.map { it.second }
-    }
-
-    private suspend fun albumDate(uid: String, albumId: String): LocalDate {
-        val response = data(Endpoints.AnchorAlbumInfo, mapOf("albumId" to albumId))
-        val main = optionalObject(response["albumPageMainInfo"])
-        if (reader.anyText(response["albumId"]) != albumId || reader.anyText(main["anchorUid"]) != uid) reader.invalid()
-        val value = cleanText(main["createDate"])
-        if (!CalendarDate.matches(value)) reader.invalid()
-        return try {
-            LocalDate.parse(value)
-        } catch (_: DateTimeParseException) {
-            reader.invalid()
+        val body = data(Endpoints.AnchorFollowings, mapOf("keyWord" to "", "uid" to id, "page" to "$page", "pageSize" to "$FollowingPageSize"))
+        if (body["uid"] != null && reader.anyText(body["uid"]) != id) reader.invalid()
+        if (count(body["page"]) != page.toLong()) repeatedPage()
+        val items = reader.rows(body["followingsPageInfo"], FollowingPageSize).map { row ->
+            AnchorProfile(
+                uid = reader.id(row["uid"]),
+                nickname = cleanText(row["anchorNickName"]).ifEmpty { reader.invalid() },
+                avatarUrl = reader.image(row["coverPath"]),
+                intro = cleanText(row["description"]),
+                verification = cleanText(row["ptitle"]),
+                verified = (count(row["logoType"]) ?: 0L) > 0L,
+                fans = count(row["followerCount"])?.toInt(),
+                following = count(row["followingCount"])?.toInt(),
+                albums = count(row["albumCount"])?.toInt(),
+                tracks = count(row["trackCount"])?.toInt(),
+            )
         }
+        val total = count(body["filterTotalCount"]) ?: count(body["totalCount"])
+        val hasMore = total?.let { page.toLong() * FollowingPageSize < it } ?: (items.size >= FollowingPageSize)
+        return AnchorContentPage(
+            items = items, page = page, pageSize = FollowingPageSize, hasMore = hasMore,
+            total = total?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt(), reportedTotal = total,
+        )
     }
 
-    private suspend fun <T> all(
-        read: suspend (Int) -> AnchorContentPage<T>, id: (T) -> String, allowFiltered: Boolean = false,
-    ): AnchorContentPage<T> {
-        val items = mutableListOf<T>()
-        val seen = hashSetOf<String>()
-        var expected: AnchorContentPage<T>? = null
-        for (page in 1..MaxPage) {
-            val result = read(page)
-            val first = expected ?: result.also { expected = it }
-            if (first.total != result.total || first.reportedTotal != result.reportedTotal) throw XmlyException("catalogue_changed")
-            for (item in result.items) {
-                if (!seen.add(id(item))) repeatedPage()
-                items += item
-            }
-            val total = first.total
-            if (!result.hasMore) {
-                if (total != null && (items.size > total || (!allowFiltered && items.size != total))) {
-                    throw XmlyException("incomplete_catalogue")
-                }
-                return result.copy(items = items.toList(), total = items.size)
-            }
-            if (result.items.isEmpty() && (!allowFiltered || total == null)) repeatedPage()
-        }
-        throw XmlyException("invalid_page")
+    /**
+     * One page of this anchor's albums that match [keyword], from the site search with the anchor as its filter. Rows that
+     * belong to another anchor are dropped, and paging stops, when the site ignores the filter.
+     */
+    suspend fun searchAlbums(uid: String, keyword: String, page: Int, pageSize: Int = 20): AnchorContentPage<AnchorAlbum> {
+        val id = xmlyIdentifier(uid)
+        val query = keyword.dartTrim()
+        if (query.isEmpty() || keyword.length > 200) throw XmlyException("invalid_search", definitive = true)
+        checkPage(page, pageSize)
+        val response = http.call(
+            Endpoints.Search, null,
+            query = mapOf(
+                "kw" to query, "core" to "album", "page" to "$page", "rows" to "$pageSize",
+                "device" to "iPhone", "condition" to "relation", "spellchecker" to "true", "fq" to "uid:$id",
+            ),
+        )
+        val values = optionalObject(optionalObject(optionalObject(response["data"])["result"])["response"])
+        val docs = values["docs"] as? JsonArray ?: reader.invalid()
+        val total = countInt(values["numFound"]) ?: reader.invalid()
+        val rows = docs.map { it as? JsonObject ?: reader.invalid() }
+        val items = rows.map { row -> AnchorAlbum(album = reader.albumOf(row), playCount = count(row["play"])) }
+        val mine = items.filter { it.album.anchorUid == id }
+        val trusted = mine.size == items.size
+        return AnchorContentPage(mine, page, pageSize, trusted && page.toLong() * pageSize < total, total)
     }
-
     private suspend fun data(endpoint: Endpoint, query: Map<String, String>, credentials: Credentials? = null): JsonObject =
         reader.obj(http.call(endpoint, credentials, credentials?.let { System.currentTimeMillis() }, query = query)["data"])
 
@@ -273,10 +263,10 @@ class XmlyAnchor(private val http: XmlyHttp) {
     }
 
     private companion object {
+        const val FollowingPageSize = 10
         const val MaxPage = 10_000
         const val TrackLimit = 5_000
         val EmptyObject = JsonObject(emptyMap())
-        val CalendarDate = Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
         val ImagePath = Regex("^(?:group[0-9]+|storages)/")
     }
 }

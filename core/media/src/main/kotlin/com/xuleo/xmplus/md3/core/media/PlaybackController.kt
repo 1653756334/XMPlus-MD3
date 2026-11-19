@@ -58,8 +58,10 @@ class PlaybackController(
     private val bookmarks: PlaybackBookmarkStore,
     private val skips: AlbumSkipStore,
     private val audio: AlbumAudioStore,
+    private val sleep: SleepTimerStore,
     private val skipSource: XmlySkip,
     private val sessions: PlaybackSessionStore,
+    private val listens: ListenHistoryStore,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -181,6 +183,9 @@ class PlaybackController(
                             if (selection != null && position != null) historyUpload.observe(
                                 source.authorization, selection.album.id, selection.track.historyDirection, position,
                             )
+                            if (selection != null && position != null) listens.observe(
+                                selection.album, selection.track, position, (selection.track.durationSeconds * 1_000).toLong(),
+                            )
                         }
                     }
                     publishPlayer(player)
@@ -220,15 +225,23 @@ class PlaybackController(
             return
         }
         // Resolve the official page before replacing the queue or stopping current audio.
-        readQueue { credentials ->
-            val hint = if (track.officialPosition == null && track.orderNo == null) {
-                resolver.trackMetadata(track.id, credentials)
-            } else track
-            val page = AlbumPlaybackQueue.pageFor(hint)
-            val result = readAlbumPage(detail, page, credentials)
-            val queue = AlbumPlaybackQueue.start(detail, hint, page, result)
-            QueueChoice(queue, queue.items.first { it.id == track.id }, keepLoaded = loaded)
+        readQueue { credentials -> readChoice(detail, track.id, track, credentials, keepLoaded = loaded) }
+    }
+
+    /**
+     * Plays a bookmark's episode from its saved position. The album is read from the server unless that episode is
+     * already loaded, in which case it seeks in place.
+     */
+    fun playSaved(albumId: String, trackId: String, positionMs: Long) {
+        if (accountChanges > 0) return
+        val selection = mutableState.value.selection
+        val loaded = selection != null && selection.track.id == trackId && selection.album.id == albumId
+        if (loaded && mutableQueue.value.errorCode == null) {
+            seekOrReopen(positionMs)
+            return
         }
+        cancelCloudRestore()
+        readQueue { credentials -> readChoice(catalogue.detail(albumId), trackId, null, credentials, positionMs = positionMs) }
     }
 
     fun playQueued(trackId: String) {
@@ -301,6 +314,27 @@ class PlaybackController(
 
     private suspend fun readAlbumPage(detail: AlbumDetail, page: Int, credentials: Credentials?) =
         catalogue.episodePage(detail.album.id, page, ascending = true, recordDescending = detail.recordDescending, credentials = credentials)
+
+    /** The queue around one episode. A saved position, when given, is where it starts instead of the saved progress. */
+    private suspend fun readChoice(
+        detail: AlbumDetail,
+        trackId: String,
+        known: Track?,
+        credentials: Credentials?,
+        keepLoaded: Boolean = false,
+        positionMs: Long? = null,
+    ): QueueChoice {
+        // The page comes from the episode's own position, so a track without one is looked up first.
+        val hint = if (known != null && (known.officialPosition != null || known.orderNo != null)) {
+            known
+        } else {
+            resolver.trackMetadata(trackId, credentials)
+        }
+        val page = AlbumPlaybackQueue.pageFor(hint)
+        val result = readAlbumPage(detail, page, credentials)
+        val queue = AlbumPlaybackQueue.start(detail, hint, page, result)
+        return QueueChoice(queue, queue.items.first { it.id == trackId }, keepLoaded = keepLoaded, positionMs = positionMs)
+    }
 
     private fun readQueue(read: suspend (Credentials?) -> QueueChoice) {
         cancelQueueWork()
@@ -573,15 +607,23 @@ class PlaybackController(
     fun bookmarkEpisode(): BookmarkEpisode? {
         if (accountChanges > 0) return null
         val selection = mutableState.value.selection ?: return null
-        val source = opened ?: return pendingAccount?.let { BookmarkEpisode(it, selection.album.id, selection.track.id) }
-        if (engine.value?.let(::isCurrent) != true) return null
-        return BookmarkEpisode(source.authorization.accountIdentity, selection.album.id, selection.track.id)
+        val episode = BookmarkEpisode(selection.album.id, selection.track.id)
+        // A restored episode can be bookmarked before it is opened, while its saved account is still pending.
+        if (opened == null) return episode.takeIf { pendingAccount != null }
+        return episode.takeIf { engine.value?.let(::isCurrent) == true }
     }
 
     /** Capture the player clock now; the time spent typing a note does not move this point. */
     fun captureBookmark(episode: BookmarkEpisode): BookmarkDraft? {
         val position = bookmarkPosition(episode) ?: return null
-        return BookmarkDraft(episode, position, System.currentTimeMillis())
+        val selection = mutableState.value.selection ?: return null
+        val source = BookmarkSource(
+            albumTitle = selection.album.title,
+            trackTitle = selection.track.title.ifBlank { selection.album.title },
+            anchor = selection.album.artist,
+            coverUrl = selection.album.coverUrl ?: selection.track.coverUrl,
+        )
+        return BookmarkDraft(episode, position, System.currentTimeMillis(), source)
     }
 
     suspend fun listBookmarks(episode: BookmarkEpisode): List<PlaybackBookmark> {
@@ -606,19 +648,24 @@ class PlaybackController(
 
     fun playBookmark(bookmark: PlaybackBookmark): Boolean {
         if (bookmarkPosition(bookmark.episode) == null) return false
+        if (mutableState.value.selection == null) return false
+        seekOrReopen(bookmark.positionMs)
+        return true
+    }
+
+    /** A bookmark is a manual position. Neither a pending next episode nor cloud resume may override it. */
+    private fun seekOrReopen(positionMs: Long) {
         val current = mutableState.value
-        val selection = current.selection ?: return false
-        val target = bookmark.positionMs.coerceIn(0, current.durationMs)
-        // A bookmark is a manual position. Neither a pending next episode nor cloud resume may override it.
+        val selection = current.selection ?: return
+        val target = positionMs.coerceIn(0, current.durationMs)
         cancelQueueWork()
         when {
             // An in-place seek clamps the exact end to the last frame. Reopen with the saved start so that
             // this is not mistaken for a natural finish (which would advance the queue or consume the timer).
-            target == current.durationMs -> open(selection, target, requiredAccount = bookmark.episode.account)
+            target == current.durationMs -> open(selection, target)
             current.wantsToPlay -> seekTo(target)
             else -> resumeAt(target)
         }
-        return true
     }
 
     private fun bookmarkPosition(episode: BookmarkEpisode): Long? {
@@ -687,6 +734,7 @@ class PlaybackController(
     /** Pause after [minutes] of wall-clock time, whether or not the audio is running. */
     fun startSleepTimer(minutes: Int) {
         if (mutableState.value.selection == null) return
+        sleep.setMinutes(minutes)
         cancelSleepTimer()
         val deadline = SystemClock.elapsedRealtime() + minutes * 60_000L
         sleepJob = scope.launch {
@@ -701,6 +749,9 @@ class PlaybackController(
             pause()
         }
     }
+
+    /** The length of the last sleep timer started on this device. */
+    fun lastSleepMinutes(): Int = sleep.minutes()
 
     /** Pause when the current episode ends, in place of moving to the next one. */
     fun sleepAtEpisodeEnd() {
@@ -765,7 +816,6 @@ class PlaybackController(
         selection: PlaybackSelection,
         position: Long?,
         refreshing: OpenSource? = null,
-        requiredAccount: String? = null,
     ) {
         val request = supersede()
         pendingAccount = null
@@ -787,9 +837,6 @@ class PlaybackController(
             awaitLedger()
             settleCurrent(keepUnsettled = true)
             val credentials = accounts.primaryCredentials()
-            if (requiredAccount != null && requiredAccount != (credentials?.identity ?: "anonymous")) {
-                throw XmlyException("account_mismatch", definitive = true)
-            }
             if (refreshing != null && refreshing.authorization.credentialsVersion != credentials?.cacheIdentity) {
                 throw XmlyException("account_mismatch", definitive = true)
             }
@@ -938,6 +985,7 @@ class PlaybackController(
         ledger.recordPlaybackState(playing = false, buffering = false)
         cancelCloudRestore()
         historyUpload.finishPlayback()
+        listens.flush()
         engine.value?.takeIf(::isCurrent)?.let { player ->
             opened?.takeIf { it.observation != null }?.let { source ->
                 if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_ENDED) {

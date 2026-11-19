@@ -36,6 +36,8 @@ internal enum class Login {
  * @property idempotent a repeat has the same effect as one attempt, so a failed attempt may be retried; everything
  * else is sent at most once and reported as uncertain when its outcome is unknown.
  * @property successCode the `ret`/`status` value that means success.
+ * @property acceptedCodes other values the caller reads itself, such as `already applied`; they return like success.
+ * @property resultRequired a mutation whose response must carry `ret` or `status`; without one the outcome is unknown, so it is rejected.
  */
 internal class Endpoint(
     val host: Host,
@@ -45,6 +47,8 @@ internal class Endpoint(
     val idempotent: Boolean = false,
     val successCode: String = "0",
     val playbackTicket: Boolean = false,
+    val acceptedCodes: Set<String> = emptySet(),
+    val resultRequired: Boolean = false,
 ) {
     fun resolve(timestamp: Long?, trackId: String?): String {
         val timedPath = path.replace(TimestampToken, timestamp?.toString().orEmpty())
@@ -82,6 +86,7 @@ internal object Endpoints {
     val TrackPaidMedia = read(Host.PaidMedia, "/mobile/track/pay/{trackId}/ts-{ts}", Login.Required)
 
     val Search = web("/revision/search")
+    val TrackSimple = web("/revision/track/simple")
     val AllCategories = web("/revision/category/v2/allCategory")
     val CategoryAlbums = web("/revision/category/v2/albums")
     val HotRankClusters = web("/revision/rank/v3/cluster")
@@ -101,6 +106,19 @@ internal object Endpoints {
     val AlbumReviews = read(Host.Mobile, "/album-comment-mobile/album/comment/list/query/{ts}")
     val AlbumReviewReplies = read(Host.Mobile, "/album-comment-mobile/ipad/album/comment/reply/list/query/{ts}")
     val AlbumSkipRecommendation = read(Host.Mobile, "/mobile-settings/v1/skipsegment/get/{ts}", Login.Required)
+    val FavoriteAdd = Endpoint(Host.Mobile, "POST", "/lite-mobile/like/v1/like", resultRequired = true)
+    val FavoriteRemove = Endpoint(Host.Mobile, "POST", "/lite-mobile/like/v1/dislike", resultRequired = true)
+    val FavoriteList = read(Host.Mobile, "/lite-mobile/like/v1/user-likes", Login.Required)
+    val SubscribeAlbum = Endpoint(Host.Mobile, "POST", "/subscribe/album-subscribe/and/ask-anchor-info", acceptedCodes = setOf("791"), resultRequired = true)
+    val UnsubscribeAlbum = Endpoint(Host.Mobile, "POST", "/subscribe/album/subscribe/delete", resultRequired = true)
+    val SubscriptionList = read(Host.Mobile, "/fsubscribe-web/subscribe/comprehensive/rank/{ts}", Login.Required)
+    val FollowAnchor = Endpoint(Host.Mobile, "POST", "/fans/follow", playbackTicket = true, resultRequired = true)
+    val AnchorFollowings = web("/revision/user/following")
+    val TrackComments = read(Host.Mobile, "/comment-mobile/v1/track/comment/{ts}", Login.Optional)
+    val CommentCreate = Endpoint(Host.Mobile, "POST", "/comment-mobile/v1/create")
+    val CommentLike = Endpoint(Host.Mobile, "POST", "/comment-mobile/like")
+    val CommentDelete = Endpoint(Host.Mobile, "POST", "/mobile/comment/delete/{ts}")
+    val UpdateFeed = read(Host.Mobile, "/track-feed/v1/track-feed/dynamic/ts-{ts}", Login.Required)
     val AlbumSearch = Endpoint(Host.Search, "POST", "/front-vertical", Login.Never, idempotent = true)
     val AnchorProfile = web("/revision/user/basic")
     val AnchorAlbumInfo = web("/revision/album/v1/simple")
