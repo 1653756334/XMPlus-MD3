@@ -14,17 +14,26 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Account-scoped authorization, never put into a Bundle or stored on disk. */
 class PlaybackAuthorization internal constructor(
     val track: Track,
-    val url: HttpUrl,
+    /** Null for a downloaded episode, which plays from [localFile]. */
+    val url: HttpUrl?,
     val accountIdentity: String,
     val credentialsVersion: String?,
     val requiresListeningTime: Boolean,
-)
+    val localFile: File? = null,
+) {
+    companion object {
+        /** A downloaded episode: it plays from its file and never uses listening time. */
+        fun offline(track: Track, file: File, accountIdentity: String, credentialsVersion: String?) =
+            PlaybackAuthorization(track, null, accountIdentity, credentialsVersion, requiresListeningTime = false, localFile = file)
+    }
+}
 
 /** Resolves full audio using the provider's current authorization. The list's paid badge is not a billing input. */
 class XmlyPlayback(

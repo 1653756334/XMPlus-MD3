@@ -1,12 +1,15 @@
 package com.xuleo.xmplus.md3
 
 import android.app.Application
+import android.os.Environment
 import com.xuleo.xmplus.md3.account.RewardScheduler
 import com.xuleo.xmplus.md3.account.XmlyUsageService
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.BalanceLocks
 import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
+import com.xuleo.xmplus.md3.core.download.DownloadManager
+import com.xuleo.xmplus.md3.core.download.DownloadStore
 import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
 import com.xuleo.xmplus.md3.core.media.SleepTimerStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
@@ -33,9 +36,11 @@ import com.xuleo.xmplus.md3.core.protocol.XmlyRewards
 import com.xuleo.xmplus.md3.core.protocol.XmlySearch
 import com.xuleo.xmplus.md3.core.protocol.XmlySkip
 import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
+import com.xuleo.xmplus.md3.download.DownloadActions
 import com.xuleo.xmplus.md3.library.BookmarkNames
 import com.xuleo.xmplus.md3.library.CommentActions
 import com.xuleo.xmplus.md3.library.LibraryActions
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -85,18 +90,27 @@ class XmApplication : Application(), PlaybackOwner {
     /** Every charge for listening time goes through this ledger. */
     val usage: UsageLedger by lazy { UsageLedger(accounts, XmlyUsageService(quotaClient), balanceLocks) }
 
+    /** Episodes kept for offline listening: the app's music folder on external storage, or the app's own files without it. */
+    val downloads: DownloadManager by lazy {
+        val folder = getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.let { File(it, "XMPlus") } ?: File(filesDir, "XMPlus-downloads")
+        DownloadManager(folder, DownloadStore(File(filesDir, "downloads/tasks.json")), accounts, playbackApi, usage, processScope)
+    }
+
+    val downloadActions by lazy { DownloadActions(accounts, album, downloads) }
+
     // Resolve an interrupted debit locally before allowing a new playback to charge.
     private val usageReady by lazy {
         processScope.async {
             accounts.load()
             usage.load()
+            downloads.start()
         }
     }
     override val playback by lazy {
         PlaybackController(
             accounts, usage, playbackApi, album, PlaybackProgressStore(this), history,
             HistoryUploader(this, accounts, history), bookmarks,
-            AlbumSkipStore(this), AlbumAudioStore(this), SleepTimerStore(this), XmlySkip(http), PlaybackSessionStore(this), listens,
+            AlbumSkipStore(this), AlbumAudioStore(this), SleepTimerStore(this), XmlySkip(http), PlaybackSessionStore(this), listens, downloads,
         ) { usageReady.await() }
     }
 

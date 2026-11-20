@@ -43,7 +43,6 @@
     <string name="bookmark_delete_action">Delete</string>
     <string name="bookmark_error">Bookmark operation failed. Try again.</string>
     <string name="player_download">Download</string>
-    <string name="player_coming_soon">Coming soon</string>
     <string name="player_speed_reset">Reset to 1×</string>
     <string name="player_speed_scope">Remembered for this album only. Other albums keep their own speed, and one you haven\u2019t adjusted plays at 1×.</string>
     <string name="player_volume">Volume</string>
@@ -342,4 +341,23 @@
     <string name="history_select">Select</string>
     <string name="history_select_all">Select all</string>
     <string name="history_selected">%1$d selected</string>
+    <string name="downloads_started">Added to downloads</string>
+    <string name="downloads_section_active">In progress</string>
+    <string name="downloads_waiting">Waiting</string>
+    <string name="downloads_running">Downloading</string>
+    <string name="downloads_percent">%1$d%%</string>
+    <string name="downloads_paused">Paused</string>
+    <string name="downloads_pause">Pause</string>
+    <string name="downloads_resume">Resume</string>
+    <string name="downloads_retry">Retry</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_delete">Delete</string>
+    <string name="downloads_pause_all">Pause all</string>
+    <string name="downloads_resume_all">Resume all</string>
+    <string name="album_download">Download album</string>
+    <string name="download_error_quota">Not enough listening time to download this</string>
+    <string name="download_error_login">Log in to download this</string>
+    <string name="download_error_space">Not enough free storage</string>
+    <string name="download_error_album_size">Albums over 5,000 episodes can\'t be downloaded at once</string>
+    <string name="download_error_index">This episode has no number, so it can\'t be saved</string>
 </resources>

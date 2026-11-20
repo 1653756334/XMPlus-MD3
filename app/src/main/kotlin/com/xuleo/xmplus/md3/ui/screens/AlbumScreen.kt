@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import android.widget.Toast
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,6 +64,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +77,7 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.AlbumState
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.download.downloadErrorMessage
 import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
 import com.xuleo.xmplus.md3.core.model.Track
@@ -106,6 +109,15 @@ internal fun AlbumScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
+    val context = LocalContext.current
+    val started = stringResource(R.string.downloads_started)
+    val notice = state.downloadNotice
+    val failure = notice?.errorCode?.let { stringResource(downloadErrorMessage(it)) }
+    LaunchedEffect(notice) {
+        if (notice == null) return@LaunchedEffect
+        Toast.makeText(context, failure ?: started, Toast.LENGTH_SHORT).show()
+        viewModel.dismissDownloadNotice()
+    }
     val pager = rememberPagerState { AlbumTabs.size }
     // The lists live here rather than in their pages, so each keeps its place while its tab is off screen or search is open.
     val introList = rememberLazyListState()
@@ -119,7 +131,7 @@ internal fun AlbumScreen(
             else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
         }
     } else {
-        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription) { onOpenAnchor(detail.album.anchorUid) } }) {
+        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription, onDownload = viewModel::downloadAlbum) { onOpenAnchor(detail.album.anchorUid) } }) {
             DetailTabs(pager, AlbumTabs)
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {

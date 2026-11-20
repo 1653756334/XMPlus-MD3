@@ -129,6 +129,10 @@ import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackPhase
 import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
+import com.xuleo.xmplus.md3.core.model.XmlyException
+import com.xuleo.xmplus.md3.download.DownloadActions
+import com.xuleo.xmplus.md3.download.DownloadNotice
+import com.xuleo.xmplus.md3.download.downloadErrorMessage
 import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
 import com.xuleo.xmplus.md3.core.media.SleepTimerState
@@ -144,6 +148,7 @@ import com.xuleo.xmplus.md3.ui.components.formatDuration
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** A full-height sheet so closing the player does not navigate away from the page under it. */
@@ -157,6 +162,7 @@ internal fun PlayerSheet(
     transcript: XmlyTranscript? = null,
     libraryActions: LibraryActions? = null,
     comments: CommentActions? = null,
+    downloads: DownloadActions? = null,
 ) {
     val state by playback.state.collectAsStateWithLifecycle()
     val queue by playback.queue.collectAsStateWithLifecycle()
@@ -179,8 +185,30 @@ internal fun PlayerSheet(
             }
         }
     }
-    val comingSoon = rememberComingSoon()
-
+    val context = LocalContext.current
+    val started = stringResource(R.string.downloads_started)
+    var downloadNotice by remember { mutableStateOf<DownloadNotice?>(null) }
+    val downloadFailure = downloadNotice?.errorCode?.let { stringResource(downloadErrorMessage(it)) }
+    LaunchedEffect(downloadNotice) {
+        if (downloadNotice == null) return@LaunchedEffect
+        Toast.makeText(context, downloadFailure ?: started, Toast.LENGTH_SHORT).show()
+        downloadNotice = null
+    }
+    fun downloadEpisode(episode: PlaybackSelection) {
+        val actions = downloads ?: return
+        scope.launch {
+            downloadNotice = try {
+                actions.downloadEpisode(episode)
+                DownloadNotice(null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: XmlyException) {
+                DownloadNotice(error.code)
+            } catch (_: Exception) {
+                DownloadNotice("unknown")
+            }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheet,
@@ -262,7 +290,7 @@ internal fun PlayerSheet(
                                 onOpenSleep = { showSleep = true },
                                 onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
                                 onMore = { showActions = true },
-                                onComingSoon = comingSoon,
+                                onDownload = { downloadEpisode(episode) },
                                 library = episodeLibrary,
                                 onAccounts = { closeThen(onAccounts) },
                             )
@@ -332,23 +360,6 @@ private enum class PlayerPage(@StringRes val label: Int) {
 
 /** The pages a finger can swipe between in the cover area, in order. */
 private val CoverPages = listOf(PlayerPage.Playing, PlayerPage.Transcript)
-
-/** Placeholder buttons for features that are not connected yet; a new tap replaces the previous toast. */
-@Composable
-private fun rememberComingSoon(): () -> Unit {
-    val context = LocalContext.current
-    val message = stringResource(R.string.player_coming_soon)
-    return remember(context, message) {
-        var shown: Toast? = null
-        val show: () -> Unit = {
-            shown?.cancel()
-            val toast = Toast.makeText(context, message, Toast.LENGTH_SHORT)
-            toast.show()
-            shown = toast
-        }
-        show
-    }
-}
 
 /** Minimize on the left and the page headings in the middle, styled like 发现's. */
 @Composable
@@ -461,14 +472,14 @@ private fun PlayerControls(
     onOpenSpeed: () -> Unit,
     onOpenSleep: () -> Unit,
     onOpenBookmarks: () -> Unit,
-    onComingSoon: () -> Unit,
+    onDownload: () -> Unit,
     library: EpisodeLibrary,
     onMore: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
-        EpisodeActions(library, onComingSoon, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
+        EpisodeActions(library, onDownload, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
         SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
@@ -515,7 +526,7 @@ private fun EpisodeHeading(episode: PlaybackSelection, onOpenAlbum: () -> Unit) 
 @Composable
 private fun EpisodeActions(
     library: EpisodeLibrary,
-    onComingSoon: () -> Unit,
+    onDownload: () -> Unit,
     onOpenBookmarks: () -> Unit,
     bookmarksAvailable: Boolean,
     onMore: () -> Unit,
@@ -527,7 +538,7 @@ private fun EpisodeActions(
             R.string.player_favorite, library.onFavorite, enabled = library.available && library.favorite != null,
         )
         EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
-        EpisodeAction(Icons.Outlined.Download, R.string.player_download, onComingSoon)
+        EpisodeAction(Icons.Outlined.Download, R.string.player_download, onDownload)
         EpisodeAction(Icons.Outlined.MoreHoriz, R.string.player_more, onMore)
     }
 }

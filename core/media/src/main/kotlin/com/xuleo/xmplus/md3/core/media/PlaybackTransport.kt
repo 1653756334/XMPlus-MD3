@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -32,7 +33,7 @@ internal fun createPlayer(context: Context): ExoPlayer {
         .build()
     val dataSource = OkHttpDataSource.Factory(client).setUserAgent("XMPlus/1.0")
         .setDefaultRequestProperties(mapOf("Accept" to "audio/*, application/octet-stream"))
-    val sources = ProgressiveMediaSource.Factory(dataSource).setLoadErrorHandlingPolicy(
+    val sources = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context, dataSource)).setLoadErrorHandlingPolicy(
         object : DefaultLoadErrorHandlingPolicy() {
             override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorInfo): Long =
                 if (loadErrorInfo.exception.hasExpiredAuthorization()) C.TIME_UNSET

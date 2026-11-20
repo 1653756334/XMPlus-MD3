@@ -14,6 +14,8 @@ import com.xuleo.xmplus.md3.core.model.AlbumSimilar
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
+import com.xuleo.xmplus.md3.download.DownloadActions
+import com.xuleo.xmplus.md3.download.DownloadNotice
 import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.library.LibraryToggle
 import kotlinx.coroutines.CancellationException
@@ -45,6 +47,8 @@ data class AlbumState(
     val episodesHasMore: Boolean = false,
     val episodesLoading: Boolean = false,
     val episodesErrorCode: String? = null,
+    /** Set when a download starts or fails; the screen shows it once and clears it. */
+    val downloadNotice: DownloadNotice? = null,
     val searchOpen: Boolean = false,
     val query: String = "",
     val hits: List<Track> = emptyList(),
@@ -78,6 +82,7 @@ class AlbumViewModel(
     private val album: XmlyAlbum,
     private val accounts: AccountRepository,
     private val library: LibraryActions,
+    private val downloads: DownloadActions,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(AlbumState())
     val state: StateFlow<AlbumState> = mutable.asStateFlow()
@@ -114,6 +119,28 @@ class AlbumViewModel(
                 mutable.update { it.copy(subscription = it.subscription.copy(failed = true)) }
             }
         }
+    }
+
+    /** Queues every episode of this album. The result reaches the screen through [AlbumState.downloadNotice]. */
+    fun downloadAlbum() {
+        val detail = mutable.value.detail ?: return
+        viewModelScope.launch {
+            val notice = try {
+                downloads.downloadAlbum(detail)
+                DownloadNotice(null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: XmlyException) {
+                DownloadNotice(error.code)
+            } catch (_: Exception) {
+                DownloadNotice("unknown")
+            }
+            mutable.update { it.copy(downloadNotice = notice) }
+        }
+    }
+
+    fun dismissDownloadNotice() {
+        mutable.update { it.copy(downloadNotice = null) }
     }
 
     fun toggleSubscription() {
@@ -391,7 +418,7 @@ class AlbumViewModel(
     }
 
     companion object {
-        fun factory(albumId: String, album: XmlyAlbum, accounts: AccountRepository, library: LibraryActions): ViewModelProvider.Factory =
-            viewModelFactory { initializer { AlbumViewModel(albumId, album, accounts, library) } }
+        fun factory(albumId: String, album: XmlyAlbum, accounts: AccountRepository, library: LibraryActions, downloads: DownloadActions): ViewModelProvider.Factory =
+            viewModelFactory { initializer { AlbumViewModel(albumId, album, accounts, library, downloads) } }
     }
 }

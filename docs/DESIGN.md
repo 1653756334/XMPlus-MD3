@@ -79,7 +79,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [x] Transcript (文稿)
 - [x] Bookmarks with notes
 - [x] Resume from local and cloud progress; optional upload with consent; an episode that played to its end is recorded as finished (see Episode end)
-- [ ] Downloaded episodes play locally without using 听时
+- [x] Downloaded episodes play locally without using 听时
 - [ ] Listen while downloading (边听边下), prefetch the next episode
 - [x] System controls: notification, lock screen, Bluetooth, headset (see Full player)
 
@@ -91,7 +91,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 ### 下载 Downloads
 
-- [ ] Task list and downloaded library, grouped by album
+- [x] Task list and downloaded library, grouped by album
 - [ ] Search, multi-select, pause / resume / cancel all, task details
 - [ ] Retry, re-fetch the link, move to a new folder, delete audio (size shown first)
 - [ ] Account choice and account rotation (轮询)

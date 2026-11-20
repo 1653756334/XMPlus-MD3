@@ -12,6 +12,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.UsageLedger
+import com.xuleo.xmplus.md3.core.download.DownloadManager
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
 import com.xuleo.xmplus.md3.core.model.AlbumSkip
 import com.xuleo.xmplus.md3.core.model.Credentials
@@ -62,6 +63,7 @@ class PlaybackController(
     private val skipSource: XmlySkip,
     private val sessions: PlaybackSessionStore,
     private val listens: ListenHistoryStore,
+    private val downloads: DownloadManager,
     private val awaitLedger: suspend () -> Unit,
 ) {
     private class OpenSource(
@@ -840,7 +842,13 @@ class PlaybackController(
             if (refreshing != null && refreshing.authorization.credentialsVersion != credentials?.cacheIdentity) {
                 throw XmlyException("account_mismatch", definitive = true)
             }
-            val resolved = resolver.resolve(selection.track.id, credentials, ledger::queryQuota)
+            // A finished download plays from its file and is never charged listening time.
+            val offline = downloads.completedFile(selection.track.id)
+            val resolved = if (offline != null) {
+                PlaybackAuthorization.offline(selection.track, offline, credentials?.identity ?: "anonymous", credentials?.cacheIdentity)
+            } else {
+                resolver.resolve(selection.track.id, credentials, ledger::queryQuota)
+            }
             if (resolved.track.id != selection.track.id ||
                 (resolved.track.albumId.isNotBlank() && resolved.track.albumId != selection.album.id)
             ) throw XmlyException("id_mismatch", definitive = true)
@@ -864,7 +872,7 @@ class PlaybackController(
                 .build()
             val mediaId = request.toString()
             val item = MediaItem.Builder().setMediaId(mediaId)
-                .setUri(resolved.url.toString()).setMediaMetadata(metadata).build()
+                .setUri(resolved.localFile?.let { Uri.fromFile(it).toString() } ?: requireNotNull(resolved.url).toString()).setMediaMetadata(metadata).build()
             val source = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
             if (refreshing != null) {
                 source.skipOff = refreshing.skipOff

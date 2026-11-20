@@ -41,7 +41,6 @@
     <string name="bookmark_delete_action">删除</string>
     <string name="bookmark_error">书签操作失败，请重试。</string>
     <string name="player_download">下载</string>
-    <string name="player_coming_soon">即将推出</string>
     <string name="player_speed_reset">恢复 1×</string>
     <string name="player_speed_scope">倍速只记在本专辑上；其他专辑各用各的，没调过的按 1×播放。</string>
     <string name="player_volume">音量</string>
@@ -331,4 +330,23 @@
     <string name="history_select">选择</string>
     <string name="history_select_all">全选</string>
     <string name="history_selected">已选 %1$d 项</string>
+    <string name="downloads_started">已加入下载</string>
+    <string name="downloads_section_active">进行中</string>
+    <string name="downloads_waiting">等待中</string>
+    <string name="downloads_running">下载中</string>
+    <string name="downloads_percent">%1$d%%</string>
+    <string name="downloads_paused">已暂停</string>
+    <string name="downloads_pause">暂停</string>
+    <string name="downloads_resume">继续</string>
+    <string name="downloads_retry">重试</string>
+    <string name="downloads_cancel">取消</string>
+    <string name="downloads_delete">删除</string>
+    <string name="downloads_pause_all">全部暂停</string>
+    <string name="downloads_resume_all">全部继续</string>
+    <string name="album_download">下载整张专辑</string>
+    <string name="download_error_quota">听时不足，无法下载</string>
+    <string name="download_error_login">登录后才能下载</string>
+    <string name="download_error_space">存储空间不足</string>
+    <string name="download_error_album_size">超过 5000 集的专辑无法整张下载</string>
+    <string name="download_error_index">这一集没有集数，无法保存</string>
 </resources>
