@@ -93,6 +93,8 @@
     <string name="player_transcript_empty">这一集没有文稿</string>
     <string name="library_action_failed">操作失败，请重试</string>
     <string name="album_subscribe">订阅</string>
+    <string name="album_subscribed">已订阅</string>
+    <string name="album_unsubscribed">已取消订阅</string>
     <string name="anchor_follow">关注</string>
     <string name="anchor_following">已关注</string>
     <string name="history_empty">听过的节目会显示在这里</string>

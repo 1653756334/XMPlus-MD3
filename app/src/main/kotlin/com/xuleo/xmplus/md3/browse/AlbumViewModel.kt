@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+enum class SubscriptionNotice { Subscribed, Unsubscribed, Failed }
+
 /** Everything one album page shows. Each part loads and fails on its own. */
 data class AlbumState(
     val detail: AlbumDetail? = null,
@@ -72,6 +74,7 @@ data class AlbumState(
     val repliesLoading: Boolean = false,
     val repliesErrorCode: String? = null,
     val subscription: LibraryToggle = LibraryToggle(),
+    val subscriptionNotice: SubscriptionNotice? = null,
 )
 
 /**
@@ -155,18 +158,28 @@ class AlbumViewModel(
             if (current.failed) loadSubscription()
             return
         }
-        mutable.update { it.copy(subscription = it.subscription.copy(busy = true, failed = false)) }
+        val target = !subscribed
+        mutable.update { it.copy(subscription = it.subscription.copy(busy = true, failed = false), subscriptionNotice = null) }
         viewModelScope.launch {
             try {
-                library.setSubscribed(albumId, !subscribed)
-                mutable.update { it.copy(subscription = it.subscription.copy(on = !subscribed, busy = false)) }
+                library.setSubscribed(albumId, target)
+                mutable.update {
+                    it.copy(
+                        subscription = it.subscription.copy(on = target, busy = false),
+                        subscriptionNotice = if (target) SubscriptionNotice.Subscribed else SubscriptionNotice.Unsubscribed,
+                    )
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                mutable.update { it.copy(subscription = it.subscription.copy(busy = false, failed = true)) }
+                mutable.update {
+                    it.copy(subscription = it.subscription.copy(busy = false, failed = true), subscriptionNotice = SubscriptionNotice.Failed)
+                }
             }
         }
     }
+
+    fun clearSubscriptionNotice() = mutable.update { it.copy(subscriptionNotice = null) }
 
     private fun loadHeader() {
         headerJob?.cancel()

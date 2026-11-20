@@ -91,6 +91,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.AlbumState
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
+import com.xuleo.xmplus.md3.browse.SubscriptionNotice
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.download.DownloadState
 import com.xuleo.xmplus.md3.core.download.DownloadTask
@@ -128,6 +129,18 @@ internal fun AlbumScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
+    val context = LocalContext.current
+    val notice = state.subscriptionNotice
+    LaunchedEffect(viewModel, notice) {
+        val message = when (notice) {
+            SubscriptionNotice.Subscribed -> R.string.album_subscribed
+            SubscriptionNotice.Unsubscribed -> R.string.album_unsubscribed
+            SubscriptionNotice.Failed -> R.string.library_action_failed
+            null -> return@LaunchedEffect
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.clearSubscriptionNotice()
+    }
     val prompt = rememberDownloadPrompt(viewModel.downloads)
     val tasks by viewModel.downloadTasks.collectAsStateWithLifecycle()
     val downloads = remember(tasks) { tasks.associateBy { it.trackId } }
@@ -176,12 +189,6 @@ internal fun AlbumScreen(
 @Composable
 private fun SubscribeAction(state: LibraryToggle, onToggle: () -> Unit) {
     if (!state.signedIn) return
-    val context = LocalContext.current
-    val failed = stringResource(R.string.library_action_failed)
-    // A failed change is reported; a failed read only leaves the button ready to read again.
-    LaunchedEffect(state.failed) {
-        if (state.failed && state.on != null) Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
-    }
     val subscribed = state.on == true
     IconToggleButton(
         checked = subscribed,
@@ -191,7 +198,7 @@ private fun SubscribeAction(state: LibraryToggle, onToggle: () -> Unit) {
         if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         else Icon(
             if (subscribed) Icons.Filled.LibraryAddCheck else Icons.Outlined.LibraryAdd,
-            stringResource(R.string.album_subscribe),
+            stringResource(if (subscribed) R.string.listen_unsubscribe else R.string.album_subscribe),
         )
     }
 }

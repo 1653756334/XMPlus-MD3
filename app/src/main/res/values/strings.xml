@@ -97,6 +97,8 @@
     <string name="player_transcript_empty">No transcript for this episode</string>
     <string name="library_action_failed">Couldn’t update. Try again.</string>
     <string name="album_subscribe">Subscribe</string>
+    <string name="album_subscribed">Subscribed</string>
+    <string name="album_unsubscribed">Unsubscribed</string>
     <string name="anchor_follow">Follow</string>
     <string name="anchor_following">Following</string>
     <string name="history_empty">Episodes you listen to will show up here</string>
