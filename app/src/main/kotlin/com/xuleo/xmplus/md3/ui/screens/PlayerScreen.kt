@@ -19,20 +19,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -218,12 +214,9 @@ internal fun PlayerSheet(
                     episode.coverUrl, Modifier.fillMaxWidth().height((maxHeight * 0.68f).coerceAtMost(540.dp)),
                 )
             }
-            Column(
-                Modifier.fillMaxSize().windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-                ),
-            ) {
-                Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+            // ModalBottomSheet consumes more of the top inset as it moves. Keep the full-screen
+            // player's padding relative to the window so the controls travel with the artwork.
+            Column(Modifier.fillMaxSize().padding(WindowInsets.safeDrawing.asPaddingValues())) {
                 PlayerTopBar(
                     hasEpisode = episode != null,
                     onMinimize = { closeThen() },
