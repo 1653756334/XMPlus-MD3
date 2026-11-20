@@ -19,7 +19,6 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,23 +27,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.AlbumSkip
+import com.xuleo.xmplus.md3.core.model.MaxSkipSeconds
 import com.xuleo.xmplus.md3.core.model.XmlyException
+import com.xuleo.xmplus.md3.ui.components.ApplyWhenSettled
 import com.xuleo.xmplus.md3.ui.components.SheetActions
+import com.xuleo.xmplus.md3.ui.components.SheetHeader
 import com.xuleo.xmplus.md3.ui.components.SheetSetting
-import com.xuleo.xmplus.md3.ui.components.SnapSlider
-import kotlin.math.roundToInt
+import com.xuleo.xmplus.md3.ui.components.Stepper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-
-/** The common lengths, labelled under each slider. */
-private val SkipMarkers = listOf(0f, 15f, 30f, 60f, 90f)
-private const val SkipSliderSeconds = 180
 
 private sealed interface Suggestion {
     data object Loading : Suggestion
@@ -55,9 +50,10 @@ private sealed interface Suggestion {
 }
 
 /**
- * The intro and outro skipped for every episode of the album. Each slider applies when the finger lifts. Ximalaya's
- * suggestion is offered when it differs from what is set, and never applied by itself. The footer clears the album's
- * skipping, or closes the sheet.
+ * The intro and outro skipped for every episode of the album, each on its own row with − and + in 1 s steps; holding a
+ * button runs on, faster the longer it is held. A change applies once the buttons settle. Ximalaya's suggestion is
+ * offered when it differs from what is set, and never applied by itself. The footer clears the album's skipping, or
+ * closes the sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,8 +64,8 @@ internal fun PlayerSkipSheet(
     onSkip: (AlbumSkip) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var intro by remember(skip) { mutableFloatStateOf(skip.introSeconds.toFloat()) }
-    var outro by remember(skip) { mutableFloatStateOf(skip.outroSeconds.toFloat()) }
+    var intro by remember(skip) { mutableIntStateOf(skip.introSeconds) }
+    var outro by remember(skip) { mutableIntStateOf(skip.outroSeconds) }
     var attempt by remember { mutableIntStateOf(0) }
     var suggestion by remember { mutableStateOf<Suggestion>(Suggestion.Loading) }
     val sheet = rememberBottomSheetState(
@@ -77,7 +73,6 @@ internal fun PlayerSkipSheet(
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
     val scope = rememberCoroutineScope()
-    val limit = maxOf(SkipSliderSeconds, skip.introSeconds, skip.outroSeconds).toFloat()
 
     LaunchedEffect(attempt) {
         suggestion = Suggestion.Loading
@@ -92,10 +87,12 @@ internal fun PlayerSkipSheet(
         }
     }
 
-    fun commit() {
-        val value = AlbumSkip(intro.roundToInt(), outro.roundToInt())
+    fun set(value: AlbumSkip) {
+        intro = value.introSeconds
+        outro = value.outroSeconds
         if (value != skip) onSkip(value)
     }
+    ApplyWhenSettled(AlbumSkip(intro, outro)) { if (it != skip) onSkip(it) }
 
     fun finish() {
         scope.launch {
@@ -115,20 +112,9 @@ internal fun PlayerSkipSheet(
                 .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding, bottom = XmLayout.ItemGap),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.player_skip_title),
-                    Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    stringResource(R.string.player_skip_scope),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            SheetHeader(stringResource(R.string.player_skip_title), stringResource(R.string.player_skip_scope))
             when (val found = suggestion) {
-                is Suggestion.Found -> if (!found.skip.isOff && found.skip != skip) {
+                is Suggestion.Found -> if (!found.skip.isOff && found.skip != AlbumSkip(intro, outro)) {
                     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.secondaryContainer) {
                         Row(
                             Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
@@ -141,11 +127,7 @@ internal fun PlayerSkipSheet(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
-                            Button(onClick = {
-                                intro = found.skip.introSeconds.toFloat()
-                                outro = found.skip.outroSeconds.toFloat()
-                                onSkip(found.skip)
-                            }) {
+                            Button(onClick = { set(found.skip) }) {
                                 Text(stringResource(R.string.player_skip_use))
                             }
                         }
@@ -167,9 +149,11 @@ internal fun PlayerSkipSheet(
                 }
                 Suggestion.Loading, Suggestion.None -> Unit
             }
-            SkipSetting(R.string.player_skip_intro, intro, limit, { intro = it }, ::commit)
-            SkipSetting(R.string.player_skip_outro, outro, limit, { outro = it }, ::commit)
-            if (durationMs > 0 && (intro.roundToInt() + outro.roundToInt()) * 1_000L >= durationMs) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SkipSetting(R.string.player_skip_intro, intro) { intro = it }
+                SkipSetting(R.string.player_skip_outro, outro) { outro = it }
+            }
+            if (durationMs > 0 && (intro + outro) * 1_000L >= durationMs) {
                 Text(
                     stringResource(R.string.player_skip_too_long),
                     style = MaterialTheme.typography.bodySmall,
@@ -178,12 +162,8 @@ internal fun PlayerSkipSheet(
             }
             SheetActions(
                 secondary = stringResource(R.string.player_skip_reset),
-                secondaryEnabled = !skip.isOff,
-                onSecondary = {
-                    intro = 0f
-                    outro = 0f
-                    onSkip(AlbumSkip())
-                },
+                secondaryEnabled = intro != 0 || outro != 0,
+                onSecondary = { set(AlbumSkip()) },
                 primary = stringResource(R.string.player_done),
                 onPrimary = ::finish,
             )
@@ -192,19 +172,15 @@ internal fun PlayerSkipSheet(
 }
 
 @Composable
-private fun SkipSetting(label: Int, seconds: Float, limit: Float, onChange: (Float) -> Unit, onFinished: () -> Unit) {
+private fun SkipSetting(label: Int, seconds: Int, onChange: (Int) -> Unit) {
     val name = stringResource(label)
-    SheetSetting(name, stringResource(R.string.player_skip_seconds, seconds.roundToInt())) {
-        SnapSlider(
+    SheetSetting(name) {
+        Stepper(
             value = seconds,
-            onValueChange = onChange,
-            onValueChangeFinished = onFinished,
-            label = name,
-            range = 0f..limit,
-            step = 1f,
-            markers = SkipMarkers,
-            markerLabel = { stringResource(R.string.player_skip_seconds, it.roundToInt()) },
-            magnet = 2f,
+            range = 0..MaxSkipSeconds,
+            onValue = onChange,
+            text = stringResource(R.string.player_skip_seconds, seconds),
+            name = name,
         )
     }
 }

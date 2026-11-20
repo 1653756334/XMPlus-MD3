@@ -23,8 +23,7 @@
     <string name="player_speed">Speed</string>
     <string name="player_speed_value">%1$s×</string>
     <string name="player_sleep">Sleep timer</string>
-    <string name="player_sleep_minutes">%1$d minutes</string>
-    <string name="player_sleep_episode_end">End of this episode</string>
+    <string name="player_sleep_minutes">%1$d min</string>
     <string name="player_sleep_off">Turn off timer</string>
     <string name="player_sleep_episode_end_short">This episode</string>
     <string name="player_page_playing">Playing</string>
@@ -56,6 +55,12 @@
     <string name="player_queue_check_added">%1$d new episodes added</string>
     <string name="player_sleep_start">Start timer</string>
     <string name="player_sleep_length">Length</string>
+    <string name="player_sleep_custom">Custom</string>
+    <string name="player_sleep_preset_episode_end">Episode end</string>
+    <string name="player_sleep_remaining">Pauses in %1$s</string>
+    <string name="player_sleep_status_episode_end">Pauses when this episode ends</string>
+    <string name="stepper_decrease">Decrease %1$s</string>
+    <string name="stepper_increase">Increase %1$s</string>
     <string name="player_done">Done</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_anchor">View creator</string>
@@ -92,7 +97,6 @@
     <string name="player_transcript_empty">No transcript for this episode</string>
     <string name="library_action_failed">Couldn’t update. Try again.</string>
     <string name="album_subscribe">Subscribe</string>
-    <string name="album_subscribed">Subscribed</string>
     <string name="anchor_follow">Follow</string>
     <string name="anchor_following">Following</string>
     <string name="history_empty">Episodes you listen to will show up here</string>

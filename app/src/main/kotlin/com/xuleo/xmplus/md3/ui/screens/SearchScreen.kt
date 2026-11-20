@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -181,7 +180,7 @@ private fun ColumnScope.Results(
         scope.launch { pager.animateScrollToPage(SearchTabs.indexOf(kind)) }
     }
     DetailTabs(pager, SearchTabs.map { it.label() })
-    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), key = { SearchTabs[it].code }) { index ->
+    SettlingPager(pager, Modifier.weight(1f).fillMaxWidth(), key = { SearchTabs[it].code }) { index ->
         val kind = SearchTabs[index]
         ResultPane(kind, state.results[kind], ::show, onLoadMore, { onRetry(kind) }, onOpenAlbum, onOpenAnchor)
     }

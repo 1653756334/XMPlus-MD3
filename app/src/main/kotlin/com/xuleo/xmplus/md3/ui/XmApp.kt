@@ -184,7 +184,6 @@ internal fun XmAppContent(
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     val backDispatcher = LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
     val routeDecorator = remember(onRoutePopped) { NavEntryDecorator<NavKey>(onPop = onRoutePopped) { it.Content() } }
-    val backCardDecorator = remember { NavEntryDecorator<NavKey> { BackCard { it.Content() } } }
     NavigationSuiteScaffold(
         state = suite,
         navigationSuiteType = navigationType,
@@ -209,14 +208,11 @@ internal fun XmAppContent(
                 backStack = pages,
                 onBack = { if (!isPlayer) navigator.pop(backDispatcher.committingBackEdge()) },
                 modifier = Modifier.weight(1f).clipToBounds(),
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator, backCardDecorator),
-                transitionSpec = {
-                    (slideInHorizontally(spatial) { it * direction } + fadeIn(effects)) togetherWith
-                        (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
-                },
-                // Every back, by gesture or button, is the same card pulled away (see BackMotion.kt).
-                popTransitionSpec = { backTransform(backDirection(navigator.popSwipeEdge, direction)) },
-                predictivePopTransitionSpec = { edge -> backTransform(backDirection(edge, direction)) },
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator),
+                transitionSpec = { openTransform(direction, spatial, effects) },
+                // Back, by gesture or button, is the opening slide run the other way (see BackMotion.kt).
+                popTransitionSpec = { backTransform(backDirection(navigator.popSwipeEdge, direction), spatial, effects) },
+                predictivePopTransitionSpec = { edge -> backTransform(backDirection(edge, direction), spatial, effects) },
                 entryProvider = entryProvider {
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {

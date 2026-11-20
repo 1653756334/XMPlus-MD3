@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
-import com.xuleo.xmplus.md3.library.LibraryToggle
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
@@ -45,14 +44,13 @@ private const val MaxTags = 6
 /**
  * The album's head. Its blurred cover runs up behind the status bar and fades into the page, so the top of the screen reads
  * as one piece. The cover sits on the left with the title and anchor beside it; the numbers and tags go below, so the head
- * is short and every line has a fixed height.
+ * is short and every line has a fixed height. 订阅 is in the top bar rather than here, so it stays in reach after the head
+ * has scrolled away; downloads start from the episode list, where the episodes are picked.
  */
 @Composable
 fun AlbumHero(
     detail: AlbumDetail,
     modifier: Modifier = Modifier,
-    subscription: LibraryToggle = LibraryToggle(),
-    onSubscribe: () -> Unit = {},
     onOpenAnchor: (() -> Unit)? = null,
 ) {
     val album = detail.album
@@ -69,12 +67,6 @@ fun AlbumHero(
                     )
                     Spacer(Modifier.height(10.dp))
                     AnchorLine(album.artist, album.anchorAvatarUrl, detail.anchorVerified, onOpenAnchor)
-                    // Beside the title it belongs to, rather than on a row of its own under the tags. Downloads start
-                    // from the episode list, where the episodes are picked.
-                    if (subscription.signedIn) {
-                        Spacer(Modifier.height(10.dp))
-                        LibraryToggleButton(subscription, R.string.album_subscribed, R.string.album_subscribe, onSubscribe, compact = true)
-                    }
                 }
             }
             Spacer(Modifier.height(16.dp))

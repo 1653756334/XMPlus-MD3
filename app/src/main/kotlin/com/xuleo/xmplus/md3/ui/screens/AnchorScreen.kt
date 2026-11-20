@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
@@ -94,7 +93,7 @@ internal fun AnchorScreen(viewModel: AnchorViewModel, onOpenAlbum: (String) -> U
         DetailPage(onBack, title = profile?.nickname.orEmpty(), header = hero) {
             header.errorCode?.let { InlineError(it, viewModel::retryProfile) }
             DetailTabs(pager, AnchorTabs, Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth())
-            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+            SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
                 if (index == 0) {
                     AnchorWorks(
                         albums, albumList, viewModel.albums, if (albums.keyword == null) R.string.anchor_no_albums else R.string.anchor_no_matches,

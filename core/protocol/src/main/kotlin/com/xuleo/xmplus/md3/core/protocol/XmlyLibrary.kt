@@ -7,6 +7,7 @@ import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.model.xmlyIdentifier
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** One page of a membership list: the identities only, which is all a state check needs. */
 data class LibraryIdsPage(val ids: List<String>, val hasMore: Boolean)
@@ -104,7 +105,7 @@ class XmlyLibrary(private val http: XmlyHttp, private val clock: () -> Long = Sy
         val rows = reader.rows(data["albumResults"], PageSize)
         val ids = HashSet<String>()
         val items = rows.map { row ->
-            val album = reader.albumOf(row)
+            val album = subscribedAlbum(row)
             if (album.id.isEmpty() || !ids.add(album.id)) reader.invalid()
             val unread = reader.count(row["unreadNum"]) ?: reader.invalid()
             SubscribedAlbum(album, reader.text(row["trackTitle"]), unread, reader.count(row["lastUpdateAt"]) ?: 0L)
@@ -190,6 +191,19 @@ class XmlyLibrary(private val http: XmlyHttp, private val clock: () -> Long = Sy
     }
 
 
+    /**
+     * A 订阅 row names the album's fields after the album: albumTitle, albumIntro, albumCover and trackCount. Renamed
+     * as XMPlus does, the catalogue parser reads it; read as it comes, the title, cover and count were empty.
+     */
+    private fun subscribedAlbum(row: JsonObject): Album {
+        val renamed = buildMap {
+            for ((from, to) in SubscriptionFields) row[from]?.let { put(to, it) }
+            for ((from, to) in SubscriptionCovers) reader.coverPath(row[from])?.let { put(to, JsonPrimitive(it)) }
+            put("tracks", JsonPrimitive(reader.integer(row["trackCount"]) ?: 0L))
+        }
+        return reader.albumOf(JsonObject(renamed))
+    }
+
     private fun responseData(response: JsonObject): JsonObject = response["data"] as? JsonObject ?: reader.invalid()
 
     private fun JsonObject.integer(name: String): Long? = reader.integer(this[name])
@@ -197,5 +211,9 @@ class XmlyLibrary(private val http: XmlyHttp, private val clock: () -> Long = Sy
     private companion object {
         const val PageSize = 30
         const val MaxTimelineMs = 2_115_354_119_000L
+        val SubscriptionFields = listOf("albumId" to "albumId", "albumTitle" to "title", "albumIntro" to "intro", "nickname" to "nickname")
+        val SubscriptionCovers = listOf(
+            "coverLarge" to "coverLarge", "coverMiddle" to "coverMiddle", "coverSmall" to "coverSmall", "albumCover" to "cover_url",
+        )
     }
 }

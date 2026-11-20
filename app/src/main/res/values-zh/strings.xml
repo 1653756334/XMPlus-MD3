@@ -21,8 +21,7 @@
     <string name="player_speed">倍速</string>
     <string name="player_speed_value">%1$s×</string>
     <string name="player_sleep">定时关闭</string>
-    <string name="player_sleep_minutes">%1$d 分钟后</string>
-    <string name="player_sleep_episode_end">本集播完后</string>
+    <string name="player_sleep_minutes">%1$d 分钟</string>
     <string name="player_sleep_off">关闭定时</string>
     <string name="player_sleep_episode_end_short">本集</string>
     <string name="player_page_playing">播放</string>
@@ -54,6 +53,12 @@
     <string name="player_queue_check_added">新增 %1$d 集</string>
     <string name="player_sleep_start">开始计时</string>
     <string name="player_sleep_length">时长</string>
+    <string name="player_sleep_custom">自定义</string>
+    <string name="player_sleep_preset_episode_end">本集播完</string>
+    <string name="player_sleep_remaining">%1$s 后暂停播放</string>
+    <string name="player_sleep_status_episode_end">本集播完后暂停播放</string>
+    <string name="stepper_decrease">减少%1$s</string>
+    <string name="stepper_increase">增加%1$s</string>
     <string name="player_done">完成</string>
     <string name="player_view_album">查看专辑</string>
     <string name="player_view_anchor">查看主播</string>
@@ -88,7 +93,6 @@
     <string name="player_transcript_empty">这一集没有文稿</string>
     <string name="library_action_failed">操作失败，请重试</string>
     <string name="album_subscribe">订阅</string>
-    <string name="album_subscribed">已订阅</string>
     <string name="anchor_follow">关注</string>
     <string name="anchor_following">已关注</string>
     <string name="history_empty">听过的节目会显示在这里</string>

@@ -1,59 +1,35 @@
 package com.xuleo.xmplus.md3.ui
 
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.dp
-import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import androidx.compose.ui.unit.IntOffset
 import androidx.navigationevent.NavigationEvent
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventTransitionState
-import kotlin.math.roundToInt
 
 /*
- * Back, as in Gmail, the same for every page and for the gesture and the back button alike. While the finger moves,
- * the page shrinks into a card and is pulled in from the edge the swipe began at, with the page it returns to showing
- * behind it; once released, it carries on that way and fades out. The first [PullShare] of the motion is the pull, so
- * the finger drives it directly; the rest is the page leaving.
+ * A page opens by sliding in from the end side while the one below drifts a third of the way out. Back is that slide
+ * run the other way, toward the side a swipe began at: from the left edge the page goes off to the right, from the right
+ * edge off to the left, and the back button sends it toward the reading end. The page below comes back from the other
+ * side. A swipe moves the page with the finger; a press plays the same slide.
  */
-private const val BackMillis = 400
-private const val PullShare = 0.5f
-private const val PulledScale = 0.88f
-/** How far the pulled card moves, as a share of the page width: its swiped side ends up about 11% in. */
-private const val PulledShift = 0.05f
-private const val LeaveShift = 0.5f
-private val PulledCorner = 28.dp
 
-private fun pulled(fraction: Float) = (fraction / PullShare).coerceAtMost(1f)
-private fun leaving(fraction: Float) = ((fraction - PullShare) / (1f - PullShare)).coerceIn(0f, 1f)
+/** [direction] is +1 when pages open from the right, as they do left to right. */
+internal fun openTransform(direction: Int, spatial: FiniteAnimationSpec<IntOffset>, effects: FiniteAnimationSpec<Float>): ContentTransform =
+    (slideInHorizontally(spatial) { it * direction } + fadeIn(effects)) togetherWith
+        (slideOutHorizontally(spatial) { -it * direction / 3 } + fadeOut(effects))
 
-/** [direction] is +1 to pull the page right, as a swipe from the left edge does, and -1 to pull it left. */
-internal fun backTransform(direction: Int): ContentTransform {
-    val pullShare = PulledShift / LeaveShift
-    val pull = scaleOut(tween(BackMillis, easing = Easing(::pulled)), targetScale = PulledScale)
-    val move = slideOutHorizontally(
-        tween(BackMillis, easing = Easing { pullShare * pulled(it) + (1f - pullShare) * leaving(it) }),
-    ) { width -> (width * LeaveShift * direction).roundToInt() }
-    val fade = fadeOut(tween(BackMillis, easing = Easing(::leaving)))
-    // The page underneath stays where it is; the one leaving is drawn above it.
-    return EnterTransition.None togetherWith (pull + move + fade)
-}
+/** [direction] is +1 to send the page off to the right, as a swipe from the left edge does, and -1 to the left. */
+internal fun backTransform(direction: Int, spatial: FiniteAnimationSpec<IntOffset>, effects: FiniteAnimationSpec<Float>): ContentTransform =
+    (slideInHorizontally(spatial) { -it * direction / 3 } + fadeIn(effects)) togetherWith
+        (slideOutHorizontally(spatial) { it * direction } + fadeOut(effects))
 
-/** The pull follows the edge the swipe began at. A press of the back button pulls toward the reading end. */
+/** The page follows the edge the swipe began at. A press of the back button sends it toward the reading end. */
 internal fun backDirection(edge: Int, layoutDirection: Int): Int = when (edge) {
     NavigationEvent.EDGE_LEFT -> 1
     NavigationEvent.EDGE_RIGHT -> -1
@@ -66,20 +42,4 @@ internal fun NavigationEventDispatcher?.committingBackEdge(): Int {
     val gesture = this?.transitionState?.value as? NavigationEventTransitionState.InProgress
     return if (gesture?.direction == NavigationEventTransitionState.TRANSITIONING_BACK) gesture.latestEvent.swipeEdge
     else NavigationEvent.EDGE_NONE
-}
-
-/** Rounds a page's corners while it leaves, so that a page pulled back looks like a card over the one below. */
-@Composable
-internal fun BackCard(content: @Composable () -> Unit) {
-    val transition = LocalNavAnimatedContentScope.current.transition
-    val corner by transition.animateDp(
-        transitionSpec = { tween(BackMillis, easing = Easing(::pulled)) },
-        label = "backCorner",
-    ) { if (it == EnterExitState.PostExit) PulledCorner else 0.dp }
-    Box(
-        Modifier.fillMaxSize().graphicsLayer {
-            shape = RoundedCornerShape(corner)
-            clip = corner > 0.dp
-        },
-    ) { content() }
 }

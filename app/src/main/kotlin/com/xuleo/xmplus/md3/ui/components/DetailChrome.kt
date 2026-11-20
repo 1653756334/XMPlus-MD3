@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,12 +63,16 @@ private val RevealSpan = 72.dp
 private val BackdropBlur = 40.dp
 private const val ShowHeaderThreshold = 0.5f
 
-/** Edge-to-edge details with tabs under a shared collapsible header. List position is independent of the header. */
+/**
+ * Edge-to-edge details with tabs under a shared collapsible header. List position is independent of the header.
+ * [actions] end the top bar, so they stay in reach after the header has scrolled away.
+ */
 @Composable
 internal fun DetailPage(
     onBack: () -> Unit,
     title: String = "",
     header: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -99,6 +104,7 @@ internal fun DetailPage(
             progress = progress,
             onBack = onBack,
             onShowHeader = { scope.launch { chrome.animateExpand(motion) } },
+            actions = actions,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }
@@ -146,6 +152,7 @@ private fun DetailTopBar(
     progress: () -> Float,
     onBack: () -> Unit,
     onShowHeader: () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
     modifier: Modifier,
 ) {
     val surface = MaterialTheme.colorScheme.surface
@@ -153,7 +160,7 @@ private fun DetailTopBar(
     val showBack by remember { derivedStateOf { currentProgress() < ShowHeaderThreshold } }
     Column(modifier.fillMaxWidth().drawBehind { drawRect(surface, alpha = progress()) }) {
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-        Row(Modifier.fillMaxWidth().height(DetailTopBarHeight), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Crossfade(showBack, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "detailTopButton") { back ->
                 IconButton(if (back) onBack else onShowHeader, Modifier.padding(start = 4.dp)) {
                     if (back) Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
@@ -165,6 +172,7 @@ private fun DetailTopBar(
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
+            actions()
         }
     }
 }

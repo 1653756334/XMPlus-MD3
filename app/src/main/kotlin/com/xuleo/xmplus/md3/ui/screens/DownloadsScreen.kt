@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -72,6 +71,7 @@ import com.xuleo.xmplus.md3.download.downloadErrorMessage
 import com.xuleo.xmplus.md3.ui.Destination
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.PagerTabs
+import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.formatDuration
 import kotlinx.coroutines.delay
 
@@ -132,7 +132,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel, onOpenAlbum: (String) -> Unit
                     tabLabel(R.string.downloads_tab_active, active.size),
                 ),
             )
-            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
+            SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 if (page == DoneTab) {
                     DonePage(
                         albums, onPlay = { onPlay(it.albumId, it.trackId) }, onOpenAlbum = onOpenAlbum,

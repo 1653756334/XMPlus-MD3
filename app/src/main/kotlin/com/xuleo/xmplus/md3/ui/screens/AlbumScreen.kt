@@ -2,6 +2,7 @@
 
 package com.xuleo.xmplus.md3.ui.screens
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -31,7 +32,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -39,20 +39,24 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryAddCheck
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -74,6 +78,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -94,6 +99,7 @@ import com.xuleo.xmplus.md3.core.model.AlbumDetail
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.download.DownloadRange
+import com.xuleo.xmplus.md3.library.LibraryToggle
 import com.xuleo.xmplus.md3.ui.components.*
 
 /** The pages of an album, in the order of their tabs. */
@@ -139,11 +145,15 @@ internal fun AlbumScreen(
             else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
         }
     } else {
-        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription) { onOpenAnchor(detail.album.anchorUid) } }) {
+        DetailPage(
+            onBack, detail.album.title,
+            header = { AlbumHero(detail) { onOpenAnchor(detail.album.anchorUid) } },
+            actions = { SubscribeAction(state.subscription, viewModel::toggleSubscription) },
+        ) {
             DetailTabs(pager, AlbumTabs)
             // Picking episodes belongs to the episode list; another tab, or back, ends it.
             LaunchedEffect(pager.currentPage) { if (pager.currentPage != AlbumTab.Episodes) viewModel.stopSelecting() }
-            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
+            SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {
                     AlbumTab.Episodes -> EpisodesPage(
                         state, detail, viewModel, episodesList, downloads, prompt,
@@ -157,6 +167,33 @@ internal fun AlbumScreen(
     }
     if (state.replyTo != null) RepliesSheet(state, viewModel)
     DownloadPromptHost(prompt)
+}
+
+/**
+ * 订阅 at the end of the top bar, with the icons the 订阅 list in 听过 uses: filled in the accent colour when subscribed.
+ * Before the account's list has been read it waits disabled; after a failed read a tap reads it again.
+ */
+@Composable
+private fun SubscribeAction(state: LibraryToggle, onToggle: () -> Unit) {
+    if (!state.signedIn) return
+    val context = LocalContext.current
+    val failed = stringResource(R.string.library_action_failed)
+    // A failed change is reported; a failed read only leaves the button ready to read again.
+    LaunchedEffect(state.failed) {
+        if (state.failed && state.on != null) Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
+    }
+    val subscribed = state.on == true
+    IconToggleButton(
+        checked = subscribed,
+        onCheckedChange = { onToggle() },
+        enabled = !state.busy && (state.on != null || state.failed),
+    ) {
+        if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        else Icon(
+            if (subscribed) Icons.Filled.LibraryAddCheck else Icons.Outlined.LibraryAdd,
+            stringResource(R.string.album_subscribe),
+        )
+    }
 }
 
 /** An episode that can be picked for download: not in the download list, or failed there. */

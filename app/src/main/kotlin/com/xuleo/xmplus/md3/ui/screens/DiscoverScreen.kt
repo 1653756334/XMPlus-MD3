@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -160,7 +159,7 @@ private fun ColumnScope.ChannelPager(
     val scope = rememberCoroutineScope()
     ScrollingDetailTabs(pager.currentPage, channels.map { it.title }, { index -> scope.launch { pager.animateScrollToPage(index) } })
     LaunchedEffect(pager.currentPage, channels) { channels.getOrNull(pager.currentPage)?.let { actions.onLoad(it.pageId, false) } }
-    HorizontalPager(pager, Modifier.weight(1f), key = { channels[it].pageId }) { index ->
+    SettlingPager(pager, Modifier.weight(1f), key = { channels[it].pageId }) { index ->
         val channel = channels[index]
         ChannelPage(channel, pages[channel.pageId], actions)
     }

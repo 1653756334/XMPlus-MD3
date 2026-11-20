@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -139,6 +138,7 @@ import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
 import com.xuleo.xmplus.md3.ui.components.DownloadButton
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
+import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.formatDuration
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -235,7 +235,7 @@ internal fun PlayerSheet(
                         Text(stringResource(R.string.mini_player_idle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
-                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+                    SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
                         when (PlayerPage.entries[index]) {
                             PlayerPage.Transcript -> PlayerPageFrame {
                                 if (transcript != null) TranscriptPanel(episode.track.id, transcript, Modifier.fillMaxSize())

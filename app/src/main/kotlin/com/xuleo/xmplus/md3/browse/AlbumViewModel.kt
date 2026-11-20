@@ -109,7 +109,7 @@ class AlbumViewModel(
 
     fun retryHeader() = loadHeader()
 
-    /** 订阅 shows only for a signed-in account; a failed read leaves the switch off until the page is opened again. */
+    /** 订阅 shows only for a signed-in account; after a failed read, a tap on the switch reads it again. */
     private fun loadSubscription() {
         viewModelScope.launch {
             if (accounts.primaryCredentials() == null) return@launch
@@ -149,8 +149,12 @@ class AlbumViewModel(
 
     fun toggleSubscription() {
         val current = mutable.value.subscription
-        val subscribed = current.on ?: return
         if (current.busy) return
+        val subscribed = current.on
+        if (subscribed == null) {
+            if (current.failed) loadSubscription()
+            return
+        }
         mutable.update { it.copy(subscription = it.subscription.copy(busy = true, failed = false)) }
         viewModelScope.launch {
             try {

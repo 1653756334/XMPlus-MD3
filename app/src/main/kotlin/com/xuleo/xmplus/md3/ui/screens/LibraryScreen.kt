@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -63,6 +62,7 @@ import com.xuleo.xmplus.md3.ui.components.ErrorState
 import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
 import com.xuleo.xmplus.md3.ui.components.PagingFooter
 import com.xuleo.xmplus.md3.ui.components.ScrollingDetailTabs
+import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.formatCount
 import com.xuleo.xmplus.md3.ui.components.formatDate
 import com.xuleo.xmplus.md3.ui.components.formatDuration
@@ -184,7 +184,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             ScrollingDetailTabs(pager.currentPage, ListeningSection.entries.map { stringResource(it.label) }, { index -> scope.launch { pager.animateScrollToPage(index) } })
-            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+            SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
                 when (ListeningSection.entries[index]) {
                     ListeningSection.History -> HistoryPage(
                         history,
