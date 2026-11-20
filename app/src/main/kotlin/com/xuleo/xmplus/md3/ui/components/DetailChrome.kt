@@ -171,7 +171,12 @@ private fun DetailTopBar(
 
 /** A tap switches pages immediately; the Material indicator still animates and the pager can still be swiped. */
 @Composable
-internal fun DetailTabs(pager: PagerState, labels: List<Int>, modifier: Modifier = Modifier) {
+internal fun DetailTabs(pager: PagerState, labels: List<Int>, modifier: Modifier = Modifier) =
+    PagerTabs(pager, labels.map { stringResource(it) }, modifier)
+
+/** [DetailTabs] for labels that are already text, such as ones carrying a count. */
+@Composable
+internal fun PagerTabs(pager: PagerState, labels: List<String>, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     PrimaryTabRow(pager.currentPage, modifier, containerColor = Color.Transparent, divider = {}) {
         CompositionLocalProvider(LocalRippleConfiguration provides null) {
@@ -179,7 +184,7 @@ internal fun DetailTabs(pager: PagerState, labels: List<Int>, modifier: Modifier
                 Tab(
                     selected = pager.currentPage == index,
                     onClick = { scope.launch { pager.scrollToPage(index) } },
-                    text = { Text(stringResource(label), maxLines = 1) },
+                    text = { Text(label, maxLines = 1) },
                 )
             }
         }

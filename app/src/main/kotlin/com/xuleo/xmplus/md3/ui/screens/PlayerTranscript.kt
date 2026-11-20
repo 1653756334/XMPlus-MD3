@@ -1,6 +1,5 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
@@ -32,7 +32,10 @@ private sealed interface TranscriptState {
     data class Failed(val code: String) : TranscriptState
 }
 
-/** 文稿 in the player's cover area: the official text of the episode, scrollable, with a retry on failure. */
+/**
+ * 文稿, the player's second page: the official text of the episode, scrollable, with a retry on failure. It sits
+ * straight on the player's backdrop within the same margins as the cover and controls, with no card of its own.
+ */
 @Composable
 internal fun TranscriptPanel(trackId: String, transcript: XmlyTranscript, modifier: Modifier = Modifier) {
     var attempt by remember(trackId) { mutableIntStateOf(0) }
@@ -48,7 +51,7 @@ internal fun TranscriptPanel(trackId: String, transcript: XmlyTranscript, modifi
         }
     }
     val current = state
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.shapes.large)) {
+    Box(modifier) {
         when (current) {
             TranscriptState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -57,7 +60,7 @@ internal fun TranscriptPanel(trackId: String, transcript: XmlyTranscript, modifi
                 InlineError(current.code, onRetry = { attempt += 1 })
             }
             is TranscriptState.Ready -> if (current.text == null) {
-                Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize().padding(horizontal = PlayerPagePadding), contentAlignment = Alignment.Center) {
                     Text(
                         stringResource(R.string.player_transcript_empty),
                         style = MaterialTheme.typography.bodyMedium,
@@ -67,8 +70,9 @@ internal fun TranscriptPanel(trackId: String, transcript: XmlyTranscript, modifi
             } else {
                 Text(
                     current.text,
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-                    style = MaterialTheme.typography.bodyLarge,
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .padding(start = PlayerPagePadding, end = PlayerPagePadding, top = 8.dp, bottom = 24.dp),
+                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
                 )
             }
         }

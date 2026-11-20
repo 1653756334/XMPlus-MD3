@@ -2,13 +2,14 @@
 
 package com.xuleo.xmplus.md3.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,20 +34,29 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import android.widget.Toast
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,7 +74,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -77,10 +87,13 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.AlbumState
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
-import com.xuleo.xmplus.md3.download.downloadErrorMessage
+import com.xuleo.xmplus.md3.core.download.DownloadState
+import com.xuleo.xmplus.md3.core.download.DownloadTask
 import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
 import com.xuleo.xmplus.md3.core.model.Track
+import com.xuleo.xmplus.md3.core.model.XmlyException
+import com.xuleo.xmplus.md3.download.DownloadRange
 import com.xuleo.xmplus.md3.ui.components.*
 
 /** The pages of an album, in the order of their tabs. */
@@ -109,15 +122,10 @@ internal fun AlbumScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
-    val context = LocalContext.current
-    val started = stringResource(R.string.downloads_started)
-    val notice = state.downloadNotice
-    val failure = notice?.errorCode?.let { stringResource(downloadErrorMessage(it)) }
-    LaunchedEffect(notice) {
-        if (notice == null) return@LaunchedEffect
-        Toast.makeText(context, failure ?: started, Toast.LENGTH_SHORT).show()
-        viewModel.dismissDownloadNotice()
-    }
+    val prompt = rememberDownloadPrompt(viewModel.downloads)
+    val tasks by viewModel.downloadTasks.collectAsStateWithLifecycle()
+    val downloads = remember(tasks) { tasks.associateBy { it.trackId } }
+    BackHandler(enabled = state.selecting) { viewModel.stopSelecting() }
     val pager = rememberPagerState { AlbumTabs.size }
     // The lists live here rather than in their pages, so each keeps its place while its tab is off screen or search is open.
     val introList = rememberLazyListState()
@@ -131,12 +139,14 @@ internal fun AlbumScreen(
             else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
         }
     } else {
-        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription, onDownload = viewModel::downloadAlbum) { onOpenAnchor(detail.album.anchorUid) } }) {
+        DetailPage(onBack, detail.album.title, header = { AlbumHero(detail, subscription = state.subscription, onSubscribe = viewModel::toggleSubscription) { onOpenAnchor(detail.album.anchorUid) } }) {
             DetailTabs(pager, AlbumTabs)
+            // Picking episodes belongs to the episode list; another tab, or back, ends it.
+            LaunchedEffect(pager.currentPage) { if (pager.currentPage != AlbumTab.Episodes) viewModel.stopSelecting() }
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 when (page) {
                     AlbumTab.Episodes -> EpisodesPage(
-                        state, detail, viewModel, episodesList,
+                        state, detail, viewModel, episodesList, downloads, prompt,
                         onPlay = { onPlayEpisode(detail, it) },
                     )
                     AlbumTab.Reviews -> ReviewsPage(state, viewModel, reviewsList)
@@ -146,7 +156,11 @@ internal fun AlbumScreen(
         }
     }
     if (state.replyTo != null) RepliesSheet(state, viewModel)
+    DownloadPromptHost(prompt)
 }
+
+/** An episode that can be picked for download: not in the download list, or failed there. */
+private fun DownloadTask?.pickable(): Boolean = this == null || state == DownloadState.Failed
 
 /** A page's list, filling the space under the tab row and kept to the content column on wide windows. */
 @Composable
@@ -171,16 +185,56 @@ private fun IntroductionPage(state: AlbumState, viewModel: AlbumViewModel, onOpe
 
 @Composable
 private fun EpisodesPage(
-    state: AlbumState, detail: AlbumDetail, viewModel: AlbumViewModel, list: LazyListState, onPlay: (Track) -> Unit,
+    state: AlbumState,
+    detail: AlbumDetail,
+    viewModel: AlbumViewModel,
+    list: LazyListState,
+    downloads: Map<String, DownloadTask>,
+    prompt: DownloadPrompt?,
+    onPlay: (Track) -> Unit,
 ) {
+    var pickingRange by rememberSaveable { mutableStateOf(false) }
+    val total = detail.album.trackCount
+    fun download(queued: () -> Unit = {}, tracks: suspend () -> List<Track>) {
+        prompt?.request(detail.album, total, queued, tracks)
+    }
+    val pickable = state.episodes.filter { downloads[it.id].pickable() }.mapTo(HashSet()) { it.id }
+    val allPicked = pickable.isNotEmpty() && state.selected.containsAll(pickable)
     Column(Modifier.fillMaxSize()) {
         // The toolbar sits above the list rather than inside it. A field inside a list is scrolled into view when it takes
         // focus, which would pull the list back to its first row every time search opens.
-        EpisodeToolbar(state, detail.album.trackCount, viewModel)
+        EpisodeToolbar(
+            state, total, viewModel,
+            selection = if (prompt == null) null else EpisodeSelection(
+                allPicked = allPicked,
+                canPickAll = pickable.isNotEmpty(),
+                onPickAll = { viewModel.setSelected(if (allPicked) emptySet() else pickable) },
+                onRange = { pickingRange = true },
+                onDownload = {
+                    val chosen = state.episodes.filter { it.id in state.selected }.sortedBy { it.officialPosition ?: Int.MAX_VALUE }
+                    download(viewModel::stopSelecting) { chosen }
+                },
+            ),
+        )
         if (searchResultsShown(state)) SearchResults(state, viewModel, onPlay)
-        else EpisodeList(state, viewModel, list, onPlay)
+        else EpisodeList(state, viewModel, list, downloads, onPlay, onDownload = if (prompt == null) null else { track -> download { listOf(track) } })
+    }
+    if (pickingRange) {
+        RangeDialog(total, onDismiss = { pickingRange = false }) { numbers ->
+            pickingRange = false
+            download(viewModel::stopSelecting) { viewModel.downloads.episodesNumbered(detail, numbers) }
+        }
     }
 }
+
+/** What the toolbar offers while episodes are being picked. */
+private class EpisodeSelection(
+    val allPicked: Boolean,
+    val canPickAll: Boolean,
+    val onPickAll: () -> Unit,
+    val onRange: () -> Unit,
+    val onDownload: () -> Unit,
+)
 
 @Composable
 private fun ReviewsPage(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState) {
@@ -201,7 +255,14 @@ private fun searchResultsShown(state: AlbumState): Boolean =
  * results take its space.
  */
 @Composable
-private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel, list: LazyListState, onPlay: (Track) -> Unit) {
+private fun ColumnScope.EpisodeList(
+    state: AlbumState,
+    viewModel: AlbumViewModel,
+    list: LazyListState,
+    downloads: Map<String, DownloadTask>,
+    onPlay: (Track) -> Unit,
+    onDownload: ((Track) -> Unit)?,
+) {
     LoadMoreEffect(
         { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount },
         state.episodePage, state.episodesLoading, state.ascending, onLoadMore = viewModel::loadMoreEpisodes,
@@ -213,7 +274,23 @@ private fun ColumnScope.EpisodeList(state: AlbumState, viewModel: AlbumViewModel
                 item(key = "episodes-error") { InlineError(state.episodesErrorCode.orEmpty(), viewModel::retryEpisodes) }
             state.episodes.isEmpty() -> item(key = "episodes-empty") { EmptyText(R.string.album_episodes_empty) }
             else -> {
-                items(state.episodes, key = { it.id }) { track -> EpisodeRow(track) { onPlay(track) } }
+                items(state.episodes, key = { it.id }) { track ->
+                    val task = downloads[track.id]
+                    EpisodeRow(
+                        track = track,
+                        task = task,
+                        selecting = state.selecting,
+                        selected = track.id in state.selected,
+                        onClick = {
+                            if (!state.selecting) onPlay(track)
+                            else if (task.pickable()) viewModel.toggleSelected(track.id)
+                        },
+                        onLongClick = if (onDownload != null && !state.selecting && task.pickable()) ({ viewModel.startSelecting(track.id) }) else null,
+                        onDownload = onDownload?.let { { it(track) } },
+                        onPause = { viewModel.pauseDownload(track.id) },
+                        onResume = { viewModel.resumeDownload(track.id) },
+                    )
+                }
                 item(key = "episodes-footer") {
                     PagingFooter(state.episodesLoading, state.episodesErrorCode != null, state.episodesHasMore, viewModel::retryEpisodes)
                 }
@@ -298,44 +375,120 @@ private fun LazyListScope.reviews(state: AlbumState, viewModel: AlbumViewModel) 
     }
 }
 
-/** The sort, count and search controls. Search opens in place of them, on the same strip. */
+private enum class ToolbarMode { Browse, Search, Select }
+
+/**
+ * The episode count and order, then icons to reverse the order, search, and pick episodes to download. Search and
+ * picking each open in place of them, on the same strip.
+ */
 @Composable
-private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel) {
+private fun EpisodeToolbar(state: AlbumState, total: Int, viewModel: AlbumViewModel, selection: EpisodeSelection?) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val mode = when {
+        state.selecting && selection != null -> ToolbarMode.Select
+        state.searchOpen -> ToolbarMode.Search
+        else -> ToolbarMode.Browse
+    }
     AnimatedContent(
-        targetState = state.searchOpen,
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp),
+        targetState = mode,
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 4.dp),
         transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
         label = "episodeToolbar",
-    ) { searching ->
-        if (searching) {
-            SearchRow(state.query, viewModel)
-        } else {
-            ToolbarRow(
+    ) { shown ->
+        when (shown) {
+            ToolbarMode.Search -> SearchRow(state.query, viewModel)
+            ToolbarMode.Select -> if (selection != null) SelectionRow(state.selected.size, selection, viewModel::stopSelecting)
+            ToolbarMode.Browse -> ToolbarRow(
                 ascending = state.ascending,
                 total = total,
                 onOrder = { viewModel.selectOrder(!state.ascending) },
                 onSearch = viewModel::openSearch,
+                onSelect = if (selection != null) ({ viewModel.startSelecting() }) else null,
             )
         }
     }
 }
 
 @Composable
-private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit) {
+private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSearch: () -> Unit, onSelect: (() -> Unit)?) {
     Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onOrder) {
-            Icon(Icons.Filled.Sort, contentDescription = null, Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(if (ascending) R.string.album_order_oldest else R.string.album_order_newest), maxLines = 1)
-        }
-        Spacer(Modifier.weight(1f))
         Text(
-            stringResource(R.string.album_total, total),
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            listOf(
+                stringResource(R.string.album_total, total),
+                stringResource(if (ascending) R.string.album_order_oldest else R.string.album_order_newest),
+            ).joinToString(" · "),
+            Modifier.weight(1f).padding(start = 12.dp),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.album_search_hint)) }
+        IconButton(onClick = onOrder) {
+            Icon(Icons.Outlined.SwapVert, stringResource(if (ascending) R.string.album_order_to_newest else R.string.album_order_to_oldest))
+        }
+        IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, stringResource(R.string.album_search_hint)) }
+        if (onSelect != null) IconButton(onClick = onSelect) { Icon(Icons.Outlined.Download, stringResource(R.string.album_select_download)) }
     }
+}
+
+/** While picking: close, how many are picked, pick by number, pick everything loaded, and download what is picked. */
+@Composable
+private fun SelectionRow(count: Int, selection: EpisodeSelection, onClose: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, stringResource(R.string.action_cancel)) }
+        Text(
+            pluralStringResource(R.plurals.album_selected, count, count), Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        IconButton(onClick = selection.onRange) { Icon(Icons.Outlined.FormatListNumbered, stringResource(R.string.album_select_range)) }
+        IconButton(onClick = selection.onPickAll, enabled = selection.canPickAll) {
+            Icon(
+                Icons.Outlined.DoneAll,
+                stringResource(if (selection.allPicked) R.string.album_select_none else R.string.history_select_all),
+                tint = if (selection.allPicked) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        }
+        FilledTonalIconButton(onClick = selection.onDownload, enabled = count > 0) {
+            Icon(Icons.Outlined.Download, stringResource(R.string.album_download_selected))
+        }
+    }
+}
+
+/** Episode numbers typed as `1,3,5-8`; a malformed entry is reported under the field and nothing is read. */
+@Composable
+private fun RangeDialog(total: Int, onDismiss: () -> Unit, onConfirm: (List<Int>) -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+    fun submit() {
+        val numbers = try {
+            DownloadRange.parse(text)
+        } catch (_: XmlyException) {
+            null
+        }
+        if (numbers == null) invalid = true else onConfirm(numbers)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.FormatListNumbered, contentDescription = null) },
+        title = { Text(stringResource(R.string.album_range_title)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = {
+                    text = it
+                    invalid = false
+                },
+                singleLine = true,
+                isError = invalid,
+                placeholder = { Text(stringResource(R.string.album_range_hint)) },
+                supportingText = {
+                    Text(if (invalid) stringResource(R.string.download_error_range) else stringResource(R.string.album_total, total))
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+            )
+        },
+        confirmButton = { TextButton(onClick = ::submit, enabled = text.isNotBlank()) { Text(stringResource(R.string.player_download)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable
@@ -382,12 +535,26 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -
     }
 }
 
+/**
+ * Number, title and details, then the episode's download state at the end. While picking, a checkbox takes the
+ * state's place on episodes that can still be downloaded. A long press starts picking with this episode.
+ */
 @Composable
-private fun EpisodeRow(track: Track, onClick: () -> Unit) {
+private fun EpisodeRow(
+    track: Track,
+    task: DownloadTask?,
+    selecting: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    onDownload: (() -> Unit)?,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+) {
     val locale = LocalConfiguration.current.locales[0]
     Row(
-        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = XmLayout.PagePadding, vertical = 12.dp),
+        Modifier.fillMaxWidth().combinedClickable(role = Role.Button, onLongClick = onLongClick, onClick = onClick)
+            .padding(start = XmLayout.PagePadding, end = 4.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -404,6 +571,14 @@ private fun EpisodeRow(track: Track, onClick: () -> Unit) {
             if (meta.isNotEmpty()) {
                 Text(meta, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
+        }
+        when {
+            selecting && task.pickable() -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Checkbox(checked = selected, onCheckedChange = null)
+            }
+            selecting -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { DownloadGlyph(task) }
+            onDownload != null -> DownloadButton(task, onDownload, onPause, onResume)
+            else -> Spacer(Modifier.width(12.dp))
         }
     }
 }

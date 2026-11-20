@@ -20,6 +20,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LibraryAddCheck
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Checkbox
@@ -33,7 +35,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -245,8 +246,8 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
                             meta = if (unread > 0) pluralStringResource(R.plurals.listen_unplayed, unread, unread) else "",
                             onOpen = { openAlbum(item.album.id) },
                             trailing = {
-                                TextButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
-                                    Text(stringResource(R.string.listen_unsubscribe))
+                                IconButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
+                                    Icon(Icons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
                         )
@@ -266,8 +267,8 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
                             meta = "",
                             onOpen = { openAlbum(track.albumId) },
                             trailing = {
-                                TextButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
-                                    Text(stringResource(R.string.listen_unfavorite))
+                                IconButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
+                                    Icon(Icons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
                         )

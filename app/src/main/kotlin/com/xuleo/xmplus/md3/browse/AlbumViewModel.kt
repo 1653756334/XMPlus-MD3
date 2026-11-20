@@ -14,8 +14,8 @@ import com.xuleo.xmplus.md3.core.model.AlbumSimilar
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
+import com.xuleo.xmplus.md3.core.download.DownloadTask
 import com.xuleo.xmplus.md3.download.DownloadActions
-import com.xuleo.xmplus.md3.download.DownloadNotice
 import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.library.LibraryToggle
 import kotlinx.coroutines.CancellationException
@@ -47,8 +47,9 @@ data class AlbumState(
     val episodesHasMore: Boolean = false,
     val episodesLoading: Boolean = false,
     val episodesErrorCode: String? = null,
-    /** Set when a download starts or fails; the screen shows it once and clears it. */
-    val downloadNotice: DownloadNotice? = null,
+    /** Episodes are being picked for download; [selected] holds their ids. */
+    val selecting: Boolean = false,
+    val selected: Set<String> = emptySet(),
     val searchOpen: Boolean = false,
     val query: String = "",
     val hits: List<Track> = emptyList(),
@@ -82,10 +83,13 @@ class AlbumViewModel(
     private val album: XmlyAlbum,
     private val accounts: AccountRepository,
     private val library: LibraryActions,
-    private val downloads: DownloadActions,
+    val downloads: DownloadActions,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(AlbumState())
     val state: StateFlow<AlbumState> = mutable.asStateFlow()
+
+    /** Every download on the device, for the episode rows' download state. */
+    val downloadTasks: StateFlow<List<DownloadTask>> get() = downloads.tasks
     private var started = false
     private var headerJob: Job? = null
     private var introductionJob: Job? = null
@@ -121,26 +125,26 @@ class AlbumViewModel(
         }
     }
 
-    /** Queues every episode of this album. The result reaches the screen through [AlbumState.downloadNotice]. */
-    fun downloadAlbum() {
-        val detail = mutable.value.detail ?: return
-        viewModelScope.launch {
-            val notice = try {
-                downloads.downloadAlbum(detail)
-                DownloadNotice(null)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: XmlyException) {
-                DownloadNotice(error.code)
-            } catch (_: Exception) {
-                DownloadNotice("unknown")
-            }
-            mutable.update { it.copy(downloadNotice = notice) }
-        }
+    /** Starts picking episodes to download, with [trackId] already picked when given (a long press on its row). */
+    fun startSelecting(trackId: String? = null) {
+        if (mutable.value.searchOpen) closeSearch()
+        mutable.update { it.copy(selecting = true, selected = setOfNotNull(trackId)) }
     }
 
-    fun dismissDownloadNotice() {
-        mutable.update { it.copy(downloadNotice = null) }
+    fun stopSelecting() = mutable.update { it.copy(selecting = false, selected = emptySet()) }
+
+    fun toggleSelected(trackId: String) = mutable.update {
+        it.copy(selected = if (trackId in it.selected) it.selected - trackId else it.selected + trackId)
+    }
+
+    fun setSelected(ids: Set<String>) = mutable.update { it.copy(selected = ids) }
+
+    fun pauseDownload(trackId: String) {
+        viewModelScope.launch { downloads.pause(trackId) }
+    }
+
+    fun resumeDownload(trackId: String) {
+        viewModelScope.launch { downloads.resume(trackId) }
     }
 
     fun toggleSubscription() {

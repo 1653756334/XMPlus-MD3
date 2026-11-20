@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="tab_discover">发现</string>
     <string name="tab_library">听过</string>
     <string name="tab_downloads">下载</string>
@@ -330,11 +330,8 @@
     <string name="history_select">选择</string>
     <string name="history_select_all">全选</string>
     <string name="history_selected">已选 %1$d 项</string>
-    <string name="downloads_started">已加入下载</string>
-    <string name="downloads_section_active">进行中</string>
     <string name="downloads_waiting">等待中</string>
     <string name="downloads_running">下载中</string>
-    <string name="downloads_percent">%1$d%%</string>
     <string name="downloads_paused">已暂停</string>
     <string name="downloads_pause">暂停</string>
     <string name="downloads_resume">继续</string>
@@ -343,10 +340,69 @@
     <string name="downloads_delete">删除</string>
     <string name="downloads_pause_all">全部暂停</string>
     <string name="downloads_resume_all">全部继续</string>
-    <string name="album_download">下载整张专辑</string>
     <string name="download_error_quota">听时不足，无法下载</string>
     <string name="download_error_login">登录后才能下载</string>
     <string name="download_error_space">存储空间不足</string>
     <string name="download_error_album_size">超过 5000 集的专辑无法整张下载</string>
     <string name="download_error_index">这一集没有集数，无法保存</string>
+    <string name="downloads_done">已下载</string>
+    <string name="downloads_tab_done">已下载</string>
+    <string name="downloads_tab_active">下载中</string>
+    <string name="downloads_tab_count">%1$s %2$d</string>
+    <string name="downloads_storage_used">下载占用 %1$s</string>
+    <string name="downloads_storage_free">剩余 %1$s</string>
+    <string name="downloads_progress_size">%1$s / %2$s</string>
+    <string name="downloads_speed">%1$s/s</string>
+    <plurals name="downloads_album_meta">
+        <item quantity="other">%1$d 集 · %2$s</item>
+    </plurals>
+    <string name="downloads_empty_done">下载的节目会出现在这里</string>
+    <string name="downloads_empty_active">没有正在下载的节目</string>
+    <string name="downloads_cancel_all">全部取消</string>
+    <string name="downloads_cancel_all_title">取消全部下载？</string>
+    <string name="downloads_cancel_all_body">未完成的节目及其已下载的部分会被删除，已扣除的听时不会退回。</string>
+    <string name="downloads_delete_title">删除这一集？</string>
+    <string name="downloads_delete_album_title">删除这张专辑的下载？</string>
+    <string name="downloads_delete_body">将从本机删除 %1$s 音频。</string>
+    <string name="downloads_open_album">打开专辑</string>
+    <string name="downloads_delete_album">删除下载</string>
+    <string name="downloads_show_episodes">展开节目</string>
+    <string name="downloads_hide_episodes">收起节目</string>
+    <plurals name="downloads_added">
+        <item quantity="other">已加入下载 %1$d 集</item>
+    </plurals>
+    <string name="downloads_already_listed">所选节目已在下载列表中</string>
+    <string name="download_checking_title">正在计算所需听时</string>
+    <string name="download_checking">已检查 %1$d / %2$d 集</string>
+    <plurals name="download_confirm_title">
+        <item quantity="other">下载 %1$d 集</item>
+    </plurals>
+    <plurals name="download_confirm_cost">
+        <item quantity="other">其中 %1$d 集需要听时，预计共扣除 %2$s（%3$s 秒）。</item>
+    </plurals>
+    <string name="download_confirm_balance">当前余额：%1$s</string>
+    <plurals name="download_confirm_skipped">
+        <item quantity="other">%1$d 集已在下载列表中，将跳过。</item>
+    </plurals>
+    <string name="download_confirm_rules">每集下载前按整集时长从当前账号扣除；下载失败或取消不退回，重试不会重复扣除。</string>
+    <string name="download_confirm_short">听时不足，无法下载这些节目</string>
+    <string name="download_confirm_action">确认扣时并下载</string>
+    <string name="download_error_confirm">这一集需要扣除听时但未经确认，请从专辑重新下载。</string>
+    <string name="download_error_range" tools:ignore="TypographyDashes">请输入集数，例如 1,3,5-8</string>
+    <string name="download_error_range_missing">部分集数不在本专辑中</string>
+    <string name="download_error_range_ambiguous">有两集使用了同一个集数</string>
+    <string name="download_error_file_missing">文件已不存在，请重新下载</string>
+    <string name="album_order_to_newest">改为从新到旧</string>
+    <string name="album_order_to_oldest">改为从旧到新</string>
+    <string name="album_select_download">选择要下载的节目</string>
+    <plurals name="album_selected">
+        <item quantity="other">已选 %1$d 集</item>
+    </plurals>
+    <string name="album_select_none">取消全选</string>
+    <string name="album_select_range">按集数选择</string>
+    <string name="album_download_selected">下载所选节目</string>
+    <string name="album_range_title">按集数下载</string>
+    <string name="album_range_hint" tools:ignore="TypographyDashes">例如 1,3,5-8</string>
+    <string name="downloads_cancel_title">取消这个下载？</string>
+    <string name="downloads_cancel_charged_body">这一集的听时已扣除，取消后不会退回，再次下载会重新扣除。</string>
 </resources>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name" translatable="false">XMPlus MD3</string>
 
     <string name="tab_discover">Discover</string>
@@ -341,11 +341,8 @@
     <string name="history_select">Select</string>
     <string name="history_select_all">Select all</string>
     <string name="history_selected">%1$d selected</string>
-    <string name="downloads_started">Added to downloads</string>
-    <string name="downloads_section_active">In progress</string>
     <string name="downloads_waiting">Waiting</string>
     <string name="downloads_running">Downloading</string>
-    <string name="downloads_percent">%1$d%%</string>
     <string name="downloads_paused">Paused</string>
     <string name="downloads_pause">Pause</string>
     <string name="downloads_resume">Resume</string>
@@ -354,10 +351,75 @@
     <string name="downloads_delete">Delete</string>
     <string name="downloads_pause_all">Pause all</string>
     <string name="downloads_resume_all">Resume all</string>
-    <string name="album_download">Download album</string>
     <string name="download_error_quota">Not enough listening time to download this</string>
     <string name="download_error_login">Log in to download this</string>
     <string name="download_error_space">Not enough free storage</string>
     <string name="download_error_album_size">Albums over 5,000 episodes can\'t be downloaded at once</string>
     <string name="download_error_index">This episode has no number, so it can\'t be saved</string>
+    <string name="downloads_done">Downloaded</string>
+    <string name="downloads_tab_done">Downloaded</string>
+    <string name="downloads_tab_active">Downloading</string>
+    <string name="downloads_tab_count">%1$s %2$d</string>
+    <string name="downloads_storage_used">Downloads use %1$s</string>
+    <string name="downloads_storage_free">%1$s free</string>
+    <string name="downloads_progress_size">%1$s / %2$s</string>
+    <string name="downloads_speed">%1$s/s</string>
+    <plurals name="downloads_album_meta">
+        <item quantity="one">%1$d episode · %2$s</item>
+        <item quantity="other">%1$d episodes · %2$s</item>
+    </plurals>
+    <string name="downloads_empty_done">Downloaded episodes appear here</string>
+    <string name="downloads_empty_active">Nothing is downloading</string>
+    <string name="downloads_cancel_all">Cancel all</string>
+    <string name="downloads_cancel_all_title">Cancel all downloads?</string>
+    <string name="downloads_cancel_all_body">Episodes that haven\'t finished are removed with their partial files. Listening time already charged is not refunded.</string>
+    <string name="downloads_delete_title">Delete this episode?</string>
+    <string name="downloads_delete_album_title">Delete this album\'s downloads?</string>
+    <string name="downloads_delete_body">%1$s of audio will be deleted from this device.</string>
+    <string name="downloads_open_album">Open album</string>
+    <string name="downloads_delete_album">Delete downloads</string>
+    <string name="downloads_show_episodes">Show episodes</string>
+    <string name="downloads_hide_episodes">Hide episodes</string>
+    <plurals name="downloads_added">
+        <item quantity="one">Added %1$d episode to downloads</item>
+        <item quantity="other">Added %1$d episodes to downloads</item>
+    </plurals>
+    <string name="downloads_already_listed">Already in downloads</string>
+    <string name="download_checking_title">Checking listening time</string>
+    <string name="download_checking">%1$d of %2$d episodes checked</string>
+    <plurals name="download_confirm_title">
+        <item quantity="one">Download %1$d episode</item>
+        <item quantity="other">Download %1$d episodes</item>
+    </plurals>
+    <plurals name="download_confirm_cost">
+        <item quantity="one">%1$d episode needs listening time: %2$s (%3$s seconds) in total.</item>
+        <item quantity="other">%1$d episodes need listening time: %2$s (%3$s seconds) in total.</item>
+    </plurals>
+    <string name="download_confirm_balance">Balance: %1$s</string>
+    <plurals name="download_confirm_skipped">
+        <item quantity="one">%1$d episode is already in downloads and is skipped.</item>
+        <item quantity="other">%1$d episodes are already in downloads and are skipped.</item>
+    </plurals>
+    <string name="download_confirm_rules">Each paid episode is charged its full length before it downloads, from the account in use. A failed or cancelled download is not refunded; retrying it never charges again.</string>
+    <string name="download_confirm_short">Not enough listening time for these episodes</string>
+    <string name="download_confirm_action">Charge and download</string>
+    <string name="download_error_confirm">This episode needs listening time that wasn\'t confirmed. Download it again from its album.</string>
+    <string name="download_error_range" tools:ignore="TypographyDashes">Enter episode numbers such as 1,3,5-8</string>
+    <string name="download_error_range_missing">Some of these numbers aren\'t in this album</string>
+    <string name="download_error_range_ambiguous">Two episodes share one of these numbers</string>
+    <string name="download_error_file_missing">The file is gone. Download it again.</string>
+    <string name="album_order_to_newest">Show newest first</string>
+    <string name="album_order_to_oldest">Show oldest first</string>
+    <string name="album_select_download">Select episodes to download</string>
+    <plurals name="album_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="album_select_none">Clear selection</string>
+    <string name="album_select_range">Select by episode number</string>
+    <string name="album_download_selected">Download selected</string>
+    <string name="album_range_title">Download by episode number</string>
+    <string name="album_range_hint" tools:ignore="TypographyDashes">e.g. 1,3,5-8</string>
+    <string name="downloads_cancel_title">Cancel this download?</string>
+    <string name="downloads_cancel_charged_body">Listening time for this episode has been charged and is not refunded. Downloading it again charges again.</string>
 </resources>

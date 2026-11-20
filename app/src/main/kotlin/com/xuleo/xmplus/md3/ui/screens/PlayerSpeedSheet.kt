@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,11 +75,11 @@ internal fun PlayerSpeedSheet(speed: Float, onSpeed: (Float) -> Unit, onDismiss:
                     Modifier.weight(1f).semantics { heading() },
                     style = MaterialTheme.typography.titleMedium,
                 )
-                if (shown != 1f) TextButton(onClick = {
+                if (shown != 1f) IconButton(onClick = {
                     shown = 1f
                     commit(1f)
                 }) {
-                    Text(stringResource(R.string.player_speed_reset))
+                    Icon(Icons.Outlined.RestartAlt, stringResource(R.string.player_speed_reset))
                 }
             }
             Text(

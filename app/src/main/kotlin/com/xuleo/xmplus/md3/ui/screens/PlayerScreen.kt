@@ -2,7 +2,6 @@
 
 package com.xuleo.xmplus.md3.ui.screens
 
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -57,7 +56,6 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.ContentCut
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
@@ -85,7 +83,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,7 +98,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -129,10 +125,8 @@ import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackPhase
 import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
-import com.xuleo.xmplus.md3.core.model.XmlyException
+import com.xuleo.xmplus.md3.core.download.DownloadTask
 import com.xuleo.xmplus.md3.download.DownloadActions
-import com.xuleo.xmplus.md3.download.DownloadNotice
-import com.xuleo.xmplus.md3.download.downloadErrorMessage
 import com.xuleo.xmplus.md3.core.media.PlaybackSkipSeconds
 import com.xuleo.xmplus.md3.core.media.PlaybackState
 import com.xuleo.xmplus.md3.core.media.SleepTimerState
@@ -143,12 +137,13 @@ import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
+import com.xuleo.xmplus.md3.ui.components.DownloadButton
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.formatDuration
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /** A full-height sheet so closing the player does not navigate away from the page under it. */
@@ -185,29 +180,12 @@ internal fun PlayerSheet(
             }
         }
     }
-    val context = LocalContext.current
-    val started = stringResource(R.string.downloads_started)
-    var downloadNotice by remember { mutableStateOf<DownloadNotice?>(null) }
-    val downloadFailure = downloadNotice?.errorCode?.let { stringResource(downloadErrorMessage(it)) }
-    LaunchedEffect(downloadNotice) {
-        if (downloadNotice == null) return@LaunchedEffect
-        Toast.makeText(context, downloadFailure ?: started, Toast.LENGTH_SHORT).show()
-        downloadNotice = null
-    }
+    val prompt = rememberDownloadPrompt(downloads)
+    val noTasks = remember { MutableStateFlow(emptyList<DownloadTask>()) }
+    val downloadTasks by (downloads?.tasks ?: noTasks).collectAsStateWithLifecycle()
     fun downloadEpisode(episode: PlaybackSelection) {
-        val actions = downloads ?: return
-        scope.launch {
-            downloadNotice = try {
-                actions.downloadEpisode(episode)
-                DownloadNotice(null)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: XmlyException) {
-                DownloadNotice(error.code)
-            } catch (_: Exception) {
-                DownloadNotice("unknown")
-            }
-        }
+        val total = maxOf(episode.album.trackCount, episode.track.officialPosition ?: 0)
+        prompt?.request(episode.album, total) { listOf(episode.track) }
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -231,16 +209,9 @@ internal fun PlayerSheet(
         var showSleep by remember { mutableStateOf(false) }
         var showSkip by remember { mutableStateOf(false) }
         var showVolume by remember { mutableStateOf(false) }
-        var page by remember { mutableStateOf(PlayerPage.Playing) }
-        // The cover and 文稿 are two pages a finger can swipe between, and the top tabs follow the swipe.
-        val coverPager = rememberPagerState { CoverPages.size }
-        LaunchedEffect(page) {
-            val index = CoverPages.indexOf(page)
-            if (index >= 0 && index != coverPager.currentPage) coverPager.animateScrollToPage(index)
-        }
-        LaunchedEffect(coverPager) {
-            snapshotFlow { coverPager.settledPage }.collect { index -> page = CoverPages[index] }
-        }
+        val episodeDownload = episode?.let { current -> downloadTasks.firstOrNull { it.trackId == current.track.id } }
+        // 播放, 文稿 and 评论 are three pages a finger can swipe between; the headings follow the swipe.
+        val pager = rememberPagerState { PlayerPage.entries.size }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (episode?.coverUrl != null) {
                 DetailArtworkBackdrop(
@@ -256,47 +227,50 @@ internal fun PlayerSheet(
                 PlayerTopBar(
                     hasEpisode = episode != null,
                     onMinimize = { closeThen() },
-                    page = page,
-                    onPage = { target -> page = target },
+                    page = PlayerPage.entries[pager.currentPage],
+                    onPage = { target -> scope.launch { pager.animateScrollToPage(target.ordinal) } },
                 )
                 if (episode == null) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.mini_player_idle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                } else if (page == PlayerPage.Comments) {
-                    PlayerComments(episode.track, comments, Modifier.weight(1f).fillMaxWidth())
                 } else {
-                    PlayerLayout(
-                        cover = {
-                            HorizontalPager(coverPager, Modifier.fillMaxSize()) { index ->
-                                if (CoverPages[index] == PlayerPage.Transcript) {
-                                    if (transcript != null) TranscriptPanel(episode.track.id, transcript, Modifier.fillMaxSize())
-                                } else {
-                                    PlayerCover(episode.coverUrl, playing = state.wantsToPlay)
-                                }
+                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+                        when (PlayerPage.entries[index]) {
+                            PlayerPage.Transcript -> PlayerPageFrame {
+                                if (transcript != null) TranscriptPanel(episode.track.id, transcript, Modifier.fillMaxSize())
                             }
-                        },
-                        controls = {
-                            PlayerControls(
-                                episode = episode,
-                                state = state,
-                                queue = queue,
-                                speed = speed,
-                                sleep = sleep,
-                                playback = playback,
-                                onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
-                                onOpenQueue = { showQueue = true },
-                                onOpenSpeed = { showSpeed = true },
-                                onOpenSleep = { showSleep = true },
-                                onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
-                                onMore = { showActions = true },
-                                onDownload = { downloadEpisode(episode) },
-                                library = episodeLibrary,
-                                onAccounts = { closeThen(onAccounts) },
+                            PlayerPage.Comments -> PlayerPageFrame { PlayerComments(episode.track, comments, Modifier.fillMaxSize()) }
+                            PlayerPage.Playing -> PlayerLayout(
+                                cover = { PlayerCover(episode.coverUrl, playing = state.wantsToPlay) },
+                                controls = {
+                                    PlayerControls(
+                                        episode = episode,
+                                        state = state,
+                                        queue = queue,
+                                        speed = speed,
+                                        sleep = sleep,
+                                        playback = playback,
+                                        onOpenAlbum = { closeThen { onOpenAlbum(episode.album.id) } },
+                                        onOpenQueue = { showQueue = true },
+                                        onOpenSpeed = { showSpeed = true },
+                                        onOpenSleep = { showSleep = true },
+                                        onOpenBookmarks = { showBookmarks = playback.bookmarkEpisode() },
+                                        onMore = { showActions = true },
+                                        download = EpisodeDownload(
+                                            task = episodeDownload,
+                                            onDownload = { downloadEpisode(episode) },
+                                            onPause = { scope.launch { downloads?.pause(episode.track.id) } },
+                                            onResume = { scope.launch { downloads?.resume(episode.track.id) } },
+                                        ),
+                                        library = episodeLibrary,
+                                        onAccounts = { closeThen(onAccounts) },
+                                    )
+                                },
+                                modifier = Modifier.fillMaxSize(),
                             )
-                        },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -318,7 +292,10 @@ internal fun PlayerSheet(
             )
         }
         if (showQueue && episode != null) {
-            PlayerQueueSheet(queue, onSelect = playback::playQueued, onCheckNew = playback::checkNewEpisodes, onDismiss = { showQueue = false })
+            PlayerQueueSheet(
+                queue, onSelect = playback::playQueued, onCheckNew = playback::checkNewEpisodes,
+                onLoadMore = playback::loadMoreQueue, onDismiss = { showQueue = false },
+            )
         }
         if (bookmarkEpisode != null && showBookmarks == bookmarkEpisode) {
             PlayerBookmarksSheet(playback, bookmarkEpisode, state.canSeek, onDismiss = { showBookmarks = null })
@@ -349,17 +326,31 @@ internal fun PlayerSheet(
             )
         }
     }
+    DownloadPromptHost(prompt)
 }
 
-/** 文稿 is the second page of the cover pager; 评论 replaces the cover area with the track's comments. */
+/** The player's pages, in the order they swipe. */
 private enum class PlayerPage(@StringRes val label: Int) {
     Playing(R.string.player_page_playing),
     Transcript(R.string.player_page_transcript),
     Comments(R.string.player_page_comments),
 }
 
-/** The pages a finger can swipe between in the cover area, in order. */
-private val CoverPages = listOf(PlayerPage.Playing, PlayerPage.Transcript)
+/** 文稿 and 评论 keep to the column the cover and controls use, over the same backdrop. */
+@Composable
+private fun PlayerPageFrame(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.widthIn(max = PlayerPageWidth).fillMaxSize()) { content() }
+    }
+}
+
+/** The episode's download state and what its button does in each. */
+private class EpisodeDownload(
+    val task: DownloadTask?,
+    val onDownload: () -> Unit,
+    val onPause: () -> Unit,
+    val onResume: () -> Unit,
+)
 
 /** Minimize on the left and the page headings in the middle, styled like 发现's. */
 @Composable
@@ -413,7 +404,7 @@ private fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable ()
                     Box { cover() }
                     Box { controls() }
                 },
-                modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth().verticalScroll(scroll).padding(horizontal = 24.dp),
+                modifier = Modifier.widthIn(max = PlayerPageWidth).fillMaxWidth().verticalScroll(scroll).padding(horizontal = PlayerPagePadding),
             ) { measurables, constraints ->
                 val controlsPlaceable = measurables[1].measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
                 val gap = CoverGap.roundToPx()
@@ -472,14 +463,14 @@ private fun PlayerControls(
     onOpenSpeed: () -> Unit,
     onOpenSleep: () -> Unit,
     onOpenBookmarks: () -> Unit,
-    onDownload: () -> Unit,
+    download: EpisodeDownload,
     library: EpisodeLibrary,
     onMore: () -> Unit,
     onAccounts: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         EpisodeHeading(episode, onOpenAlbum)
-        EpisodeActions(library, onDownload, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
+        EpisodeActions(library, download, onOpenBookmarks, state.canSeek, onMore, Modifier.padding(top = 4.dp))
         SeekBar(state, playback::seekTo, Modifier.padding(top = 4.dp))
         TransportControls(state, queue, playback, Modifier.padding(top = 8.dp))
         PlaybackErrors(state, queue, onAccounts)
@@ -526,7 +517,7 @@ private fun EpisodeHeading(episode: PlaybackSelection, onOpenAlbum: () -> Unit) 
 @Composable
 private fun EpisodeActions(
     library: EpisodeLibrary,
-    onDownload: () -> Unit,
+    download: EpisodeDownload,
     onOpenBookmarks: () -> Unit,
     bookmarksAvailable: Boolean,
     onMore: () -> Unit,
@@ -538,7 +529,9 @@ private fun EpisodeActions(
             R.string.player_favorite, library.onFavorite, enabled = library.available && library.favorite != null,
         )
         EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
-        EpisodeAction(Icons.Outlined.Download, R.string.player_download, onDownload)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            DownloadButton(download.task, download.onDownload, download.onPause, download.onResume)
+        }
         EpisodeAction(Icons.Outlined.MoreHoriz, R.string.player_more, onMore)
     }
 }
@@ -957,6 +950,10 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
         }
     }
 }
+
+/** The column every player page keeps to, and its side margins. */
+internal val PlayerPageWidth = 480.dp
+internal val PlayerPagePadding = 24.dp
 
 private val MinCover = 160.dp
 private val MaxCover = 400.dp

@@ -66,6 +66,8 @@ class DownloadStore(private val file: File) {
         put("receiptId", receiptId)
         put("error", error)
         put("createdAt", createdAt)
+        put("coverUrl", coverUrl)
+        put("confirmedSeconds", confirmedSeconds)
     }
 
     private fun JsonObject.toTask(): DownloadTask {
@@ -88,6 +90,8 @@ class DownloadStore(private val file: File) {
             receiptId = text("receiptId"),
             error = text("error"),
             createdAt = text("createdAt")?.toLongOrNull() ?: 0L,
+            coverUrl = text("coverUrl"),
+            confirmedSeconds = text("confirmedSeconds")?.toIntOrNull(),
         )
     }
 }

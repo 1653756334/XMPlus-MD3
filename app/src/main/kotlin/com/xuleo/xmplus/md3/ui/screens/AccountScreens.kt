@@ -337,8 +337,11 @@ internal val AccountsState.hasAccounts: Boolean
 internal fun accountName(account: AccountSummary): String = stringResource(R.string.account_name, account.uid)
 
 @Composable
-internal fun quotaText(account: AccountSummary): String {
-    val seconds = account.quota.remainingSeconds
+internal fun quotaText(account: AccountSummary): String = listeningTimeText(account.quota.remainingSeconds)
+
+/** Listening time as hours and minutes, or 不足 1 分钟 below a minute. */
+@Composable
+internal fun listeningTimeText(seconds: Long): String {
     val format = NumberFormat.getIntegerInstance()
     return if (seconds in 1..59) stringResource(R.string.account_quota_less_minute)
         else stringResource(R.string.account_quota_duration, format.format(seconds / 3600), format.format(seconds % 3600 / 60))

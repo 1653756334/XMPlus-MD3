@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,7 +53,6 @@ fun AlbumHero(
     modifier: Modifier = Modifier,
     subscription: LibraryToggle = LibraryToggle(),
     onSubscribe: () -> Unit = {},
-    onDownload: (() -> Unit)? = null,
     onOpenAnchor: (() -> Unit)? = null,
 ) {
     val album = detail.album
@@ -72,17 +69,11 @@ fun AlbumHero(
                     )
                     Spacer(Modifier.height(10.dp))
                     AnchorLine(album.artist, album.anchorAvatarUrl, detail.anchorVerified, onOpenAnchor)
-                    // Beside the title it belongs to, rather than on a row of its own under the tags.
-                    if (subscription.signedIn || onDownload != null) {
+                    // Beside the title it belongs to, rather than on a row of its own under the tags. Downloads start
+                    // from the episode list, where the episodes are picked.
+                    if (subscription.signedIn) {
                         Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (subscription.signedIn) {
-                                LibraryToggleButton(subscription, R.string.album_subscribed, R.string.album_subscribe, onSubscribe, compact = true)
-                            }
-                            onDownload?.let { download ->
-                                IconButton(onClick = download) { Icon(Icons.Outlined.Download, stringResource(R.string.album_download)) }
-                            }
-                        }
+                        LibraryToggleButton(subscription, R.string.album_subscribed, R.string.album_subscribe, onSubscribe, compact = true)
                     }
                 }
             }

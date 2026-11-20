@@ -96,7 +96,7 @@ class XmApplication : Application(), PlaybackOwner {
         DownloadManager(folder, DownloadStore(File(filesDir, "downloads/tasks.json")), accounts, playbackApi, usage, processScope)
     }
 
-    val downloadActions by lazy { DownloadActions(accounts, album, downloads) }
+    val downloadActions by lazy { DownloadActions(accounts, album, playbackApi, usage, downloads) }
 
     // Resolve an interrupted debit locally before allowing a new playback to charge.
     private val usageReady by lazy {

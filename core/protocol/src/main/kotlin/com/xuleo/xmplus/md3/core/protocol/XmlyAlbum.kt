@@ -381,11 +381,14 @@ class XmlyAlbum(private val http: XmlyHttp) {
     private companion object {
         const val MaxPage = 10000
         const val MaxSimilar = 100
-        const val EpisodePageSize = 200
+        const val EpisodePageSize = AlbumEpisodePageSize
         const val ReviewPageSize = 20
         const val MaxTimestamp = 8_640_000_000_000_000L
     }
 }
+
+/** Episodes per page of [XmlyAlbum.episodePage]. Episode number n is on page (n - 1) / 200 + 1. */
+const val AlbumEpisodePageSize = 200
 
 private fun present(value: JsonElement?): Boolean = value != null && value !is JsonNull
 

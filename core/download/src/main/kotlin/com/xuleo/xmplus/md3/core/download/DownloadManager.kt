@@ -45,8 +45,9 @@ import okhttp3.Response
 /**
  * Downloads episodes into [folder]. Each episode is one task, keyed by its track id.
  *
- * - A paid episode is charged through the usage ledger before its bytes are requested. The charge is keyed by the task
- *   id, so a retry gets the confirmed receipt back and never charges again.
+ * - A paid episode is charged through the usage ledger before its bytes are requested, and only with the listening time
+ *   the listener confirmed when it was queued. The charge is keyed by the task id, so a retry gets the confirmed receipt
+ *   back and never charges again.
  * - Pause and cancel stop the transfer at once. A paused transfer keeps its partial file and continues with a range
  *   request.
  * - Tasks are saved in [store]. After a restart nothing runs by itself: unfinished tasks wait as paused.
@@ -96,10 +97,20 @@ class DownloadManager(
         return task.file?.let { target(it) }?.takeIf { it.isFile }
     }
 
-    /** Queues [tracks] of one album. Episodes already waiting, running, paused or downloaded are left alone; failed ones queue again. */
-    suspend fun enqueue(albumId: String, albumTitle: String, albumTotal: Int, tracks: List<Track>) = lock.withLock {
+    /**
+     * Queues [requests] of one album and returns how many were added. Episodes already waiting, running, paused or
+     * downloaded are left alone; failed ones queue again, with the listening time confirmed this time.
+     */
+    suspend fun enqueue(
+        albumId: String,
+        albumTitle: String,
+        coverUrl: String?,
+        albumTotal: Int,
+        requests: List<DownloadRequest>,
+    ): Int = lock.withLock {
         val now = clock()
-        for (track in tracks) {
+        var added = 0
+        for ((track, confirmed) in requests) {
             val existing = tasks[track.id]
             when {
                 existing == null -> tasks[track.id] = DownloadTask(
@@ -113,13 +124,22 @@ class DownloadManager(
                     durationSeconds = track.durationSeconds,
                     state = DownloadState.Queued,
                     createdAt = now,
+                    coverUrl = coverUrl,
+                    confirmedSeconds = confirmed,
                 )
-                existing.state == DownloadState.Failed -> tasks[track.id] = existing.copy(state = DownloadState.Queued, error = null)
-                else -> Unit
+                existing.state == DownloadState.Failed -> tasks[track.id] = existing.copy(
+                    state = DownloadState.Queued,
+                    error = null,
+                    coverUrl = coverUrl ?: existing.coverUrl,
+                    confirmedSeconds = confirmed ?: existing.confirmedSeconds,
+                )
+                else -> continue
             }
+            added++
         }
         pumpLocked()
         commitLocked()
+        added
     }
 
     /** Stops a waiting or running episode. Its partial file stays, so [resume] continues where it stopped. */
@@ -166,10 +186,45 @@ class DownloadManager(
         task.file?.let { target(it).delete() }
     }
 
-    suspend fun pauseAll() {
-        val ids = lock.withLock { tasks.values.filter { it.state == DownloadState.Queued || it.state == DownloadState.Running }.map { it.trackId } }
-        for (id in ids) pause(id)
+    /** Removes every downloaded episode of one album, with their audio files. */
+    suspend fun deleteAlbum(albumId: String) = lock.withLock {
+        val gone = tasks.values.filter { it.albumId == albumId && it.state == DownloadState.Completed }
+        if (gone.isEmpty()) return@withLock
+        gone.forEach { tasks.remove(it.trackId) }
+        commitLocked()
+        gone.forEach { task -> task.file?.let { target(it).delete() } }
     }
+
+    /**
+     * Pauses everything waiting or running in one step, so a slot freed by one pause is not handed to an episode that
+     * is about to be paused too (and might be charged first).
+     */
+    suspend fun pauseAll() {
+        val running = lock.withLock {
+            val active = tasks.values.filter { it.state == DownloadState.Queued || it.state == DownloadState.Running }
+            if (active.isEmpty()) return
+            active.forEach { tasks[it.trackId] = it.copy(state = DownloadState.Paused) }
+            commitLocked()
+            active.mapNotNull { jobs[it.trackId] }
+        }
+        running.forEach { it.cancelAndJoin() }
+    }
+
+    /** Removes every episode that is not downloaded yet, with the partial files, in one step for the same reason. */
+    suspend fun cancelAll() {
+        val removed = lock.withLock {
+            val unfinished = tasks.values.filter { it.state != DownloadState.Completed }
+            if (unfinished.isEmpty()) return
+            unfinished.forEach { tasks.remove(it.trackId) }
+            commitLocked()
+            unfinished.map { jobs[it.trackId] to it.taskId }
+        }
+        removed.forEach { (job, _) -> job?.cancelAndJoin() }
+        removed.forEach { (_, taskId) -> partial(taskId).delete() }
+    }
+
+    /** Free space where the downloads are kept. */
+    fun freeBytes(): Long = generateSequence(folder) { it.parentFile }.firstOrNull { it.exists() }?.usableSpace ?: 0L
 
     suspend fun resumeAll() {
         val ids = lock.withLock { tasks.values.filter { it.state == DownloadState.Paused || it.state == DownloadState.Failed }.map { it.trackId } }
@@ -224,13 +279,16 @@ class DownloadManager(
         val authorization = playback.resolve(task.trackId, credentials, ledger::queryQuota)
         val url = authorization.url ?: throw XmlyException("invalid_media", definitive = true)
         if (authorization.requiresListeningTime) {
+            // Only what the listener agreed to is charged. An episode the preview showed as free stops here with
+            // confirmation_required, unless an earlier attempt already holds its receipt.
             val receipt = ledger.prepay(
                 identity = authorization.accountIdentity,
                 taskId = task.taskId,
                 trackId = task.trackId,
                 durationSeconds = task.durationSeconds,
                 requiresReward = true,
-                userConfirmed = true,
+                userConfirmed = task.confirmedSeconds != null,
+                expectedSeconds = task.confirmedSeconds,
             )
             val confirmed = receipt?.takeIf { it.state == DebitState.Confirmed }
                 ?: throw XmlyException("receipt_required", definitive = true)

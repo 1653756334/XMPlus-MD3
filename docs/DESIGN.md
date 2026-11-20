@@ -57,7 +57,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [ ] Full HTML introduction, similar albums
 - [ ] Reviews: score, sort, replies, copy
 - [ ] Subscribe, play, play next, add to queue
-- [ ] Download one episode, a range such as `1,3,5-8`, or the whole album (up to 5,000 episodes), with multi-select
+- [x] Download one episode, a range such as `1,3,5-8`, or picked episodes (up to 5,000 at a time), with multi-select
 - [x] Per-album speed, volume and intro/outro skip, with the server's suggestion
 
 ### 主播 Anchor
@@ -92,10 +92,11 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 ### 下载 Downloads
 
 - [x] Task list and downloaded library, grouped by album
-- [ ] Search, multi-select, pause / resume / cancel all, task details
+- [x] Pause / resume / cancel all, live speed, storage used and free
+- [ ] Search, multi-select, task details
 - [ ] Retry, re-fetch the link, move to a new folder, delete audio (size shown first)
 - [ ] Account choice and account rotation (轮询)
-- [ ] Cost preview before starting (estimated 听时)
+- [x] Cost preview before starting (estimated 听时)
 - [ ] Whole albums downloaded page by page, with waits and retries when rate-limited
 - [ ] Minimum free space, concurrent downloads, quality (highest first by default)
 - [ ] Auto-download new episodes of subscribed albums, without back-filling
@@ -199,24 +200,25 @@ Rules:
 ### 专辑 Album
 
 - Collapsing header: blurred cover running up behind the status bar; cover on the left, title (two lines) and anchor on the right; stats and tags below. It collapses on scroll and comes back only when its list is at the top. The top-left button goes back at the top; once collapsed it brings the header back without moving the list.
-- Main actions: 继续播放 第N集, 订阅, download icon.
-- Tabs 简介 / 节目 / 评价, swipeable, with no divider. The episode toolbar (sort, the episode count, search) sticks under the tabs; search opens in place of it. Episodes load a page at a time as the list is scrolled down, so 从新到旧 reverses the whole album. Multi-select arrives with downloads.
-- Episode rows: number, duration, 已听 35%, download state, animated equalizer on the one playing. Long-press opens a multi-select action bar.
+- Main actions: 继续播放 第N集, 订阅. Downloads start from the episode list rather than the header.
+- Tabs 简介 / 节目 / 评价, swipeable, with no divider. The episode toolbar sticks under the tabs: the count and order as text (共765集 · 从旧到新), then icons to reverse the order, search, and pick episodes to download. Search and picking each open in place of it. Episodes load a page at a time as the list is scrolled down, so 从新到旧 reverses the whole album.
+- Episode rows: number, duration, 已听 35%, download state, animated equalizer on the one playing. The download state is one outlined 24 dp control at the end of the row: an arrow to download, a dashed arrow while waiting, a ring that fills while downloading (tap to pause, tap again to resume), a check once downloaded, a warning sign after a failure (tap to retry).
+- Picking: the toolbar's download icon, or a long press on a row, turns the rows' download controls into checkboxes (episodes already downloading or downloaded show their state instead). The toolbar then reads close · 已选 N 集 · pick by number (`1,3,5-8`, reading only the pages those numbers are on) · pick all loaded · download. Another tab or back ends picking.
 
 ### Full player
 
 - Color scheme taken from the cover, changing smoothly between episodes.
-- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 文稿 is a page of the cover area that swipes with it; 评论 replaces the cover area with the track's comments.
+- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 播放, 文稿 and 评论 are three pages that swipe sideways under the top bar; 文稿 and 评论 sit on the same backdrop and keep to the same column (480 dp, 24 dp margins) as the cover and controls. 评论: avatar, name, the comment, then the date, replies and a compact like with its count on one quiet line; the box to write one is a filled pill with the send icon in the accent colour.
 - The cover takes the largest square left above the controls and shrinks slightly with a spring when paused.
 - Under the cover, top to bottom:
   - Episode title (two lines), then the album name, which opens the album.
-  - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载. 点赞 and 收藏 are connected; 下载 is not yet (Phase 5).
+  - Episode actions, icon only: 点赞 · 收藏 · 书签 · 下载. 下载 is the same download control as on episode rows, showing the episode's state.
   - Progress bar with the elapsed and total time in a pill riding on it (as in Ximalaya). Drag the pill or tap the bar to seek. The played part is wavy while playing and flat when paused.
   - Transport: seek back · previous · play/pause (shape-morph button) · next · seek forward. The seek buttons show the fixed 15 s interval.
   - Listening tools, icon over label: 播放列表 · 倍速 · 定时关闭. A setting away from its default shows its value in the accent color (1.5×, the sleep countdown). There is no play mode: episodes play in order, and 随机播放, 列表循环 and 单集循环 are left out on purpose, because this is for listening to novels, not music.
 - 更多 sheet: one list of rows, each a round icon, a title and, where it helps, a line under it: 查看专辑, 查看主播, 跳过片头片尾 (showing its current setting, see Intro and outro skip) 音量 (the album's volume, or 已静音) and 回到开头 (dimmed when already at the start; it goes to where the episode begins, past any intro). Rows that open something end in a chevron.
 - Unlike other screens, the player shows its planned actions before they work: until one is connected, a tap says 即将推出.
-- Queue sheet: the album's episodes in episode-number order with the current one marked, and 回到当前 to scroll back to it. No reverse or drag handles.
+- Queue sheet: the album's episodes in episode-number order with the current one marked, and a locate icon to scroll back to it. Scrolling toward either end loads the album page beyond it, so the list runs from the first episode to the last. No reverse or drag handles.
 - Speed sheet: a slider from 0.5× to 3× in 0.1× steps, with the common speeds (0.5, 1, 1.5, 2, 2.5, 3) as labelled snap points. The speed applies when the finger lifts and the sheet stays open; 恢复 1× appears when the speed differs from 1×. The speed is remembered for the album only; an album that was never adjusted plays at 1×, whatever another album is set to.
   - Volume sheet: the album's volume from 0 to 100% in 5% steps, applied when the finger lifts, remembered per album, plus a switch that mutes every album until the app is closed. The phone's volume keys stay the master volume, so there is no second master slider; there is no boost above 100%.
   - Playlist sheet: when the list reaches the end of the album, 检查新节目 sits under the last row (nothing is offered earlier, since there is nothing to check for) and re-reads the end of the album and adds episodes published since the queue was built, then says 新增 N 集 or 没有新节目. Playing continues undisturbed.
@@ -249,9 +251,11 @@ Rules:
 
 ### 下载 Downloads
 
-- Storage usage bar at the top.
-- 下载中: live speed, pause / resume all.
-- 已下载: grid of album covers, each opening an offline album page.
+- Storage bar at the top: the space downloads use against what is left.
+- 已下载 and 下载中 swipe, each with its count. Icons in the top bar act on everything in 下载中: pause all or resume all, and cancel all (confirmed, since charged 听时 is not refunded).
+- 已下载: albums, newest first, with cover, title, episode count and size; a row opens in place into its episodes (tap to play, delete with the size shown first). The album's menu opens the album page or deletes its downloads.
+- 下载中: cover, title and album, a thin progress bar, bytes so far and live speed; pause / resume (retry after a failure) and cancel. Cancelling an episode that was already charged asks first.
+- Cost preview: before anything is queued, each picked episode the list does not mark as free is looked up the way playback resolves it. When any need 听时, a dialog shows how many, the total, the balance and the rules (charged per episode before it downloads, no refund on failure or cancel, a retry never charges twice), and the confirm button is off when the balance is short. Free downloads start at once. Only the confirmed amount is ever charged: an episode the preview took for free that turns out to need 听时 stops and asks to be downloaded again.
 
 ### 我的 Me
 

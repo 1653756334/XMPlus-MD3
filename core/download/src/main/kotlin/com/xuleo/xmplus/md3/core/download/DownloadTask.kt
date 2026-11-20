@@ -1,5 +1,7 @@
 package com.xuleo.xmplus.md3.core.download
 
+import com.xuleo.xmplus.md3.core.model.Track
+
 /** Where one episode is in its download. */
 enum class DownloadState(val key: String) {
     Queued("queued"), Running("running"), Paused("paused"), Completed("completed"), Failed("failed");
@@ -35,4 +37,14 @@ data class DownloadTask(
     /** A stable error code, shown to the user as text. */
     val error: String? = null,
     val createdAt: Long,
+    /** The album's cover, for the download list. */
+    val coverUrl: String? = null,
+    /**
+     * The listening time the listener agreed to pay for this episode before it was queued. Null means it was shown as
+     * free: if the server asks for listening time after all, the download stops instead of charging.
+     */
+    val confirmedSeconds: Int? = null,
 )
+
+/** One episode to queue, with the listening time agreed for it; null when it was shown as free. */
+data class DownloadRequest(val track: Track, val confirmedSeconds: Int?)

@@ -119,6 +119,8 @@ class PlaybackController(
     private var albumQueue: AlbumPlaybackQueue? = null
     private var queueWork: Job? = null
     private var queueIntent = 0L
+    private var paging: Job? = null
+    private var pagingIntent = 0L
     private var clock: Job? = null
     private var sleepJob: Job? = null
     private var sampling: Job? = null
@@ -244,6 +246,58 @@ class PlaybackController(
         }
         cancelCloudRestore()
         readQueue { credentials -> readChoice(catalogue.detail(albumId), trackId, null, credentials, positionMs = positionMs) }
+    }
+
+    /**
+     * Plays an episode of an album from its saved progress, as a downloaded episode is played. The album is read from
+     * the server unless that episode is already loaded.
+     */
+    fun playEpisode(albumId: String, trackId: String) {
+        if (accountChanges > 0) return
+        val selection = mutableState.value.selection
+        val loaded = selection != null && selection.track.id == trackId && selection.album.id == albumId
+        if (loaded && mutableQueue.value.errorCode == null) {
+            cancelQueueWork()
+            resumeAt()
+            return
+        }
+        cancelCloudRestore()
+        readQueue { credentials -> readChoice(catalogue.detail(albumId), trackId, null, credentials, keepLoaded = loaded) }
+    }
+
+    /**
+     * Adds the album page after ([forward]) or before the queue's window, as the queue sheet scrolls toward that end.
+     * What is playing is left alone; a queue rebuilt in the meantime wins over the page.
+     */
+    fun loadMoreQueue(forward: Boolean) {
+        if (accountChanges > 0 || queueWork != null || paging != null) return
+        val snapshot = albumQueue ?: return
+        if (if (forward) !snapshot.hasLaterPage else !snapshot.hasEarlierPage) return
+        val page = if (forward) snapshot.lastPage + 1 else snapshot.firstPage - 1
+        val intent = ++pagingIntent
+        mutableQueue.value = mutableQueue.value.copy(pagingForward = forward, pagingErrorCode = null)
+        paging = scope.launch(Dispatchers.Main) {
+            try {
+                awaitLedger()
+                val credentials = accounts.primaryCredentials()
+                val window = snapshot.merge(page, readAlbumPage(snapshot.detail, page, credentials))
+                currentCoroutineContext().ensureActive()
+                if (intent != pagingIntent || albumQueue !== snapshot || queueWork != null) return@launch
+                if (credentials?.cacheIdentity != accounts.primaryCredentials()?.cacheIdentity) throw XmlyException("account_mismatch")
+                applyQueueChoice(QueueChoice(window, null))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (intent == pagingIntent && albumQueue === snapshot) {
+                    mutableQueue.value = mutableQueue.value.copy(pagingErrorCode = errorCode(failure), pagingErrorForward = forward)
+                }
+            } finally {
+                if (intent == pagingIntent) {
+                    paging = null
+                    if (mutableQueue.value.pagingForward != null) mutableQueue.value = mutableQueue.value.copy(pagingForward = null)
+                }
+            }
+        }
     }
 
     fun playQueued(trackId: String) {
@@ -379,6 +433,9 @@ class PlaybackController(
 
     private fun clearQueue() {
         cancelQueueWork()
+        pagingIntent++
+        paging?.cancel()
+        paging = null
         pendingAccount = null
         albumQueue = null
         mutableQueue.value = PlaybackQueueState()
@@ -394,6 +451,7 @@ class PlaybackController(
             hasNext = currentId != null && choice.queue.hasNext(currentId),
             addedCount = choice.added,
             reachedEnd = !choice.queue.hasLaterPage,
+            hasEarlier = choice.queue.hasEarlierPage,
         )
         if (target == null) return
         val album = choice.queue.detail.album
@@ -447,6 +505,7 @@ class PlaybackController(
                 albumQueue = queue
                 mutableQueue.value = PlaybackQueueState(
                     items = queue.items, currentTrackId = track.id, hasNext = queue.hasNext(track.id), reachedEnd = !queue.hasLaterPage,
+                    hasEarlier = queue.hasEarlierPage,
                 )
                 mutableSkip.value = skips.get(album.id)
                 audio.get(album.id).let {

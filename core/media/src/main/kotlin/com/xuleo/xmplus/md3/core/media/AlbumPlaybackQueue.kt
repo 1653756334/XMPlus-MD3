@@ -16,6 +16,13 @@ data class PlaybackQueueState(
     val addedCount: Int? = null,
     /** The list ends where the album ends, so a check for new episodes belongs under the last row. */
     val reachedEnd: Boolean = false,
+    /** The list starts after the album's first page, so scrolling up can load the one before it. */
+    val hasEarlier: Boolean = false,
+    /** A page being added after (true) or before (false) the list for the queue sheet; null when none is. */
+    val pagingForward: Boolean? = null,
+    /** Why the last page could not be added, and on which side. */
+    val pagingErrorCode: String? = null,
+    val pagingErrorForward: Boolean = true,
 )
 
 internal const val PlaybackAlbumPageSize = 200

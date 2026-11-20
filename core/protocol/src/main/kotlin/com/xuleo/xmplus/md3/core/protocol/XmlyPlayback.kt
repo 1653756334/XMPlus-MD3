@@ -55,6 +55,22 @@ class XmlyPlayback(
         return reader.trackOf(info)
     }
 
+    /**
+     * Whether the episode costs listening time for [credentials], read as [resolve] reads it but without asking for a
+     * stream or the balance. The download preview prices episodes with it.
+     */
+    suspend fun requiresListeningTime(trackId: String, credentials: Credentials?): Boolean {
+        val id = xmlyIdentifier(trackId)
+        val info = if (credentials == null) publicInfo(id) else try {
+            accountInfo(id, credentials)
+        } catch (failure: XmlyException) {
+            if (failure.code != "login_expired") throw failure
+            publicInfo(id)
+        }
+        checkId(info, id)
+        return !free(info) && info.flag("isAuthorized") != true
+    }
+
     suspend fun resolve(
         trackId: String,
         credentials: Credentials?,

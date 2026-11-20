@@ -1,6 +1,8 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,22 +10,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ThumbUp as ThumbUpOutlined
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,15 +43,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
-import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.protocol.TrackComment
 import com.xuleo.xmplus.md3.library.CommentActions
@@ -86,6 +96,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
     var ownUid by remember(actions) { mutableStateOf<String?>(null) }
     var draft by rememberSaveable(track.id) { mutableStateOf("") }
     var busy by remember(track.id) { mutableStateOf(false) }
+    var posting by remember(track.id) { mutableStateOf(false) }
     var pendingDelete by remember(track.id) { mutableStateOf<TrackComment?>(null) }
     LaunchedEffect(list) { list.ensureLoaded() }
     LaunchedEffect(actions) { ownUid = actions.uid() }
@@ -98,9 +109,10 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
     )
 
     // Writes run one at a time. The list changes only after the server has confirmed the write.
-    fun perform(action: suspend () -> Unit, onDone: () -> Unit = {}) {
+    fun perform(action: suspend () -> Unit, post: Boolean = false, onDone: () -> Unit = {}) {
         if (busy) return
         busy = true
+        posting = post
         scope.launch {
             try {
                 if (!actions.signedIn()) {
@@ -115,6 +127,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
                 Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
             } finally {
                 busy = false
+                posting = false
             }
         }
     }
@@ -130,8 +143,8 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
         val count = track.commentCount ?: 0
         if (count > 0) Text(
             pluralStringResource(R.plurals.comment_count, count, count),
-            Modifier.padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
+            Modifier.padding(start = PlayerPagePadding, end = PlayerPagePadding, top = 4.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val failure = state.failure
@@ -141,7 +154,11 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
                     CircularProgressIndicator()
                 }
                 state.items.isEmpty() && failure != null -> InlineError(failure, onRetry = { list.refresh() }, modifier = Modifier.fillMaxSize())
-                state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.items.isEmpty() -> Column(
+                    Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.size(12.dp))
                     Text(stringResource(R.string.comment_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), state = lazy) {
@@ -163,10 +180,11 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
         CommentComposer(
             draft = draft,
             busy = busy,
+            posting = posting,
             onDraft = { draft = it },
             onSend = {
                 val content = draft
-                perform({ actions.post(track.id, content) }) {
+                perform({ actions.post(track.id, content) }, post = true) {
                     draft = ""
                     list.refresh()
                 }
@@ -188,68 +206,102 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
     }
 }
 
+/** Avatar, name, the comment, then when it was written, its replies, and the like and delete buttons on one quiet line. */
 @Composable
 private fun CommentRow(comment: TrackComment, own: Boolean, locale: Locale, onLike: () -> Unit, onDelete: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding - 8.dp, top = 12.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Avatar(comment.avatarUrl, Modifier.size(36.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                comment.author, Modifier.padding(end = 8.dp), style = MaterialTheme.typography.labelLarge,
+                color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                comment.content, Modifier.padding(top = 4.dp, end = 8.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp), color = scheme.onSurface,
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val replies = comment.replyCount
+                val meta = listOfNotNull(
+                    comment.createdAtMillis?.let { formatDate(it, locale) },
+                    if (replies > 0) pluralStringResource(R.plurals.comment_replies, replies, replies) else null,
+                ).joinToString(" · ")
                 Text(
-                    comment.author, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
+                    meta, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                comment.createdAtMillis?.let { createdAt ->
-                    Text(
-                        formatDate(createdAt, locale), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Text(comment.content, style = MaterialTheme.typography.bodyMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (comment.replyCount > 0) {
-                    val replies = comment.replyCount
-                    Text(
-                        pluralStringResource(R.plurals.comment_replies, replies, replies), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
                 if (own) IconButton(onClick = onDelete) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = stringResource(R.string.comment_delete))
+                    Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.comment_delete), Modifier.size(SmallIcon), tint = scheme.onSurfaceVariant)
                 }
-                Text(formatCount(comment.likes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                IconButton(onClick = onLike) {
-                    Icon(
-                        imageVector = if (comment.liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOutlined,
-                        contentDescription = stringResource(R.string.comment_like),
-                        tint = if (comment.liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                LikeButton(comment.liked, comment.likes, onLike)
             }
         }
     }
 }
 
+/** The thumb and the count side by side, in the accent colour once liked. */
 @Composable
-private fun CommentComposer(draft: String, busy: Boolean, onDraft: (String) -> Unit, onSend: () -> Unit) {
+private fun LikeButton(liked: Boolean, likes: Long, onClick: () -> Unit) {
+    val tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        Modifier.heightIn(min = 48.dp).clip(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.comment_like), onClick = onClick)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        OutlinedTextField(
+        Icon(
+            if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOutlined, stringResource(R.string.comment_like),
+            Modifier.size(SmallIcon), tint = tint,
+        )
+        if (likes > 0) Text(formatCount(likes), style = MaterialTheme.typography.labelMedium, color = tint)
+    }
+}
+
+/** A filled pill with no outline, like the album search field, and the send button in the accent colour. */
+@Composable
+private fun CommentComposer(draft: String, busy: Boolean, posting: Boolean, onDraft: (String) -> Unit, onSend: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding - 8.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        BasicTextField(
             value = draft,
             onValueChange = onDraft,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(stringResource(R.string.comment_hint)) },
-            maxLines = 3,
+            modifier = Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp))
+                .background(scheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 11.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+            cursorBrush = SolidColor(scheme.primary),
+            maxLines = 4,
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (draft.isEmpty()) {
+                        Text(stringResource(R.string.comment_hint), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
+                    }
+                    inner()
+                }
+            },
         )
-        IconButton(onClick = onSend, enabled = !busy && draft.isNotBlank()) {
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_send))
+        if (posting) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+        } else {
+            IconButton(
+                onClick = onSend, enabled = !busy && draft.isNotBlank(),
+                colors = IconButtonDefaults.iconButtonColors(contentColor = scheme.primary),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_send))
+            }
         }
     }
 }
+
+/** The like and delete glyphs, smaller than a toolbar icon so the line stays quiet. */
+private val SmallIcon = 18.dp
