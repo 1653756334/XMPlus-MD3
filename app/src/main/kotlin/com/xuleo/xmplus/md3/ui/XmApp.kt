@@ -22,7 +22,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.*
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import com.xuleo.xmplus.md3.XmApplication
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
@@ -182,7 +181,6 @@ internal fun XmAppContent(
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
-    val backDispatcher = LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
     val routeDecorator = remember(onRoutePopped) { NavEntryDecorator<NavKey>(onPop = onRoutePopped) { it.Content() } }
     NavigationSuiteScaffold(
         state = suite,
@@ -206,13 +204,13 @@ internal fun XmAppContent(
         Column(Modifier.fillMaxSize().imePadding()) {
             NavDisplay(
                 backStack = pages,
-                onBack = { if (!isPlayer) navigator.pop(backDispatcher.committingBackEdge()) },
+                onBack = { if (!isPlayer) navigator.pop() },
                 modifier = Modifier.weight(1f).clipToBounds(),
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator),
                 transitionSpec = { openTransform(direction, spatial, effects) },
-                // Back, by gesture or button, is the opening slide run the other way (see BackMotion.kt).
-                popTransitionSpec = { backTransform(backDirection(navigator.popSwipeEdge, direction), spatial, effects) },
-                predictivePopTransitionSpec = { edge -> backTransform(backDirection(edge, direction), spatial, effects) },
+                // Back, by gesture from either edge or by button, is the opening slide in reverse (see BackMotion.kt).
+                popTransitionSpec = { backTransform(direction, spatial, effects) },
+                predictivePopTransitionSpec = { backTransform(direction, spatial, effects) },
                 entryProvider = entryProvider {
                     entry<AppRoute.Home> {
                         Surface(Modifier.fillMaxSize()) {
