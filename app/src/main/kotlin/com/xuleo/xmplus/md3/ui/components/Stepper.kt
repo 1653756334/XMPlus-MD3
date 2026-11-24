@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import kotlinx.coroutines.delay
 
@@ -71,7 +69,7 @@ internal fun Stepper(
         horizontalArrangement = Arrangement.spacedBy(if (large) 16.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepButton(Icons.Filled.Remove, stringResource(R.string.stepper_decrease, name), value > range.first, large) {
+        StepButton(XmIcons.Filled.Remove, stringResource(R.string.stepper_decrease, name), value > range.first, large) {
             onValue(down.coerceIn(range))
         }
         Text(
@@ -83,7 +81,7 @@ internal fun Stepper(
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
-        StepButton(Icons.Filled.Add, stringResource(R.string.stepper_increase, name), value < range.last, large) {
+        StepButton(XmIcons.Filled.Add, stringResource(R.string.stepper_increase, name), value < range.last, large) {
             onValue(up.coerceIn(range))
         }
     }

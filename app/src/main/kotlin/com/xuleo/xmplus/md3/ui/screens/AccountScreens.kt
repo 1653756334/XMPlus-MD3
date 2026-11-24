@@ -9,9 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.account.*
 import com.xuleo.xmplus.md3.core.designsystem.*
@@ -40,7 +38,7 @@ import java.util.Date
 @Composable
 internal fun AccountScaffold(title: Int, onBack: () -> Unit, content: @Composable (PaddingValues) -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(title)) }, navigationIcon = {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
+        IconButton(onClick = onBack) { Icon(XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back)) }
     }) }, contentWindowInsets = WindowInsets(0, 0, 0, 0), content = content)
 }
 
@@ -86,12 +84,12 @@ internal fun AccountsContent(
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                                    Icon(Icons.Outlined.Add, contentDescription = null)
+                                    Icon(XmIcons.Outlined.Add, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
                                     Text(stringResource(R.string.account_add))
                                 }
                                 OutlinedButton(onClick = onImportBackup, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                                    Icon(Icons.Outlined.FileOpen, contentDescription = null)
+                                    Icon(XmIcons.Outlined.FileOpen, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
                                     Text(stringResource(R.string.archive_import))
                                 }
@@ -147,7 +145,7 @@ private fun AccountRow(account: AccountSummary, avatar: String?, busy: Boolean, 
                     color = MaterialTheme.colorScheme.error)
             }
             IconButton(onClick = { actions = true }, enabled = !busy) {
-                Icon(Icons.Outlined.MoreVert, stringResource(R.string.account_options, accountName(account)))
+                Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.account_options, accountName(account)))
             }
         }
     }
@@ -167,12 +165,12 @@ private fun AccountActions(account: AccountSummary, onDismiss: () -> Unit, onPri
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Text(accountName(account), Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.titleMedium)
-        if (!account.primary) AccountAction(Icons.Outlined.Star, R.string.account_make_primary) { choose(onPrimary) }
-        AccountAction(Icons.Outlined.Refresh, R.string.account_refresh) { choose(onRefresh) }
-        if (account.rewardPaused) AccountAction(Icons.Outlined.PlayArrow, R.string.reward_resume) { choose(onResume) }
-        else AccountAction(Icons.Outlined.Redeem, R.string.reward_claim) { choose(onClaim) }
-        AccountAction(Icons.Outlined.Key, R.string.account_reimport) { choose(onImport) }
-        AccountAction(Icons.Outlined.Delete, R.string.account_remove, destructive = true) { choose(onRemove) }
+        if (!account.primary) AccountAction(XmIcons.Outlined.Star, R.string.account_make_primary) { choose(onPrimary) }
+        AccountAction(XmIcons.Outlined.Refresh, R.string.account_refresh) { choose(onRefresh) }
+        if (account.rewardPaused) AccountAction(XmIcons.Outlined.PlayArrow, R.string.reward_resume) { choose(onResume) }
+        else AccountAction(XmIcons.Outlined.Redeem, R.string.reward_claim) { choose(onClaim) }
+        AccountAction(XmIcons.Outlined.Key, R.string.account_reimport) { choose(onImport) }
+        AccountAction(XmIcons.Outlined.Delete, R.string.account_remove, destructive = true) { choose(onRemove) }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -198,7 +196,7 @@ internal fun ImportAccountContent(
     recovery: Boolean = false, showPrimaryOption: Boolean = true, onPhoneLogin: () -> Unit = {},
 ) {
     var visible by remember { mutableStateOf(false) }
-    FormPage(Icons.Outlined.Key, if (recovery) R.string.account_reimport else R.string.account_import,
+    FormPage(XmIcons.Outlined.Key, if (recovery) R.string.account_reimport else R.string.account_import,
         R.string.account_import_detail, onBack) {
         OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.account_login_info)) },
@@ -206,7 +204,7 @@ internal fun ImportAccountContent(
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
             trailingIcon = { IconButton(onClick = { visible = !visible }) {
-                Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                Icon(if (visible) XmIcons.Outlined.VisibilityOff else XmIcons.Outlined.Visibility,
                     stringResource(if (visible) R.string.account_hide_info else R.string.account_show_info))
             } })
         if (!recovery && showPrimaryOption) PrimaryAccountOption(makePrimary, !busy, onPrimary)
@@ -297,7 +295,7 @@ internal fun AccountOperationFeedback(busy: Boolean, errorCode: String?) {
         Surface(Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) {
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Outlined.ErrorOutline, contentDescription = null)
+                Icon(XmIcons.Outlined.ErrorOutline, contentDescription = null)
                 Text(stringResource(errorMessage(errorCode)), style = MaterialTheme.typography.bodyMedium)
             }
         }

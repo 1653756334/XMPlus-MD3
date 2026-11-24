@@ -19,20 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Album
-import androidx.compose.material.icons.outlined.Cancel
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.Downloading
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PauseCircle
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.download.DownloadState
@@ -113,12 +100,12 @@ fun DownloadsScreen(viewModel: DownloadsViewModel, onOpenAlbum: (String) -> Unit
         actions = {
             if (pager.currentPage == ActiveTab && active.isNotEmpty()) {
                 if (running) {
-                    IconButton(onClick = viewModel::pauseAll) { Icon(Icons.Outlined.PauseCircle, stringResource(R.string.downloads_pause_all)) }
+                    IconButton(onClick = viewModel::pauseAll) { Icon(XmIcons.Outlined.PauseCircle, stringResource(R.string.downloads_pause_all)) }
                 } else {
-                    IconButton(onClick = viewModel::resumeAll) { Icon(Icons.Outlined.PlayCircle, stringResource(R.string.downloads_resume_all)) }
+                    IconButton(onClick = viewModel::resumeAll) { Icon(XmIcons.Outlined.PlayCircle, stringResource(R.string.downloads_resume_all)) }
                 }
                 IconButton(onClick = { removal = PendingRemoval.Unfinished }) {
-                    Icon(Icons.Outlined.Cancel, stringResource(R.string.downloads_cancel_all))
+                    Icon(XmIcons.Outlined.Cancel, stringResource(R.string.downloads_cancel_all))
                 }
             }
         },
@@ -204,7 +191,7 @@ private fun DonePage(
     onDeleteAlbum: (DownloadedAlbum) -> Unit,
 ) {
     if (albums.isEmpty()) {
-        EmptyPage(Icons.Outlined.DownloadDone, R.string.downloads_empty_done)
+        EmptyPage(XmIcons.Outlined.DownloadDone, R.string.downloads_empty_done)
         return
     }
     var expanded by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -249,13 +236,13 @@ private fun AlbumRow(album: DownloadedAlbum, open: Boolean, onToggle: () -> Unit
                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
             )
         }
-        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.graphicsLayer { rotationZ = turn }, tint = scheme.onSurfaceVariant)
+        Icon(XmIcons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.graphicsLayer { rotationZ = turn }, tint = scheme.onSurfaceVariant)
         Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.player_more), tint = scheme.onSurfaceVariant) }
+            IconButton(onClick = { menu = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.player_more), tint = scheme.onSurfaceVariant) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.downloads_open_album)) },
-                    leadingIcon = { Icon(Icons.Outlined.Album, contentDescription = null) },
+                    leadingIcon = { Icon(XmIcons.Outlined.Album, contentDescription = null) },
                     onClick = {
                         menu = false
                         onOpenAlbum()
@@ -263,7 +250,7 @@ private fun AlbumRow(album: DownloadedAlbum, open: Boolean, onToggle: () -> Unit
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.downloads_delete_album)) },
-                    leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null) },
+                    leadingIcon = { Icon(XmIcons.Outlined.DeleteOutline, contentDescription = null) },
                     onClick = {
                         menu = false
                         onDelete()
@@ -298,14 +285,14 @@ private fun DoneEpisodeRow(task: DownloadTask, onPlay: () -> Unit, onDelete: () 
                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
             )
         }
-        IconButton(onClick = onDelete) { Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.downloads_delete), tint = scheme.onSurfaceVariant) }
+        IconButton(onClick = onDelete) { Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.downloads_delete), tint = scheme.onSurfaceVariant) }
     }
 }
 
 @Composable
 private fun ActivePage(active: List<DownloadTask>, viewModel: DownloadsViewModel, onCancel: (DownloadTask) -> Unit) {
     if (active.isEmpty()) {
-        EmptyPage(Icons.Outlined.Downloading, R.string.downloads_empty_active)
+        EmptyPage(XmIcons.Outlined.Downloading, R.string.downloads_empty_active)
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
@@ -375,12 +362,12 @@ private fun ActiveRow(task: DownloadTask, onPause: () -> Unit, onResume: () -> U
             }
         }
         val (icon, label, action) = when {
-            running || waiting -> Triple(Icons.Outlined.Pause, R.string.downloads_pause, onPause)
-            task.state == DownloadState.Failed -> Triple(Icons.Outlined.Refresh, R.string.downloads_retry, onResume)
-            else -> Triple(Icons.Outlined.PlayArrow, R.string.downloads_resume, onResume)
+            running || waiting -> Triple(XmIcons.Outlined.Pause, R.string.downloads_pause, onPause)
+            task.state == DownloadState.Failed -> Triple(XmIcons.Outlined.Refresh, R.string.downloads_retry, onResume)
+            else -> Triple(XmIcons.Outlined.PlayArrow, R.string.downloads_resume, onResume)
         }
         IconButton(onClick = action) { Icon(icon, stringResource(label), tint = scheme.onSurfaceVariant) }
-        IconButton(onClick = onCancel) { Icon(Icons.Outlined.Close, stringResource(R.string.downloads_cancel), tint = scheme.onSurfaceVariant) }
+        IconButton(onClick = onCancel) { Icon(XmIcons.Outlined.Close, stringResource(R.string.downloads_cancel), tint = scheme.onSurfaceVariant) }
     }
 }
 

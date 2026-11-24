@@ -9,8 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -30,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
 import com.xuleo.xmplus.md3.browse.RankingsViewModel
@@ -124,7 +123,7 @@ internal fun DiscoverContent(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     ModeSwitch(DiscoverMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.weight(1f))
                     IconButton(actions.onSearch, Modifier.padding(end = 4.dp)) {
-                        Icon(Icons.Filled.Search, stringResource(R.string.search_submit))
+                        Icon(XmIcons.Filled.Search, stringResource(R.string.search_submit))
                     }
                 }
             }

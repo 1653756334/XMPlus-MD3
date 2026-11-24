@@ -13,10 +13,6 @@ import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +26,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.SearchResult
 import com.xuleo.xmplus.md3.browse.SearchState
@@ -99,20 +96,20 @@ internal fun SearchContent(
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.Top) {
             IconButton(onBack, Modifier.padding(top = 4.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
             }
             TextField(
                 state = query,
                 modifier = Modifier.weight(1f).padding(vertical = 4.dp).focusRequester(focusRequester),
                 placeholder = { Text(stringResource(R.string.search_hint), maxLines = 1) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                leadingIcon = { Icon(XmIcons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.text.isNotEmpty()) {
                         IconButton({
                             query.setTextAndPlaceCursorAtEnd("")
                             onClear()
                             focusRequester.requestFocus()
-                        }) { Icon(Icons.Filled.Close, stringResource(R.string.search_clear)) }
+                        }) { Icon(XmIcons.Filled.Close, stringResource(R.string.search_clear)) }
                     }
                 },
                 supportingText = if (state.invalid) {

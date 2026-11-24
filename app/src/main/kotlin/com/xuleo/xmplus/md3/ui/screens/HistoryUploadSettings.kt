@@ -1,9 +1,6 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -19,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.media.HistoryUploadFeedback
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
@@ -33,7 +31,7 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
             if (enabled) confirm = true else uploader.setEnabled(false)
         },
         supportingContent = { Text(stringResource(if (state.enabled) R.string.history_upload_on_hint else R.string.history_upload_off_hint)) },
-        leadingContent = { Icon(Icons.Outlined.CloudUpload, contentDescription = null) },
+        leadingContent = { Icon(XmIcons.Outlined.CloudUpload, contentDescription = null) },
         trailingContent = { Switch(checked = state.enabled, onCheckedChange = null, enabled = canChange) },
     ) { Text(stringResource(R.string.history_upload_title)) }
 
@@ -53,7 +51,7 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
         ListItem(
             onClick = uploader::retry,
             enabled = !state.sending,
-            leadingContent = { Icon(Icons.Outlined.Sync, contentDescription = null) },
+            leadingContent = { Icon(XmIcons.Outlined.Sync, contentDescription = null) },
             supportingContent = { Text(stringResource(feedback)) },
         ) { Text(stringResource(R.string.history_upload_retry)) }
     }

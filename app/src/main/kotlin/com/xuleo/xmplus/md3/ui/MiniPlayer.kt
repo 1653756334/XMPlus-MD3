@@ -14,11 +14,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
@@ -75,7 +71,7 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Filled.MusicNote,
+                        imageVector = XmIcons.Filled.MusicNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -106,7 +102,7 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
                     CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelLabel }, strokeWidth = 2.dp)
                 } else {
                     Icon(
-                        imageVector = if (retry) Icons.Filled.Refresh else if (state.wantsToPlay) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        imageVector = if (retry) XmIcons.Filled.Refresh else if (state.wantsToPlay) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow,
                         contentDescription = stringResource(if (retry) R.string.action_retry else if (state.wantsToPlay) R.string.action_pause else R.string.action_play),
                     )
                 }

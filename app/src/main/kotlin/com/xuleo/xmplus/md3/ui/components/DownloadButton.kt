@@ -2,13 +2,6 @@ package com.xuleo.xmplus.md3.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.Downloading
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.download.DownloadState
 import com.xuleo.xmplus.md3.core.download.DownloadTask
@@ -72,10 +66,10 @@ fun DownloadButton(
 fun DownloadGlyph(task: DownloadTask?, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     when (task?.state) {
-        null -> Icon(Icons.Outlined.Download, contentDescription = null, modifier)
-        DownloadState.Queued -> Icon(Icons.Outlined.Downloading, contentDescription = null, modifier)
-        DownloadState.Completed -> Icon(Icons.Outlined.DownloadDone, contentDescription = null, modifier, tint = scheme.primary)
-        DownloadState.Failed -> Icon(Icons.Outlined.ErrorOutline, contentDescription = null, modifier, tint = scheme.error)
+        null -> Icon(XmIcons.Outlined.Download, contentDescription = null, modifier)
+        DownloadState.Queued -> Icon(XmIcons.Outlined.Downloading, contentDescription = null, modifier)
+        DownloadState.Completed -> Icon(XmIcons.Outlined.DownloadDone, contentDescription = null, modifier, tint = scheme.primary)
+        DownloadState.Failed -> Icon(XmIcons.Outlined.ErrorOutline, contentDescription = null, modifier, tint = scheme.error)
         DownloadState.Running, DownloadState.Paused -> {
             val running = task.state == DownloadState.Running
             val total = task.totalBytes
@@ -92,7 +86,7 @@ fun DownloadGlyph(task: DownloadTask?, modifier: Modifier = Modifier) {
                     )
                 }
                 Icon(
-                    if (running) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null,
+                    if (running) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow, contentDescription = null,
                     Modifier.size(12.dp), tint = if (running) scheme.primary else scheme.onSurfaceVariant,
                 )
             }

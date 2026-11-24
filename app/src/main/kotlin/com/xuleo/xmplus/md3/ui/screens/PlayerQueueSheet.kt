@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.outlined.MyLocation
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.PlaybackQueueState
@@ -105,7 +102,7 @@ internal fun PlayerQueueSheet(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 IconButton(onClick = { scope.launch { list.scrollToItem(current) } }, enabled = current >= 0) {
-                    Icon(Icons.Outlined.MyLocation, stringResource(R.string.player_queue_locate))
+                    Icon(XmIcons.Outlined.MyLocation, stringResource(R.string.player_queue_locate))
                 }
             }
             if (queue.isLoading || queue.pagingForward == false) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -122,7 +119,7 @@ internal fun PlayerQueueSheet(
                         onClick = { onSelect(track.id) },
                         modifier = Modifier.fillMaxWidth().semantics { if (isCurrent) stateDescription = label },
                         leadingContent = {
-                            if (isCurrent) Icon(Icons.Filled.Equalizer, null, tint = MaterialTheme.colorScheme.primary)
+                            if (isCurrent) Icon(XmIcons.Filled.Equalizer, null, tint = MaterialTheme.colorScheme.primary)
                             else Text(track.officialPosition?.toString().orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
                         trailingContent = if (track.durationSeconds > 0) ({
@@ -151,7 +148,7 @@ internal fun PlayerQueueSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             TextButton(onClick = onCheckNew, enabled = !queue.isLoading) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = null, Modifier.size(18.dp))
+                                Icon(XmIcons.Outlined.Refresh, contentDescription = null, Modifier.size(18.dp))
                                 Text(stringResource(R.string.player_queue_check), Modifier.padding(start = 8.dp))
                             }
                             queue.addedCount?.let { added ->
@@ -180,7 +177,7 @@ private fun QueueError(code: String, onRetry: (() -> Unit)?) {
             stringResource(playbackMessage(code)), Modifier.weight(1f).padding(vertical = 4.dp),
             color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
         )
-        if (onRetry != null) IconButton(onClick = onRetry) { Icon(Icons.Outlined.Refresh, stringResource(R.string.action_retry)) }
+        if (onRetry != null) IconButton(onClick = onRetry) { Icon(XmIcons.Outlined.Refresh, stringResource(R.string.action_retry)) }
     }
 }
 

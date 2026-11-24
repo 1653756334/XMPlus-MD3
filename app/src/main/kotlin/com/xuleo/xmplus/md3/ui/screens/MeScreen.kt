@@ -7,8 +7,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.core.account.*
@@ -109,8 +108,8 @@ internal fun MeContent(
                     ListItem(
                         onClick = { showLanguage = true },
                         supportingContent = { Text(languageLabel(language)) },
-                        leadingContent = { Icon(Icons.Outlined.Language, contentDescription = null) },
-                        trailingContent = { Icon(Icons.Outlined.ChevronRight, contentDescription = null) },
+                        leadingContent = { Icon(XmIcons.Outlined.Language, contentDescription = null) },
+                        trailingContent = { Icon(XmIcons.Outlined.ChevronRight, contentDescription = null) },
                     ) { Text(stringResource(R.string.setting_language)) }
                     generalExtras()
                 }
@@ -124,7 +123,7 @@ internal fun MeContent(
 internal fun AccountAvatar(url: String? = null) {
     // The default picture stays underneath, so it shows while the avatar loads and if it cannot be loaded.
     Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-        Icon(Icons.Outlined.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        Icon(XmIcons.Outlined.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         if (url != null) AsyncImage(url, contentDescription = null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
     }
 }

@@ -33,29 +33,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
-import androidx.compose.material.icons.automirrored.outlined.VolumeOff
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.Album
-import androidx.compose.material.icons.outlined.BookmarkAdd
-import androidx.compose.material.icons.outlined.ContentCut
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.MoreHoriz
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -113,6 +90,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.BookmarkEpisode
@@ -353,7 +331,7 @@ private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onMinimize) {
-            Icon(Icons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp))
+            Icon(XmIcons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp))
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (hasEpisode) {
@@ -499,7 +477,7 @@ private fun EpisodeHeading(episode: PlaybackSelection, onOpenAlbum: () -> Unit) 
                     color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                    XmIcons.Filled.KeyboardArrowRight, contentDescription = null,
                     modifier = Modifier.size(18.dp), tint = scheme.onSurfaceVariant,
                 )
             }
@@ -518,14 +496,14 @@ private fun EpisodeActions(
 ) {
     Row(modifier.fillMaxWidth()) {
         EpisodeAction(
-            if (library.favorite == true) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            if (library.favorite == true) XmIcons.Filled.Favorite else XmIcons.Outlined.FavoriteBorder,
             R.string.player_favorite, library.onFavorite, enabled = library.available && library.favorite != null,
         )
-        EpisodeAction(Icons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
+        EpisodeAction(XmIcons.Outlined.BookmarkAdd, R.string.player_bookmarks, onOpenBookmarks, enabled = bookmarksAvailable)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             DownloadButton(download.task, download.onDownload, download.onPause, download.onResume)
         }
-        EpisodeAction(Icons.Outlined.MoreHoriz, R.string.player_more, onMore)
+        EpisodeAction(XmIcons.Outlined.MoreHoriz, R.string.player_more, onMore)
     }
 }
 
@@ -689,16 +667,16 @@ private fun ListeningTools(
     val sleepLabel = sleep.remainingMs?.let { formatDuration(it / 1000.0) }
         ?: stringResource(if (sleep.atEpisodeEnd) R.string.player_sleep_episode_end_short else R.string.player_sleep)
     Row(modifier.fillMaxWidth()) {
-        ToolButton(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.player_queue), onOpenQueue, enabled = hasQueue)
+        ToolButton(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue), onOpenQueue, enabled = hasQueue)
         ToolButton(
-            Icons.Outlined.Speed,
+            XmIcons.Outlined.Speed,
             if (speed == 1f) stringResource(R.string.player_speed)
             else stringResource(R.string.player_speed_value, speedLabel(speed)),
             onOpenSpeed,
             highlighted = speed != 1f,
         )
         ToolButton(
-            if (sleep.active) Icons.Filled.Timer else Icons.Outlined.Timer,
+            if (sleep.active) XmIcons.Filled.Timer else XmIcons.Outlined.Timer,
             sleepLabel,
             onOpenSleep,
             highlighted = sleep.active,
@@ -742,7 +720,7 @@ private fun RowScope.ToolButton(
 private fun EpisodeButton(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
     IconButton(onClick, Modifier.size(48.dp), enabled = enabled) {
         Icon(
-            if (forward) Icons.Filled.SkipNext else Icons.Filled.SkipPrevious,
+            if (forward) XmIcons.Filled.SkipNext else XmIcons.Filled.SkipPrevious,
             stringResource(if (forward) R.string.player_next_episode else R.string.player_previous_episode),
             Modifier.size(36.dp),
         )
@@ -801,23 +779,23 @@ private fun PlayerActionsSheet(
                 Modifier.padding(horizontal = 8.dp).semantics { heading() },
                 style = MaterialTheme.typography.titleMedium,
             )
-            MoreRow(Icons.Outlined.Album, R.string.player_view_album, { select(onOpenAlbum) })
-            MoreRow(Icons.Outlined.Person, R.string.player_view_anchor, { select(onOpenAnchor) })
+            MoreRow(XmIcons.Outlined.Album, R.string.player_view_album, { select(onOpenAlbum) })
+            MoreRow(XmIcons.Outlined.Person, R.string.player_view_anchor, { select(onOpenAnchor) })
             MoreRow(
-                Icons.Outlined.ContentCut, R.string.player_skip_title, { select(onOpenSkip) },
+                XmIcons.Outlined.ContentCut, R.string.player_skip_title, { select(onOpenSkip) },
                 supporting = if (skip.isOff) stringResource(R.string.player_skip_off)
                 else stringResource(R.string.player_skip_value, skip.introSeconds, skip.outroSeconds),
                 highlighted = !skip.isOff,
             )
             MoreRow(
-                if (muted) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Outlined.VolumeUp,
+                if (muted) XmIcons.Outlined.VolumeOff else XmIcons.Outlined.VolumeUp,
                 R.string.player_volume, { select(onOpenVolume) },
                 supporting = if (muted) stringResource(R.string.player_volume_muted)
                 else stringResource(R.string.player_volume_value, volumePercent(volume)),
                 highlighted = muted || volume != 1f,
             )
             MoreRow(
-                Icons.Filled.Replay, R.string.player_go_to_start, { select(onGoToStart) },
+                XmIcons.Filled.Replay, R.string.player_go_to_start, { select(onGoToStart) },
                 enabled = canGoToStart, chevron = false,
             )
         }
@@ -857,7 +835,7 @@ private fun MoreRow(
                 )
             }
         }
-        if (chevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        if (chevron) Icon(XmIcons.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
     }
 }
 @Composable
@@ -935,9 +913,9 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
             )
         } else {
             val icon = when {
-                retry -> Icons.Filled.Refresh
-                state.wantsToPlay -> Icons.Filled.Pause
-                else -> Icons.Filled.PlayArrow
+                retry -> XmIcons.Filled.Refresh
+                state.wantsToPlay -> XmIcons.Filled.Pause
+                else -> XmIcons.Filled.PlayArrow
             }
             Icon(icon, contentDescription = null, modifier = Modifier.size(36.dp))
         }

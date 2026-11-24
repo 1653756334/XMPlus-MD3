@@ -16,13 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LibraryAddCheck
-import androidx.compose.material.icons.outlined.Checklist
-import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.BookmarkEntry
@@ -159,7 +153,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
         headline = if (historySelecting) stringResource(R.string.history_selected, selected.size) else null,
         navigation = {
             if (historySelecting) IconButton(onClick = { selecting = false; selected = emptySet() }) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_cancel))
+                Icon(XmIcons.Filled.Close, contentDescription = stringResource(R.string.action_cancel))
             }
         },
         actions = {
@@ -168,14 +162,14 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
                     IconButton(onClick = {
                         selected = if (allSelected) emptySet<String>() else historyRows.mapTo(HashSet()) { it.albumId }
                     }) {
-                        Icon(Icons.Filled.DoneAll, contentDescription = stringResource(R.string.history_select_all))
+                        Icon(XmIcons.Filled.DoneAll, contentDescription = stringResource(R.string.history_select_all))
                     }
                     IconButton(onClick = deleteSelected, enabled = selected.isNotEmpty()) {
-                        Icon(Icons.Outlined.DeleteOutline, contentDescription = stringResource(R.string.history_remove))
+                        Icon(XmIcons.Outlined.DeleteOutline, contentDescription = stringResource(R.string.history_remove))
                     }
                 } else {
                     IconButton(onClick = { selecting = true }) {
-                        Icon(Icons.Outlined.Checklist, contentDescription = stringResource(R.string.history_select))
+                        Icon(XmIcons.Outlined.Checklist, contentDescription = stringResource(R.string.history_select))
                     }
                 }
             }
@@ -247,7 +241,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
                             onOpen = { openAlbum(item.album.id) },
                             trailing = {
                                 IconButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
-                                    Icon(Icons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
+                                    Icon(XmIcons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
                         )
@@ -268,7 +262,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, on
                             onOpen = { openAlbum(track.albumId) },
                             trailing = {
                                 IconButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
-                                    Icon(Icons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
+                                    Icon(XmIcons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
                         )

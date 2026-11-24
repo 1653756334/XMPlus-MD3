@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import kotlinx.coroutines.launch
@@ -163,8 +161,8 @@ private fun DetailTopBar(
         Row(Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Crossfade(showBack, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "detailTopButton") { back ->
                 IconButton(if (back) onBack else onShowHeader, Modifier.padding(start = 4.dp)) {
-                    if (back) Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
-                    else Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.detail_show_header))
+                    if (back) Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
+                    else Icon(XmIcons.Filled.KeyboardArrowUp, stringResource(R.string.detail_show_header))
                 }
             }
             Text(

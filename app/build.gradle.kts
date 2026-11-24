@@ -67,7 +67,6 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3.navigation.suite)
     implementation(libs.compose.material3.adaptive)
-    implementation(libs.compose.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)

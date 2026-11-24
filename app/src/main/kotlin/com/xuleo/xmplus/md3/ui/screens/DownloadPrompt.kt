@@ -4,8 +4,6 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -25,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.Track
@@ -183,7 +182,7 @@ private fun ConfirmDialog(plan: DownloadPlan, onConfirm: () -> Unit, onDismiss: 
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+        icon = { Icon(XmIcons.Outlined.Download, contentDescription = null) },
         title = { Text(pluralStringResource(R.plurals.download_confirm_title, count, count)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -37,17 +37,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LibraryAddCheck
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DoneAll
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FormatListNumbered
-import androidx.compose.material.icons.outlined.LibraryAdd
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -88,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.AlbumState
 import com.xuleo.xmplus.md3.browse.AlbumViewModel
@@ -198,7 +188,7 @@ private fun SubscribeAction(state: LibraryToggle, onToggle: () -> Unit) {
     ) {
         if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         else Icon(
-            if (subscribed) Icons.Filled.LibraryAddCheck else Icons.Outlined.LibraryAdd,
+            if (subscribed) XmIcons.Filled.LibraryAddCheck else XmIcons.Outlined.LibraryAdd,
             stringResource(if (subscribed) R.string.listen_unsubscribe else R.string.album_subscribe),
         )
     }
@@ -467,10 +457,10 @@ private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSe
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         IconButton(onClick = onOrder) {
-            Icon(Icons.Outlined.SwapVert, stringResource(if (ascending) R.string.album_order_to_newest else R.string.album_order_to_oldest))
+            Icon(XmIcons.Outlined.SwapVert, stringResource(if (ascending) R.string.album_order_to_newest else R.string.album_order_to_oldest))
         }
-        IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, stringResource(R.string.album_search_hint)) }
-        if (onSelect != null) IconButton(onClick = onSelect) { Icon(Icons.Outlined.Download, stringResource(R.string.album_select_download)) }
+        IconButton(onClick = onSearch) { Icon(XmIcons.Outlined.Search, stringResource(R.string.album_search_hint)) }
+        if (onSelect != null) IconButton(onClick = onSelect) { Icon(XmIcons.Outlined.Download, stringResource(R.string.album_select_download)) }
     }
 }
 
@@ -478,21 +468,21 @@ private fun ToolbarRow(ascending: Boolean, total: Int, onOrder: () -> Unit, onSe
 @Composable
 private fun SelectionRow(count: Int, selection: EpisodeSelection, onClose: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(ToolbarHeight), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, stringResource(R.string.action_cancel)) }
+        IconButton(onClick = onClose) { Icon(XmIcons.Outlined.Close, stringResource(R.string.action_cancel)) }
         Text(
             pluralStringResource(R.plurals.album_selected, count, count), Modifier.weight(1f),
             style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        IconButton(onClick = selection.onRange) { Icon(Icons.Outlined.FormatListNumbered, stringResource(R.string.album_select_range)) }
+        IconButton(onClick = selection.onRange) { Icon(XmIcons.Outlined.FormatListNumbered, stringResource(R.string.album_select_range)) }
         IconButton(onClick = selection.onPickAll, enabled = selection.canPickAll) {
             Icon(
-                Icons.Outlined.DoneAll,
+                XmIcons.Outlined.DoneAll,
                 stringResource(if (selection.allPicked) R.string.album_select_none else R.string.history_select_all),
                 tint = if (selection.allPicked) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
         }
         FilledTonalIconButton(onClick = selection.onDownload, enabled = count > 0) {
-            Icon(Icons.Outlined.Download, stringResource(R.string.album_download_selected))
+            Icon(XmIcons.Outlined.Download, stringResource(R.string.album_download_selected))
         }
     }
 }
@@ -512,7 +502,7 @@ private fun RangeDialog(total: Int, onDismiss: () -> Unit, onConfirm: (List<Int>
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.FormatListNumbered, contentDescription = null) },
+        icon = { Icon(XmIcons.Outlined.FormatListNumbered, contentDescription = null) },
         title = { Text(stringResource(R.string.album_range_title)) },
         text = {
             OutlinedTextField(
@@ -554,7 +544,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -
         modifier.height(SearchHeight).clip(CircleShape).background(colors.surfaceContainerHigh).padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Search, contentDescription = null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+        Icon(XmIcons.Filled.Search, contentDescription = null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         BasicTextField(
             value = query,
@@ -574,7 +564,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onSubmit: () -
         )
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQuery("") }, Modifier.size(40.dp)) {
-                Icon(Icons.Filled.Close, stringResource(R.string.search_clear), Modifier.size(18.dp))
+                Icon(XmIcons.Filled.Close, stringResource(R.string.search_clear), Modifier.size(18.dp))
             }
         }
     }

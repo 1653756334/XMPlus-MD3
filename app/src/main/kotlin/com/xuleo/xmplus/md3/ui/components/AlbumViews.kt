@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.Album
@@ -45,7 +43,7 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, actionLabel: Str
         if (actionLabel != null && onAction != null) {
             TextButton(onAction, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
                 Text(actionLabel, maxLines = 1)
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, Modifier.size(18.dp))
+                Icon(XmIcons.Filled.KeyboardArrowRight, contentDescription = null, Modifier.size(18.dp))
             }
         }
     }
@@ -60,7 +58,7 @@ fun PlayCountBadge(playCount: Long, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(Icons.Filled.Headphones, contentDescription = null, Modifier.size(12.dp), tint = Color.White)
+        Icon(XmIcons.Filled.Headphones, contentDescription = null, Modifier.size(12.dp), tint = Color.White)
         Text(formatCount(playCount), style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1)
     }
 }
@@ -96,7 +94,7 @@ fun RankRow(position: Int, album: Album, stats: AlbumStats?, modifier: Modifier 
         }
         stats?.playCount?.let {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(Icons.Filled.Headphones, contentDescription = stringResource(R.string.play_count), Modifier.size(14.dp),
+                Icon(XmIcons.Filled.Headphones, contentDescription = stringResource(R.string.play_count), Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatCount(it), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

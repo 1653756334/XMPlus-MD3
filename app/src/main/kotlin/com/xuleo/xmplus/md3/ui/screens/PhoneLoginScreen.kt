@@ -2,10 +2,6 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Phone
-import androidx.compose.material.icons.outlined.Smartphone
-import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.account.AccountViewModel
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
@@ -62,14 +59,14 @@ internal fun PhoneLoginContent(
     onMobile: (String) -> Unit, onCode: (String) -> Unit, onPrimary: (Boolean) -> Unit,
     onSend: () -> Unit, onVerify: () -> Unit, onImport: () -> Unit, onBack: () -> Unit,
 ) {
-    FormPage(Icons.Outlined.Smartphone, R.string.login_phone_title, R.string.login_phone_intro, onBack) {
+    FormPage(XmIcons.Outlined.Smartphone, R.string.login_phone_title, R.string.login_phone_intro, onBack) {
         if (signInPending) {
             Text(stringResource(R.string.login_phone_verified), style = MaterialTheme.typography.bodyLarge)
         } else {
             OutlinedTextField(
                 value = mobile, onValueChange = onMobile, modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.login_phone_number)) },
-                leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = null) },
+                leadingIcon = { Icon(XmIcons.Outlined.Phone, contentDescription = null) },
                 enabled = !busy && !awaitingCode, singleLine = true, isError = errorCode == "invalid_mobile",
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Phone),
             )
@@ -80,7 +77,7 @@ internal fun PhoneLoginContent(
             OutlinedTextField(
                 value = code, onValueChange = onCode, modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.login_phone_code)) },
-                leadingIcon = { Icon(Icons.Outlined.Sms, contentDescription = null) },
+                leadingIcon = { Icon(XmIcons.Outlined.Sms, contentDescription = null) },
                 trailingIcon = { ResendButton(cooldownSeconds, enabled = !busy, onSend) },
                 enabled = !busy, singleLine = true,
                 supportingText = { Text(stringResource(R.string.login_phone_code_hint)) },

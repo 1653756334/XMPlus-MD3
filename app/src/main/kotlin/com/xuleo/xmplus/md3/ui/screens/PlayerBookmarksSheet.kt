@@ -18,11 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BookmarkAdd
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.BookmarkDraft
@@ -247,7 +243,7 @@ private fun BookmarkSheetContent(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
                 enabled = canSeek && !busy && !loadFailed && rows != null,
             ) {
-                Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                Icon(XmIcons.Outlined.BookmarkAdd, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text(stringResource(R.string.bookmark_add), textAlign = TextAlign.Center)
             }
@@ -264,7 +260,7 @@ private fun EmptyBookmarks() {
     ) {
         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.BookmarkBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(XmIcons.Outlined.BookmarkBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Text(
@@ -315,10 +311,10 @@ private fun BookmarkOptions(busy: Boolean, onEdit: () -> Unit, onDelete: () -> U
     val tint = MaterialTheme.colorScheme.onSurfaceVariant
     Row {
         IconButton(onClick = onEdit, enabled = !busy) {
-            Icon(Icons.Outlined.Edit, stringResource(R.string.bookmark_edit_note), tint = tint)
+            Icon(XmIcons.Outlined.Edit, stringResource(R.string.bookmark_edit_note), tint = tint)
         }
         IconButton(onClick = onDelete, enabled = !busy) {
-            Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.bookmark_delete_action), tint = tint)
+            Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.bookmark_delete_action), tint = tint)
         }
     }
 }

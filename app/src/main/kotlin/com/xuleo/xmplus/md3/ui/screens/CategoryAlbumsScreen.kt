@@ -5,8 +5,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -17,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsState
 import com.xuleo.xmplus.md3.browse.CategoryAlbumsViewModel
@@ -75,7 +74,7 @@ internal fun CategoryAlbumsContent(
                     val label = if (state.filters.isEmpty()) stringResource(R.string.category_filter)
                     else stringResource(R.string.category_filter_count, state.filters.size)
                     AssistChip({ filtering = true }, { Text(label, maxLines = 1) },
-                        leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, Modifier.size(18.dp)) })
+                        leadingIcon = { Icon(XmIcons.Outlined.Tune, contentDescription = null, Modifier.size(18.dp)) })
                 }
             } else if (state.infoFailed) {
                 item(key = "filter") { AssistChip(onRetryInfo, { Text(stringResource(R.string.category_filter_retry), maxLines = 1) }) }

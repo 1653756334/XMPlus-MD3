@@ -1,8 +1,6 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.RankCharts
 import com.xuleo.xmplus.md3.browse.RankingsState
@@ -56,7 +55,7 @@ internal fun RankingsContent(
             Chips {
                 item(key = "category") {
                     AssistChip({ choosing = true }, { Text(category.title, maxLines = 1) },
-                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp)) })
+                        trailingIcon = { Icon(XmIcons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp)) })
                 }
                 items(category.tabs, key = { it.rankingId }) { FilterChip(it.rankingId == state.rankingId, { onTab(it.rankingId) }, { Text(it.title, maxLines = 1) }) }
             }

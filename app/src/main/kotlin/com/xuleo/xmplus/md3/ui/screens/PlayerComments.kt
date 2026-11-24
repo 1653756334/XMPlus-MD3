@@ -19,12 +19,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.ThumbUp as ThumbUpOutlined
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.protocol.TrackComment
@@ -157,7 +152,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
                 state.items.isEmpty() -> Column(
                     Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                    Icon(XmIcons.Outlined.ChatBubbleOutline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(Modifier.size(12.dp))
                     Text(stringResource(R.string.comment_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -235,7 +230,7 @@ private fun CommentRow(comment: TrackComment, own: Boolean, locale: Locale, onLi
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (own) IconButton(onClick = onDelete) {
-                    Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.comment_delete), Modifier.size(SmallIcon), tint = scheme.onSurfaceVariant)
+                    Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.comment_delete), Modifier.size(SmallIcon), tint = scheme.onSurfaceVariant)
                 }
                 LikeButton(comment.liked, comment.likes, onLike)
             }
@@ -255,7 +250,7 @@ private fun LikeButton(liked: Boolean, likes: Long, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(
-            if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOutlined, stringResource(R.string.comment_like),
+            if (liked) XmIcons.Filled.ThumbUp else XmIcons.Outlined.ThumbUpOutlined, stringResource(R.string.comment_like),
             Modifier.size(SmallIcon), tint = tint,
         )
         if (likes > 0) Text(formatCount(likes), style = MaterialTheme.typography.labelMedium, color = tint)
@@ -297,7 +292,7 @@ private fun CommentComposer(draft: String, busy: Boolean, posting: Boolean, onDr
                 onClick = onSend, enabled = !busy && draft.isNotBlank(),
                 colors = IconButtonDefaults.iconButtonColors(contentColor = scheme.primary),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_send))
+                Icon(XmIcons.Filled.Send, contentDescription = stringResource(R.string.action_send))
             }
         }
     }

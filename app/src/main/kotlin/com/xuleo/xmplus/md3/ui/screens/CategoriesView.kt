@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -19,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.CategoriesState
 import com.xuleo.xmplus.md3.browse.CategoriesViewModel
@@ -95,7 +94,7 @@ private fun ChannelGrid(group: CategoryGroup, list: ChannelList, onLoadMore: () 
         ) {
             item(key = "featured", span = { GridItemSpan(maxLineSpan) }) {
                 FilledTonalButton({ onOpen(group, null) }) {
-                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
+                    Icon(XmIcons.Outlined.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.category_featured, group.title), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

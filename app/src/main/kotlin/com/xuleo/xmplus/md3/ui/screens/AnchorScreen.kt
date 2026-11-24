@@ -14,10 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -36,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.browse.AnchorListing
 import com.xuleo.xmplus.md3.browse.AnchorListingState
@@ -133,7 +130,7 @@ private fun AnchorHero(profile: AnchorProfile, follow: LibraryToggle, onFollow: 
                             fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                         if (profile.verified) Icon(
-                            Icons.Filled.Verified, stringResource(R.string.anchor_verified), Modifier.size(18.dp),
+                            XmIcons.Filled.Verified, stringResource(R.string.anchor_verified), Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -271,7 +268,7 @@ private fun AnchorSearchField(query: String, onQuery: (String) -> Unit, onSubmit
             .height(44.dp).clip(CircleShape).background(colors.surfaceContainerHigh).padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Search, contentDescription = null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+        Icon(XmIcons.Filled.Search, contentDescription = null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         BasicTextField(
             value = query,
@@ -291,7 +288,7 @@ private fun AnchorSearchField(query: String, onQuery: (String) -> Unit, onSubmit
         )
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQuery(""); onSubmit("") }, Modifier.size(40.dp)) {
-                Icon(Icons.Filled.Close, stringResource(R.string.search_clear), Modifier.size(18.dp))
+                Icon(XmIcons.Filled.Close, stringResource(R.string.search_clear), Modifier.size(18.dp))
             }
         }
     }

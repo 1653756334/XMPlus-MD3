@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.PlaybackMaxSpeed
@@ -81,7 +80,7 @@ internal fun PlayerSpeedSheet(speed: Float, onSpeed: (Float) -> Unit, onDismiss:
                     shown = NormalTenths
                     commit(NormalTenths)
                 }) {
-                    Icon(Icons.Outlined.RestartAlt, stringResource(R.string.player_speed_reset))
+                    Icon(XmIcons.Outlined.RestartAlt, stringResource(R.string.player_speed_reset))
                 }
             }
             Stepper(
