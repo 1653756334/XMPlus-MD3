@@ -52,7 +52,7 @@ import com.xuleo.xmplus.md3.ui.screens.*
 fun XmApp() {
     val application = LocalContext.current.applicationContext as XmApplication
     val accounts: AccountViewModel = viewModel(
-        factory = AccountViewModel.factory(application.accounts, application.login, application.playback),
+        factory = AccountViewModel.factory(application.accounts, application.login, application.playback, application.profile),
     )
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
     val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
@@ -259,7 +259,7 @@ internal fun XmAppContent(
                                 { navigator.pop() }, ::openPhone, { accounts?.setPrimary(it) }, { accounts?.remove(it) },
                                 { accounts?.refreshQuota(it) }, { accounts?.retryLoad() }, { openImport(it) },
                                 { accounts?.claim(it) }, { accounts?.resumeRewards(it) }, { accounts?.setAutoClaim(it) },
-                                importArchive)
+                                importArchive, avatars = accounts?.avatars.orEmpty())
                         }
                     }
                     entry<AppRoute.PhoneLogin> {

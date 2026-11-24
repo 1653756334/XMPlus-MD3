@@ -124,6 +124,7 @@ internal object Endpoints {
     val AnchorAlbumInfo = web("/revision/album/v1/simple")
     val AnchorAlbumsDesktop = pc("/simple-revision-for-pc/user/pub")
     val AnchorAlbumsWeb = web("/revision/user/pub")
+    val AccountProfile = read(Host.Mobile, "/fmobile-user/homePage/ts-{ts}", Login.Required)
     val AnchorProfileAccount = read(Host.Mobile, "/mobile-user/v3/artist/homepage/ts-{ts}", Login.Required)
     val AnchorAlbumsAccount = read(Host.Mobile, "/mobile-user/v3/artist/album/ts-{ts}", Login.Required)
     val AnchorTracks = read(Host.Welfare, "/m-revision/common/anchor/queryAnchorTracksByPage")

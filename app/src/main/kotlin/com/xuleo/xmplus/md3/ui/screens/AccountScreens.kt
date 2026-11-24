@@ -49,7 +49,7 @@ internal fun AccountsContent(
     state: AccountsState, busy: Boolean, errorCode: String?, onBack: () -> Unit, onImport: () -> Unit,
     onPrimary: (String) -> Unit, onRemove: (String) -> Unit, onRefresh: (String) -> Unit, onRetry: () -> Unit,
     onReimport: (String) -> Unit = {}, onClaim: (String) -> Unit = {}, onResume: (String) -> Unit = {},
-    onAutoClaim: (Boolean) -> Unit = {}, onImportBackup: () -> Unit = {},
+    onAutoClaim: (Boolean) -> Unit = {}, onImportBackup: () -> Unit = {}, avatars: Map<String, String> = emptyMap(),
 ) {
     var removing by rememberSaveable { mutableStateOf<String?>(null) }
     var rewardPrompt by rememberSaveable { mutableStateOf<RewardPrompt?>(null) }
@@ -78,7 +78,7 @@ internal fun AccountsContent(
                             }
                         }
                         items(accounts, key = { it.identity }) { account ->
-                            AccountRow(account, busy, { onPrimary(account.identity) }, { removing = account.identity },
+                            AccountRow(account, avatars[account.identity], busy, { onPrimary(account.identity) }, { removing = account.identity },
                                 { onRefresh(account.identity) }, { onReimport(account.identity) },
                                 { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Claim },
                                 { rewardTarget = account.identity; rewardPrompt = RewardPrompt.Resume })
@@ -124,13 +124,13 @@ internal fun AccountsContent(
 }
 
 @Composable
-private fun AccountRow(account: AccountSummary, busy: Boolean, onPrimary: () -> Unit, onRemove: () -> Unit,
+private fun AccountRow(account: AccountSummary, avatar: String?, busy: Boolean, onPrimary: () -> Unit, onRemove: () -> Unit,
     onRefresh: () -> Unit, onImport: () -> Unit, onClaim: () -> Unit, onResume: () -> Unit) {
     var actions by remember { mutableStateOf(false) }
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            AccountAvatar()
+            AccountAvatar(avatar)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(accountName(account), style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

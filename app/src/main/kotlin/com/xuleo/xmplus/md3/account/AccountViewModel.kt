@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.account
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -9,19 +10,28 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xuleo.xmplus.md3.core.account.AccountRepository
+import com.xuleo.xmplus.md3.core.account.AccountsState
 import com.xuleo.xmplus.md3.core.account.ArchiveContents
 import com.xuleo.xmplus.md3.core.account.XmplusArchive
 import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
+import com.xuleo.xmplus.md3.core.protocol.XmlyProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AccountViewModel(
     private val repository: AccountRepository,
     login: XmlyLogin,
     private val playback: PlaybackController,
+    private val profile: XmlyProfile,
 ) : ViewModel() {
     val accounts = repository.state
+
+    /** Each account's avatar by identity, read once per session; a missing one shows the default picture. */
+    val avatars = mutableStateMapOf<String, String>()
+    private val avatarRequests = mutableSetOf<String>()
     private val operations = Operations(viewModelScope)
 
     /** Set when a sign-in finished; the UI consumes it to leave the login screens. */
@@ -43,6 +53,27 @@ class AccountViewModel(
 
     init {
         retryLoad()
+        viewModelScope.launch { accounts.collect { state -> if (state is AccountsState.Ready) loadAvatars(state) } }
+    }
+
+    private fun loadAvatars(state: AccountsState.Ready) {
+        val present = state.accounts.map { it.identity }.toSet()
+        avatars.keys.retainAll(present)
+        avatarRequests.retainAll(present)
+        for (account in state.accounts) {
+            if (account.expired || !avatarRequests.add(account.identity)) continue
+            val credentials = repository.credentials(account.identity) ?: continue
+            viewModelScope.launch {
+                try {
+                    val url = withContext(Dispatchers.Default) { profile.avatar(credentials) }
+                    if (url != null && account.identity in avatarRequests) avatars[account.identity] = url
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Optional, as in XMPlus: the default picture stays, and the next launch tries again.
+                }
+            }
+        }
     }
 
     fun retryLoad() = operations.launch { repository.load() }
@@ -110,7 +141,9 @@ class AccountViewModel(
     companion object {
         const val MaxImportCharacters = 65_536
 
-        fun factory(repository: AccountRepository, login: XmlyLogin, playback: PlaybackController): ViewModelProvider.Factory =
-            viewModelFactory { initializer { AccountViewModel(repository, login, playback) } }
+        fun factory(
+            repository: AccountRepository, login: XmlyLogin, playback: PlaybackController, profile: XmlyProfile,
+        ): ViewModelProvider.Factory =
+            viewModelFactory { initializer { AccountViewModel(repository, login, playback, profile) } }
     }
 }

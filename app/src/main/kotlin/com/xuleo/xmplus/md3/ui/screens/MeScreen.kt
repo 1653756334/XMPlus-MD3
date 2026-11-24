@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -27,6 +29,7 @@ import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.settings.AppLanguage
 import com.xuleo.xmplus.md3.settings.setAppLanguage
 import com.xuleo.xmplus.md3.ui.Destination
+import coil3.compose.AsyncImage
 
 @Composable
 fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?) {
@@ -36,6 +39,7 @@ fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> 
     MeContent(language, ::setAppLanguage, state, viewModel?.busy == true, viewModel?.errorCode,
         onManage = onManage, onImport = onLogin, onImportBackup = onImportBackup,
         onRefresh = { viewModel?.refreshQuota(it) }, onRetry = { viewModel?.retryLoad() },
+        avatars = viewModel?.avatars.orEmpty(),
         generalExtras = { if (historyUpload != null) HistoryUploadSettings(historyUpload) })
 }
 
@@ -51,6 +55,7 @@ internal fun MeContent(
     onImportBackup: () -> Unit = {},
     onRefresh: (String) -> Unit = {},
     onRetry: () -> Unit = {},
+    avatars: Map<String, String> = emptyMap(),
     generalExtras: @Composable () -> Unit = {},
 ) {
     var showLanguage by rememberSaveable { mutableStateOf(false) }
@@ -67,7 +72,7 @@ internal fun MeContent(
                         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    AccountAvatar()
+                                    AccountAvatar(primary?.let { avatars[it.identity] })
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(if (primary == null) stringResource(R.string.account_welcome) else accountName(primary),
                                             style = MaterialTheme.typography.titleLarge)
@@ -116,9 +121,11 @@ internal fun MeContent(
 }
 
 @Composable
-internal fun AccountAvatar() {
-    Box(Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+internal fun AccountAvatar(url: String? = null) {
+    // The default picture stays underneath, so it shows while the avatar loads and if it cannot be loaded.
+    Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
         Icon(Icons.Outlined.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (url != null) AsyncImage(url, contentDescription = null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
     }
 }
 

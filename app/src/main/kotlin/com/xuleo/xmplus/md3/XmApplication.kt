@@ -31,6 +31,7 @@ import com.xuleo.xmplus.md3.core.protocol.XmlyHttp
 import com.xuleo.xmplus.md3.core.protocol.XmlyLibrary
 import com.xuleo.xmplus.md3.core.protocol.XmlyLogin
 import com.xuleo.xmplus.md3.core.protocol.XmlyPlayback
+import com.xuleo.xmplus.md3.core.protocol.XmlyProfile
 import com.xuleo.xmplus.md3.core.protocol.XmlyQuotaClient
 import com.xuleo.xmplus.md3.core.protocol.XmlyRewards
 import com.xuleo.xmplus.md3.core.protocol.XmlySearch
@@ -62,6 +63,7 @@ class XmApplication : Application(), PlaybackOwner {
     val album by lazy { XmlyAlbum(http) }
     val playbackApi by lazy { XmlyPlayback(http) }
     val anchor by lazy { XmlyAnchor(http) }
+    val profile by lazy { XmlyProfile(http) }
     val transcript by lazy { XmlyTranscript(http) }
     val library by lazy { XmlyLibrary(http) }
     val libraryActions by lazy { LibraryActions(accounts, library) }
