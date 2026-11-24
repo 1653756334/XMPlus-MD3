@@ -99,7 +99,7 @@ internal object Endpoints {
     val RankTabs = pc("/simple-revision-for-pc/rank/v4/rankTabs")
     val RankElements = pc("/simple-revision-for-pc/rank/v4/element")
     val AlbumInfo = read(Host.Mobile, "/mobile/v1/album/info")
-    val AlbumTracks = read(Host.Mobile, "/mobile/v1/album/track/ts-{ts}", Login.Optional)
+    val AlbumTracks = read(Host.Mobile, "/mobile/v1/album/track/v2", Login.Optional)
     val AlbumIntroduction = read(Host.Mobile, "/fmobile-album/album/rec/detail/ts-{ts}")
     val AlbumIntroductionAccount = read(Host.Mobile, "/mobile-album/album/plant/detail", Login.Required)
     val AlbumSimilar = read(Host.Mobile, "/album-mobile/album/similar/querySimilarAlbumList/ts-{ts}")

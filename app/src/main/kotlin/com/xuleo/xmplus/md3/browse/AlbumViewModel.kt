@@ -249,7 +249,9 @@ class AlbumViewModel(
 
     fun retryEpisodes() {
         val state = mutable.value
-        if (!state.episodesLoading) loadEpisodes(state.episodePage + 1)
+        if (state.episodesLoading) return
+        // A list whose album changed while it was read starts again, so its positions agree with the new total.
+        loadEpisodes(if (state.episodesErrorCode == "catalogue_changed") 1 else state.episodePage + 1)
     }
 
     /** Reads one page in the order the state asks for. Page 1 starts the list; later pages are added to its end. */
@@ -264,13 +266,17 @@ class AlbumViewModel(
                 val read = withContext(Dispatchers.Default) {
                     album.episodePage(albumId, page, ascending, detail.recordDescending, accounts.primaryCredentials())
                 }
-                // A page whose total has moved means the album changed under us.
-                if (read.total != detail.album.trackCount) throw XmlyException("catalogue_changed")
+                // The first page sets the total, as the original app does, so an album that gained an episode since its
+                // details were read still lists. A later page whose total has moved means the album changed under us.
+                if (page > 1 && read.total != detail.album.trackCount) throw XmlyException("catalogue_changed")
                 val tracks = read.items.sortedWith(
                     if (ascending) compareBy { it.officialPosition } else compareByDescending { it.officialPosition },
                 )
                 mutable.update { now ->
                     now.copy(
+                        detail = now.detail?.let {
+                            if (page == 1 && it.album.trackCount != read.total) it.copy(album = it.album.copy(trackCount = read.total)) else it
+                        },
                         episodes = (if (page == 1) emptyList() else now.episodes) + tracks,
                         episodePage = page,
                         episodesHasMore = page * read.pageSize < read.total,
