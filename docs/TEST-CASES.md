@@ -145,6 +145,8 @@ Source: XMPlus `lib/storage/config_archive.dart`.
 - BR-02 Search results switch between 全部, 专辑, 声音 and 主播, each with its own paging.
 - BR-03 Hot words turned off in settings → no hot words on 发现 or in search.
 - BR-04 The same album, track or anchor never appears twice on a page; the last page shows there is nothing more.
+- BR-05 Search history keeps the last 10 keywords on this device, newest first; searching a kept keyword again moves it to the front. An empty or over-long keyword is neither searched nor kept.
+- BR-06 History shows one line until expanded; a long press removes one keyword, and clearing all asks first. Popular searches are a ranked list that scrolls with the history.
 
 ### 发现, categories and rankings
 

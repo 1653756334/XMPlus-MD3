@@ -64,6 +64,9 @@ class XmApplication : Application(), PlaybackOwner {
     val playbackApi by lazy { XmlyPlayback(http) }
     val anchor by lazy { XmlyAnchor(http) }
     val profile by lazy { XmlyProfile(http) }
+
+    /** Keywords searched on this device; never part of a backup. */
+    val searchHistory by lazy { com.xuleo.xmplus.md3.browse.SearchHistoryStore(this) }
     val transcript by lazy { XmlyTranscript(http) }
     val library by lazy { XmlyLibrary(http) }
     val libraryActions by lazy { LibraryActions(accounts, library) }

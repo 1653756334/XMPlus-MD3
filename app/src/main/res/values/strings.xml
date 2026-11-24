@@ -226,7 +226,13 @@
     <string name="search_hint">Search albums, sounds, anchors</string>
     <string name="search_submit">Search</string>
     <string name="search_clear">Clear</string>
-    <string name="search_hot">Trending</string>
+    <string name="search_hot">Popular searches</string>
+    <string name="search_history">Search history</string>
+    <string name="search_history_clear">Clear search history</string>
+    <string name="search_history_clear_title">Clear search history?</string>
+    <string name="search_history_expand">Show more</string>
+    <string name="search_history_collapse">Show less</string>
+    <string name="search_history_delete">Delete</string>
     <string name="search_prompt">Search for something to listen to</string>
     <string name="search_empty">No results found</string>
     <string name="search_invalid">Enter 1 to 200 characters</string>

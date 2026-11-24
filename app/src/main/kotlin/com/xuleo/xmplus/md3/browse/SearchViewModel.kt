@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AnchorProfile
 import com.xuleo.xmplus.md3.core.model.HotWord
+import com.xuleo.xmplus.md3.core.model.SearchHistory
 import com.xuleo.xmplus.md3.core.model.SearchKind
 import com.xuleo.xmplus.md3.core.model.SearchPage
 import com.xuleo.xmplus.md3.core.model.Track
@@ -41,6 +42,10 @@ data class SearchResult(
 
 data class SearchState(
     val hotWords: List<HotWord> = emptyList(),
+    /** False until the first hot-word read has finished, so the list can show placeholders meanwhile. */
+    val hotWordsSettled: Boolean = false,
+    /** Keywords searched on this device, newest first. */
+    val history: List<String> = emptyList(),
     val keyword: String? = null,
     val kind: SearchKind = SearchKind.All,
     val results: Map<SearchKind, SearchResult> = emptyMap(),
@@ -55,6 +60,7 @@ data class SearchState(
 class SearchViewModel(
     private val search: XmlySearch,
     private val discovery: XmlyDiscovery,
+    private val historyStore: SearchHistoryStore,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(SearchState())
     val state: StateFlow<SearchState> = mutable.asStateFlow()
@@ -64,6 +70,10 @@ class SearchViewModel(
 
     init {
         loadHotWords()
+        viewModelScope.launch {
+            val history = withContext(Dispatchers.IO) { historyStore.read() }
+            mutable.update { it.copy(history = history) }
+        }
     }
 
     /** Fetches hot words if there are none yet; failing is quiet because they only decorate. */
@@ -72,23 +82,43 @@ class SearchViewModel(
         hotJob = viewModelScope.launch {
             try {
                 val words = withContext(Dispatchers.Default) { discovery.hotWords() }
-                mutable.update { it.copy(hotWords = words) }
+                mutable.update { it.copy(hotWords = words, hotWordsSettled = true) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
+                mutable.update { it.copy(hotWordsSettled = true) }
             }
         }
     }
 
+    /** Searches [raw] and keeps it in the history. An invalid keyword is neither searched nor kept. */
     fun submit(raw: String) {
-        val keyword = raw.dartTrim()
         cancelAll()
-        if (keyword.isEmpty() || raw.length > MAX_KEYWORD) {
+        val keyword = SearchHistory.keyword(raw)
+        if (keyword == null) {
             mutable.update { it.copy(keyword = null, results = emptyMap(), invalid = true) }
             return
         }
-        mutable.update { it.copy(keyword = keyword, results = emptyMap(), invalid = false) }
+        mutable.update {
+            it.copy(keyword = keyword, results = emptyMap(), invalid = false, history = SearchHistory.record(it.history, keyword))
+        }
+        saveHistory()
         load(mutable.value.kind, 1)
+    }
+
+    fun removeHistory(keyword: String) {
+        mutable.update { it.copy(history = it.history - keyword) }
+        saveHistory()
+    }
+
+    fun clearHistory() {
+        mutable.update { it.copy(history = emptyList()) }
+        saveHistory()
+    }
+
+    private fun saveHistory() {
+        val history = mutable.value.history
+        viewModelScope.launch(Dispatchers.IO) { historyStore.write(history) }
     }
 
     fun selectKind(kind: SearchKind) {
@@ -145,13 +175,12 @@ class SearchViewModel(
     }
 
     companion object {
-        const val MAX_KEYWORD = 200
         /** 全部 shows a short preview of each kind; the kind's own tab pages through all of it. */
         const val ALL_PAGE_SIZE = 6
         const val PAGE_SIZE = 30
 
-        fun factory(search: XmlySearch, discovery: XmlyDiscovery): ViewModelProvider.Factory = viewModelFactory {
-            initializer { SearchViewModel(search, discovery) }
+        fun factory(search: XmlySearch, discovery: XmlyDiscovery, history: SearchHistoryStore): ViewModelProvider.Factory = viewModelFactory {
+            initializer { SearchViewModel(search, discovery, history) }
         }
     }
 }

@@ -55,7 +55,7 @@ fun XmApp() {
         factory = AccountViewModel.factory(application.accounts, application.login, application.playback, application.profile),
     )
     val discover: DiscoverViewModel = viewModel(factory = DiscoverViewModel.factory(application.home, application.browse, application.accounts))
-    val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery))
+    val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(application.search, application.discovery, application.searchHistory))
     val allAlbums: AllAlbumsViewModel = viewModel(factory = AllAlbumsViewModel.factory(application.browse))
     val categories: CategoriesViewModel = viewModel(factory = CategoriesViewModel.factory(application.discovery))
     val categoryAlbums: CategoryAlbumsViewModel = viewModel(factory = CategoryAlbumsViewModel.factory(application.discovery))

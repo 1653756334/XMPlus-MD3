@@ -1,10 +1,14 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -15,15 +19,22 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
@@ -62,6 +73,7 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenAlbum: (String) -> Unit = {},
     SearchContent(
         state, onBack, viewModel::submit, viewModel::clear, viewModel::dismissInvalid,
         viewModel::selectKind, viewModel::loadMore, viewModel::retry, onOpenAlbum, onOpenAnchor,
+        viewModel::removeHistory, viewModel::clearHistory,
     )
 }
 
@@ -77,6 +89,8 @@ internal fun SearchContent(
     onRetry: (SearchKind) -> Unit,
     onOpenAlbum: (String) -> Unit = {},
     onOpenAnchor: (String) -> Unit = {},
+    onRemoveHistory: (String) -> Unit = {},
+    onClearHistory: () -> Unit = {},
 ) {
     val query = rememberTextFieldState()
     val focus = LocalFocusManager.current
@@ -131,33 +145,210 @@ internal fun SearchContent(
             TextButton({ submit(query.text.toString()) }, Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.search_submit)) }
         }
         if (state.keyword == null) {
-            Suggestions(state.hotWords) {
-                query.setTextAndPlaceCursorAtEnd(it.word)
-                submit(it.word)
-            }
+            Suggestions(
+                state.history, state.hotWords, hotLoading = !state.hotWordsSettled && state.hotWords.isEmpty(),
+                onPick = {
+                    query.setTextAndPlaceCursorAtEnd(it)
+                    submit(it)
+                },
+                onRemove = onRemoveHistory, onClear = onClearHistory,
+            )
         } else {
             Results(state, onSelectKind, onLoadMore, onRetry, onOpenAlbum, onOpenAnchor)
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+private val ChipHeight = 32.dp
+private val ChipGap = 8.dp
+private const val HotPlaceholders = 8
+
+/** Before a search: this device's history on top, then the popular searches as a ranked list; the two scroll together. */
 @Composable
-private fun Suggestions(hotWords: List<HotWord>, onPick: (HotWord) -> Unit) {
+private fun Suggestions(
+    history: List<String>,
+    hotWords: List<HotWord>,
+    hotLoading: Boolean,
+    onPick: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    if (history.isEmpty() && hotWords.isEmpty() && !hotLoading) return Message(R.string.search_prompt)
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        if (hotWords.isEmpty()) {
-            Message(R.string.search_prompt)
-        } else {
-            Column(
-                Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth().padding(XmLayout.PagePadding),
-                verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
-            ) {
-                Text(stringResource(R.string.search_hot), style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    hotWords.forEach { word -> AssistChip(onClick = { onPick(word) }, label = { Text(word.display, maxLines = 1) }) }
+        LazyColumn(Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxSize(), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
+            if (history.isNotEmpty()) {
+                item(key = "history-head") {
+                    SectionHead(R.string.search_history) {
+                        IconButton({ confirmClear = true }) {
+                            Icon(XmIcons.Outlined.Delete, stringResource(R.string.search_history_clear))
+                        }
+                    }
+                }
+                item(key = "history") { HistoryChips(history, onPick, onRemove) }
+            }
+            if (hotLoading || hotWords.isNotEmpty()) {
+                item(key = "hot-head") { SectionHead(R.string.search_hot) }
+                if (hotLoading) {
+                    items(HotPlaceholders, key = { "hot-placeholder-$it" }) { HotWordPlaceholder() }
+                } else {
+                    // The same word can be listed twice, so rows are keyed by rank.
+                    itemsIndexed(hotWords, key = { index, _ -> "hot-$index" }) { index, word ->
+                        HotWordRow(index + 1, word.display) { onPick(word.word) }
+                    }
                 }
             }
         }
+    }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.search_history_clear_title)) },
+            confirmButton = {
+                TextButton({ confirmClear = false; onClear() }) { Text(stringResource(R.string.history_clear_confirm)) }
+            },
+            dismissButton = { TextButton({ confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun SectionHead(@StringRes title: Int, action: @Composable () -> Unit = {}) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).padding(start = XmLayout.PagePadding, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(title), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        action()
+    }
+}
+
+/** One line of keywords; the arrow at its end opens the rest. A long press removes a keyword. */
+@Composable
+private fun HistoryChips(history: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    CollapsibleChipRows(
+        expanded,
+        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding)
+            .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
+        toggle = {
+            Surface(
+                onClick = { expanded = !expanded }, shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(ChipHeight),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (expanded) XmIcons.Filled.KeyboardArrowUp else XmIcons.Filled.KeyboardArrowDown,
+                        stringResource(if (expanded) R.string.search_history_collapse else R.string.search_history_expand),
+                        Modifier.size(20.dp),
+                    )
+                }
+            }
+        },
+    ) {
+        history.forEach { keyword ->
+            HistoryChip(keyword, onClick = { onPick(keyword) }) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onRemove(keyword)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryChip(keyword: String, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Box(
+            Modifier.combinedClickable(
+                onLongClickLabel = stringResource(R.string.search_history_delete), onLongClick = onLongClick, onClick = onClick,
+            ).height(ChipHeight).widthIn(max = 200.dp).padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(keyword, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * Chips in rows. Collapsed, only the first row shows, with [toggle] at its end; expanded, every row shows and [toggle]
+ * ends the last one. When everything fits on one row there is no [toggle].
+ */
+@Composable
+private fun CollapsibleChipRows(
+    expanded: Boolean,
+    modifier: Modifier,
+    toggle: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Layout(listOf(content, toggle), modifier) { (chipMeasurables, toggleMeasurables), constraints ->
+        val gap = ChipGap.roundToPx()
+        val width = constraints.maxWidth
+        val switch = toggleMeasurables.first().measure(Constraints())
+        val chips = chipMeasurables.map { it.measure(Constraints(maxWidth = (width - switch.width - gap).coerceAtLeast(0))) }
+        fun span(line: List<Int>) = line.sumOf { chips[it].width } + gap * (line.size - 1)
+        fun lines(firstWidth: Int): List<List<Int>> {
+            val result = mutableListOf<MutableList<Int>>()
+            chips.indices.forEach { index ->
+                val line = result.lastOrNull()
+                val room = if (result.size <= 1) firstWidth else width
+                if (line != null && span(line) + gap + chips[index].width <= room) line += index else result += mutableListOf(index)
+            }
+            return result
+        }
+        val all = lines(width)
+        val overflowing = all.size > 1
+        val shown = if (overflowing && !expanded) lines(width - switch.width - gap).take(1) else all
+        val switchRow = when {
+            !overflowing -> -1
+            !expanded -> 0
+            span(shown.last()) + gap + switch.width <= width -> shown.size - 1
+            else -> shown.size
+        }
+        val rowHeight = maxOf(chips.maxOfOrNull { it.height } ?: 0, switch.height)
+        val rows = maxOf(shown.size, switchRow + 1)
+        layout(width, (rows * rowHeight + (rows - 1) * gap).coerceAtLeast(0)) {
+            shown.forEachIndexed { row, line ->
+                var x = 0
+                val y = row * (rowHeight + gap)
+                line.forEach {
+                    chips[it].placeRelative(x, y + (rowHeight - chips[it].height) / 2)
+                    x += chips[it].width + gap
+                }
+            }
+            if (switchRow >= 0) {
+                switch.placeRelative(width - switch.width, switchRow * (rowHeight + gap) + (rowHeight - switch.height) / 2)
+            }
+        }
+    }
+}
+
+/** A popular search with its rank; the top three stand out in the accent colour. */
+@Composable
+private fun HotWordRow(rank: Int, text: String, onClick: () -> Unit) {
+    val top = rank <= 3
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 48.dp).padding(horizontal = XmLayout.PagePadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            rank.toString(), Modifier.width(32.dp), style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (top) FontWeight.Bold else FontWeight.Normal,
+            color = if (top) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (top) FontWeight.Medium else null, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun HotWordPlaceholder() {
+    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = XmLayout.PagePadding), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(width = 16.dp, height = 16.dp).skeleton())
+        Spacer(Modifier.width(16.dp))
+        Box(Modifier.fillMaxWidth(0.5f).height(14.dp).skeleton())
     }
 }
 
@@ -285,5 +476,11 @@ private fun SearchResultsPreview() = XmPreview {
 @XmPreviews
 @Composable
 private fun SearchIdlePreview() = XmPreview {
-    SearchContent(SearchState(hotWords = listOf(HotWord("a", "Hot"), HotWord("b", "Another hot word"))), {}, {}, {}, {}, {}, {}, {})
+    SearchContent(
+        SearchState(
+            hotWords = (1..12).map { HotWord("w$it", "Popular search $it") }, hotWordsSettled = true,
+            history = listOf("Mystery", "A rather long keyword", "History", "Sci-fi", "Comedy", "Audiobook"),
+        ),
+        {}, {}, {}, {}, {}, {}, {},
+    )
 }

@@ -222,7 +222,13 @@
     <string name="search_hint">搜索专辑、声音、主播</string>
     <string name="search_submit">搜索</string>
     <string name="search_clear">清空</string>
-    <string name="search_hot">热搜</string>
+    <string name="search_hot">热门搜索</string>
+    <string name="search_history">搜索历史</string>
+    <string name="search_history_clear">清空搜索历史</string>
+    <string name="search_history_clear_title">清空搜索历史？</string>
+    <string name="search_history_expand">展开</string>
+    <string name="search_history_collapse">收起</string>
+    <string name="search_history_delete">删除</string>
     <string name="search_prompt">搜索你想听的内容</string>
     <string name="search_empty">没有找到相关内容</string>
     <string name="search_invalid">请输入 1～200 字的关键词</string>
