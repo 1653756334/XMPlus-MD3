@@ -62,15 +62,20 @@ internal fun AnchorScreen(viewModel: AnchorViewModel, onOpenAlbum: (String) -> U
     }
 
     if (header.uid == null) {
-        DetailPage(onBack) {
-            if (header.loading) ListSkeleton()
-            else ErrorState(header.errorCode.orEmpty(), viewModel::retryProfile)
+        if (header.loading) {
+            DetailPage(onBack, header = { AnchorHeroSkeleton() }) { ListSkeleton(Modifier.weight(1f)) }
+        } else {
+            DetailPage(onBack) { ErrorState(header.errorCode.orEmpty(), viewModel::retryProfile) }
         }
         return
     }
 
     val profile = header.profile
-    val hero: (@Composable () -> Unit)? = if (profile != null) ({ AnchorHero(profile, header.follow, viewModel::toggleFollow) }) else null
+    val hero: (@Composable () -> Unit)? = when {
+        profile != null -> ({ AnchorHero(profile, header.follow, viewModel::toggleFollow) })
+        header.loading -> ({ AnchorHeroSkeleton() })
+        else -> null
+    }
     val refreshing = if (pager.settledPage == 0) albums.refreshing else tracks.refreshing
     val refreshState = rememberPullToRefreshState()
     // Collapsing chrome is inside the refresh box so it expands before a downward drag can trigger a refresh.
@@ -163,6 +168,30 @@ private fun AnchorHero(profile: AnchorProfile, follow: LibraryToggle, onFollow: 
                         confirmButton = { TextButton(onClick = { showIntro = false }) { Text(stringResource(R.string.action_close)) } },
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Stands in for [AnchorHero] while the profile loads: the avatar, name, details and introduction as blocks. */
+@Composable
+private fun AnchorHeroSkeleton() {
+    DetailHero(null) {
+        Column(
+            Modifier.widthIn(max = XmLayout.ContentWidth).fillMaxWidth().padding(XmLayout.PagePadding),
+            verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+                Box(Modifier.size(72.dp).skeleton(CircleShape))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxWidth(0.55f).height(22.dp).skeleton())
+                    Box(Modifier.fillMaxWidth(0.4f).height(12.dp).skeleton())
+                    Box(Modifier.fillMaxWidth(0.3f).height(12.dp).skeleton())
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.fillMaxWidth().height(12.dp).skeleton())
+                Box(Modifier.fillMaxWidth(0.7f).height(12.dp).skeleton())
             }
         }
     }

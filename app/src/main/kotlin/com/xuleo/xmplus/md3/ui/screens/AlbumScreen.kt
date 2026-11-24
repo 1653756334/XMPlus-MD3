@@ -153,9 +153,10 @@ internal fun AlbumScreen(
     LaunchedEffect(pager.currentPage) { if (pager.currentPage == AlbumTab.Reviews) viewModel.ensureReviews() }
     val detail = state.detail
     if (detail == null) {
-        DetailPage(onBack) {
-            if (state.headerLoading) ListSkeleton(Modifier.fillMaxSize())
-            else ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader)
+        if (state.headerLoading) {
+            DetailPage(onBack, header = { AlbumHeroSkeleton() }) { ListSkeleton(Modifier.weight(1f)) }
+        } else {
+            DetailPage(onBack) { ErrorState(state.headerErrorCode.orEmpty(), viewModel::retryHeader) }
         }
     } else {
         DetailPage(

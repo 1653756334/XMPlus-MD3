@@ -3,6 +3,7 @@ package com.xuleo.xmplus.md3.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Icon
@@ -76,6 +78,40 @@ fun AlbumHero(
             )
             Spacer(Modifier.height(10.dp))
             Tags(detail.tags.take(MaxTags))
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+/** Stands in for [AlbumHero] while the album loads: blocks where the cover, title, anchor, numbers and tags will be. */
+@Composable
+fun AlbumHeroSkeleton(modifier: Modifier = Modifier) {
+    DetailHero(null, modifier) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(HeaderCover).skeleton(MaterialTheme.shapes.large))
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f).heightIn(min = HeaderCover)) {
+                    Box(Modifier.fillMaxWidth().height(22.dp).skeleton())
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth(0.6f).height(22.dp).skeleton())
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.height(AnchorHeight), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(20.dp).skeleton(CircleShape))
+                        Spacer(Modifier.width(6.dp))
+                        Box(Modifier.width(96.dp).height(14.dp).skeleton())
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(0.7f).height(16.dp).skeleton())
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.height(TagHeight), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(3) { Box(Modifier.width(56.dp).height(24.dp).skeleton()) }
+            }
             Spacer(Modifier.height(20.dp))
         }
     }
