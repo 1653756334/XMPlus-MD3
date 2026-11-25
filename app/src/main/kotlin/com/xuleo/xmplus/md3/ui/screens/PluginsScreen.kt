@@ -4,7 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.annotation.StringRes
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -80,6 +90,9 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
     var showLink by rememberSaveable { mutableStateOf(false) }
     var showSubscriptions by rememberSaveable { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
+    var selecting by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var confirmUninstall by remember { mutableStateOf(false) }
     var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
     var variablesFor by rememberSaveable { mutableStateOf<String?>(null) }
     var alternativeFor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -90,18 +103,42 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
     val job = viewModel.job
     // A batch shows its progress and results in a sheet; a single plugin only the line under the bar, then a snackbar.
     val jobSheet = job != null && !viewModel.hidden && (!job.running || job.total > 1)
+    val stopSelecting = { selecting = false; selected = emptySet() }
+    BackHandler(enabled = selecting, onBack = stopSelecting)
+    // Plugins that leave the list leave the selection too; with none left there is nothing to select.
+    LaunchedEffect(list) {
+        val names = list.mapTo(HashSet()) { it.platform }
+        selected = selected.filterTo(HashSet()) { it in names }
+        if (list.isEmpty()) selecting = false
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(if (sorting) R.string.plugin_sort else R.string.plugins_title)) },
+                title = {
+                    Text(
+                        when {
+                            selecting -> stringResource(R.string.history_selected, selected.size)
+                            sorting -> stringResource(R.string.plugin_sort)
+                            else -> stringResource(R.string.plugins_title)
+                        },
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { if (sorting) sorting = false else onBack() }) {
-                        Icon(if (sorting) XmIcons.Outlined.Close else XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back))
+                    IconButton(onClick = { if (selecting) stopSelecting() else if (sorting) sorting = false else onBack() }) {
+                        Icon(if (selecting || sorting) XmIcons.Outlined.Close else XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
-                    if (sorting) {
+                    if (selecting) {
+                        val all = list.isNotEmpty() && selected.size == list.size
+                        IconButton(onClick = { selected = if (all) emptySet() else list.mapTo(HashSet()) { it.platform } }) {
+                            Icon(
+                                XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
+                                tint = if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            )
+                        }
+                    } else if (sorting) {
                         TextButton(onClick = { viewModel.reorder(order); sorting = false }) { Text(stringResource(R.string.plugin_done)) }
                     } else {
                         IconButton(onClick = { showInstall = true }, enabled = !viewModel.busy) {
@@ -114,11 +151,16 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
                             IconButton(onClick = { showMore = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.plugin_more)) }
                             XmMenu(showMore, onDismissRequest = { showMore = false }) {
                                 XmMenuItem(
+                                    stringResource(R.string.history_select),
+                                    { showMore = false; selecting = true },
+                                    0, 3, enabled = list.isNotEmpty(),
+                                )
+                                XmMenuItem(
                                     stringResource(R.string.plugin_sort),
                                     { showMore = false; order = list.map { it.platform }; sorting = true },
-                                    0, 2, enabled = list.size > 1,
+                                    1, 3, enabled = list.size > 1,
                                 )
-                                XmMenuItem(stringResource(R.string.plugin_subscriptions), { showMore = false; showSubscriptions = true }, 1, 2)
+                                XmMenuItem(stringResource(R.string.plugin_subscriptions), { showMore = false; showSubscriptions = true }, 2, 3)
                             }
                         }
                     }
@@ -128,20 +170,50 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            if (viewModel.busy && !jobSheet) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
-            when {
-                plugins == null -> Unit
-                list.isEmpty() -> PluginsEmpty { showInstall = true }
-                sorting -> SortList(order.mapNotNull(::find)) { order = it }
-                else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                    list.forEach { plugin ->
-                        key(plugin.platform) {
-                            PluginRow(plugin, onOpen = { menuFor = plugin.platform }) { viewModel.setEnabled(plugin.platform, it) }
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Column(Modifier.fillMaxSize()) {
+                if (viewModel.busy && !jobSheet) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
+                when {
+                    plugins == null -> Unit
+                    list.isEmpty() -> PluginsEmpty { showInstall = true }
+                    sorting -> SortList(order.mapNotNull(::find)) { order = it }
+                    else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        list.forEach { plugin ->
+                            key(plugin.platform) {
+                                PluginRow(
+                                    plugin,
+                                    selecting = selecting,
+                                    selected = plugin.platform in selected,
+                                    onOpen = { menuFor = plugin.platform },
+                                    onSelect = { on -> selected = if (on) selected + plugin.platform else selected - plugin.platform },
+                                    onLongClick = if (sorting || selecting) null else ({ selecting = true; selected = setOf(plugin.platform) }),
+                                ) { viewModel.setEnabled(plugin.platform, it) }
+                            }
                         }
+                        // Keeps the last rows clear of the toolbar.
+                        Spacer(Modifier.height(if (selecting) SelectionToolbarSpace else XmLayout.SectionGap))
                     }
-                    Spacer(Modifier.height(XmLayout.SectionGap))
                 }
+            }
+            val motion = MaterialTheme.motionScheme
+            AnimatedVisibility(
+                visible = selecting,
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                    .padding(bottom = FloatingToolbarDefaults.ScreenOffset),
+                enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.defaultEffectsSpec()),
+                exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
+            ) {
+                val chosen = list.filter { it.platform in selected }
+                SelectionToolbar(
+                    canEnable = chosen.any { it.meta.disabled },
+                    canDisable = chosen.any { !it.meta.disabled },
+                    canUpdate = !viewModel.busy && chosen.any { it.info.srcUrl != null },
+                    canUninstall = !viewModel.busy && chosen.isNotEmpty(),
+                    onEnable = { viewModel.setEnabled(selected, true); stopSelecting() },
+                    onDisable = { viewModel.setEnabled(selected, false); stopSelecting() },
+                    onUpdate = { viewModel.update(selected); stopSelecting() },
+                    onUninstall = { confirmUninstall = true },
+                )
             }
         }
     }
@@ -208,6 +280,19 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { uninstallFor = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
+    if (confirmUninstall) {
+        val count = selected.size
+        AlertDialog(
+            onDismissRequest = { confirmUninstall = false },
+            title = { Text(pluralStringResource(R.plurals.plugin_uninstall_count, count, count)) },
+            confirmButton = {
+                TextButton(onClick = { confirmUninstall = false; viewModel.uninstall(selected); stopSelecting() }) {
+                    Text(stringResource(R.string.plugin_uninstall), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmUninstall = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
     if (showSubscriptions) SubscriptionsSheet(
         subscriptions, busy = viewModel.busy,
         onDismiss = { showSubscriptions = false },
@@ -226,18 +311,81 @@ private fun PluginsEmpty(onInstall: () -> Unit) {
     }
 }
 
+/** A plugin's name, version and switch; while selecting, a check box takes the switch's place and a tap picks it. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PluginRow(plugin: InstalledPlugin, onOpen: () -> Unit, onToggle: (Boolean) -> Unit) {
+private fun PluginRow(
+    plugin: InstalledPlugin,
+    selecting: Boolean,
+    selected: Boolean,
+    onOpen: () -> Unit,
+    onSelect: (Boolean) -> Unit,
+    onLongClick: (() -> Unit)?,
+    onToggle: (Boolean) -> Unit,
+) {
     val error = plugin.info.error ?: if (plugin.info.usable) null else PluginErrorReason.CannotParse
-    ListItem(
-        onClick = onOpen,
-        modifier = Modifier.heightIn(min = PluginRowHeight),
-        supportingContent = {
-            if (error != null) Text(stringResource(errorText(error)), color = MaterialTheme.colorScheme.error, maxLines = 1)
-            else pluginMeta(plugin)?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        },
-        trailingContent = if (error == null) ({ Switch(checked = !plugin.meta.disabled, onCheckedChange = onToggle) }) else null,
-    ) { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    val supporting: @Composable () -> Unit = {
+        if (error != null) Text(stringResource(errorText(error)), color = MaterialTheme.colorScheme.error, maxLines = 1)
+        else pluginMeta(plugin)?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    }
+    val name: @Composable () -> Unit = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    if (selecting) {
+        ListItem(
+            checked = selected,
+            onCheckedChange = onSelect,
+            modifier = Modifier.heightIn(min = PluginRowHeight),
+            supportingContent = supporting,
+            trailingContent = { Checkbox(checked = selected, onCheckedChange = null) },
+            content = name,
+        )
+    } else {
+        ListItem(
+            onClick = onOpen,
+            modifier = Modifier.heightIn(min = PluginRowHeight),
+            supportingContent = supporting,
+            trailingContent = if (error == null) ({ Switch(checked = !plugin.meta.disabled, onCheckedChange = onToggle) }) else null,
+            onLongClick = onLongClick,
+            content = name,
+        )
+    }
+}
+
+private val SelectionToolbarSpace = 112.dp
+
+/** What can be done to the selected plugins at once, floating above the list. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SelectionToolbar(
+    canEnable: Boolean,
+    canDisable: Boolean,
+    canUpdate: Boolean,
+    canUninstall: Boolean,
+    onEnable: () -> Unit,
+    onDisable: () -> Unit,
+    onUpdate: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    HorizontalFloatingToolbar(expanded = true, colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors()) {
+        ToolbarAction(R.string.plugin_enable, XmIcons.Outlined.ToggleOn, canEnable, onEnable)
+        ToolbarAction(R.string.plugin_disable, XmIcons.Outlined.ToggleOff, canDisable, onDisable)
+        ToolbarAction(R.string.plugin_update, XmIcons.Outlined.Refresh, canUpdate, onUpdate)
+        ToolbarAction(R.string.plugin_uninstall, XmIcons.Outlined.DeleteOutline, canUninstall, onUninstall)
+    }
+}
+
+@Composable
+private fun ToolbarAction(@StringRes label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.widthIn(min = 64.dp).clip(MaterialTheme.shapes.large)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .alpha(if (enabled) 1f else 0.38f)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Icon(icon, contentDescription = null)
+        Text(stringResource(label), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+    }
 }
 
 /** Version and author, the one quiet line under a plugin's name. */

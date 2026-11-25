@@ -460,6 +460,12 @@
     <string name="plugin_about">About</string>
     <string name="plugin_uninstall">Uninstall</string>
     <string name="plugin_uninstall_title">Uninstall %1$s?</string>
+    <plurals name="plugin_uninstall_count">
+        <item quantity="one">Uninstall %1$d plugin?</item>
+        <item quantity="other">Uninstall %1$d plugins?</item>
+    </plurals>
+    <string name="plugin_enable">Enable</string>
+    <string name="plugin_disable">Disable</string>
     <string name="plugin_save">Save</string>
     <string name="plugin_version">v%1$s</string>
     <string name="plugin_error_parse">Cannot be read</string>

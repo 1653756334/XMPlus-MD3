@@ -213,6 +213,13 @@ class PluginManager(context: Context, client: OkHttpClient) {
         return batch(platforms, progress, { it }) { update(it) }
     }
 
+    /** Updates those of [platforms] that have a `srcUrl`; one failure does not stop the others. */
+    suspend fun update(platforms: Collection<String>, progress: InstallProgress = InstallProgress.None): List<InstallResult> {
+        val names = platforms.toSet()
+        val list = lock.withLock { records.filter { it.second.srcUrl != null && it.second.platform in names }.map { it.second.platform } }
+        return batch(list, progress, { it }) { update(it) }
+    }
+
     /** Installs from every subscription, in order. */
     suspend fun updateSubscriptions(progress: InstallProgress = InstallProgress.None): List<InstallResult> =
         installLinks(subscriptions.value.map { it.url }, progress)
@@ -227,6 +234,23 @@ class PluginManager(context: Context, client: OkHttpClient) {
     }
 
     suspend fun setEnabled(platform: String, enabled: Boolean) = editMeta(platform) { it.copy(disabled = !enabled) }
+
+    /** Enables or disables [platforms] together, saved once. */
+    suspend fun setEnabled(platforms: Collection<String>, enabled: Boolean) = lock.withLock {
+        val names = platforms.toSet()
+        metas = metas.mapValues { (platform, meta) -> if (platform in names) meta.copy(disabled = !enabled) else meta }
+        if (!enabled) records.filter { it.second.platform in names }.forEach { (file, _) -> hosts.remove(file)?.close() }
+        save()
+    }
+
+    /** Uninstalls [platforms] together, saved once. */
+    suspend fun uninstall(platforms: Collection<String>) = lock.withLock {
+        val names = platforms.toSet()
+        records.filter { it.second.platform in names }.forEach { (file, _) -> drop(file) }
+        records = records.filterNot { it.second.platform in names }
+        metas = metas - names
+        save()
+    }
 
     suspend fun setVariables(platform: String, values: Map<String, String>) = editMeta(platform) { it.copy(variables = values) }
 

@@ -443,6 +443,11 @@
     <string name="plugin_about">说明</string>
     <string name="plugin_uninstall">卸载</string>
     <string name="plugin_uninstall_title">卸载 %1$s？</string>
+    <plurals name="plugin_uninstall_count">
+        <item quantity="other">卸载 %1$d 个插件？</item>
+    </plurals>
+    <string name="plugin_enable">启用</string>
+    <string name="plugin_disable">停用</string>
     <string name="plugin_save">保存</string>
     <string name="plugin_version">v%1$s</string>
     <string name="plugin_error_parse">无法读取</string>

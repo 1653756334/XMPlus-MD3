@@ -257,7 +257,8 @@ Why this layout: the queue holds one kind of content at a time, so 继续听 is 
 
 - 我的: the 听书 account summary, then 插件 (with the count), then the settings groups; music settings (default play and download quality, quality fallback) join them.
 - 插件 page: one card per plugin with name, version, author and an enable switch; tapping opens its menu: 设置 (user variables), 替代插件, 更新, 说明, 复制链接, 卸载. Broken plugins show the reason in place of the switch.
-- Top bar: 安装 (from a file or a link), 全部更新, and 更多 → 排序, 订阅. Sorting is a mode with drag handles.
+- Top bar: 安装 (from a file or a link), 全部更新, and 更多 → 选择, 排序, 订阅. Sorting is a mode with drag handles.
+- Selection: a long press on a plugin, or 更多 → 选择, starts it with check boxes in place of the switches; the bar shows the count and 全选. A floating toolbar acts on the selected plugins at once: 启用, 停用, 更新 (those with a link, in the batch sheet) and 卸载 (after a confirmation). Back or ✕ ends it.
 - No sample plugin, list or website is shown anywhere.
 
 ### Motion

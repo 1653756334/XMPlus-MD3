@@ -96,6 +96,8 @@ class PluginsViewModel(private val app: XmApplication, private val manager: Plug
 
     fun updateAll() = work(update = true) { manager.updateAll(it) }
 
+    fun update(platforms: Set<String>) = work(update = true) { manager.update(platforms, it) }
+
     fun updateSubscriptions() = work(update = false) { manager.updateSubscriptions(it) }
 
     /** Closes the results, or lets a running job go on without the sheet. */
@@ -109,6 +111,14 @@ class PluginsViewModel(private val app: XmApplication, private val manager: Plug
 
     fun setEnabled(platform: String, enabled: Boolean) {
         viewModelScope.launch { manager.setEnabled(platform, enabled) }
+    }
+
+    fun setEnabled(platforms: Set<String>, enabled: Boolean) {
+        viewModelScope.launch { manager.setEnabled(platforms, enabled) }
+    }
+
+    fun uninstall(platforms: Set<String>) {
+        viewModelScope.launch { manager.uninstall(platforms) }
     }
 
     fun setVariables(platform: String, values: Map<String, String>) {
