@@ -2,6 +2,7 @@ package com.xuleo.xmplus.md3.core.media
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -53,6 +54,14 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
     val queue = mutableQueue.asStateFlow()
     private val mutableState = MutableStateFlow(MusicPlaybackState())
     val state = mutableState.asStateFlow()
+    private val mutableSpeed = MutableStateFlow(1f)
+    /** The speed songs play at until the app closes. */
+    val speed = mutableSpeed.asStateFlow()
+    private val sleepStore = SleepTimerStore(context)
+    private val mutableSleep = MutableStateFlow(SleepTimerState())
+    /** [SleepTimerState.atEpisodeEnd] means at the end of the current song. */
+    val sleepTimer = mutableSleep.asStateFlow()
+    private var sleepJob: Job? = null
 
     /** Plain client: plugin links go anywhere and redirect freely, with no Ximalaya headers or checks. */
     private val client by lazy {
@@ -191,8 +200,50 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
         remember()
     }
 
+    fun setSpeed(value: Float) {
+        if (!value.isFinite() || value < PlaybackMinSpeed || value > PlaybackMaxSpeed) return
+        mutableSpeed.value = value
+        engine.value?.takeIf(::isCurrent)?.setPlaybackSpeed(value)
+    }
+
+    /** Pause after [minutes] of wall-clock time. */
+    fun startSleepTimer(minutes: Int) {
+        if (mutableState.value.song == null) return
+        sleepStore.setMinutes(minutes)
+        cancelSleepTimer()
+        val deadline = SystemClock.elapsedRealtime() + minutes * 60_000L
+        sleepJob = scope.launch {
+            while (true) {
+                val remaining = deadline - SystemClock.elapsedRealtime()
+                if (remaining <= 0) break
+                mutableSleep.value = SleepTimerState(remainingMs = (remaining + 999) / 1000 * 1000)
+                delay(minOf(remaining, 1_000L))
+            }
+            sleepJob = null
+            mutableSleep.value = SleepTimerState()
+            pause()
+        }
+    }
+
+    /** The length of the last sleep timer started on this device, shared with 听书. */
+    fun lastSleepMinutes(): Int = sleepStore.minutes()
+
+    /** Pause when the current song ends, in place of moving to the next one. */
+    fun sleepAtSongEnd() {
+        if (mutableState.value.song == null) return
+        cancelSleepTimer()
+        mutableSleep.value = SleepTimerState(atEpisodeEnd = true)
+    }
+
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        sleepJob = null
+        if (mutableSleep.value.active) mutableSleep.value = SleepTimerState()
+    }
+
     /** Empties the queue and stops. */
     fun clear() {
+        cancelSleepTimer()
         revision++
         loading?.cancel()
         paging?.cancel()
@@ -365,6 +416,7 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
         opened = mediaId
         // Music asks other apps' sounds to duck rather than pause it; 听书 sets speech again when it opens.
         player.setAudioAttributes(MusicAttributes, true)
+        player.setPlaybackSpeed(mutableSpeed.value)
         player.setMediaSource(factory.createMediaSource(item), positionMs)
         player.prepare()
         player.playWhenReady = play
@@ -377,6 +429,14 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
 
     private fun finishSong(player: ExoPlayer) {
         failures = 0
+        if (mutableSleep.value.atEpisodeEnd) {
+            cancelSleepTimer()
+            player.pause()
+            player.seekTo(0)
+            publish(player)
+            remember()
+            return
+        }
         if (mutableQueue.value.mode == MusicPlayMode.Single) {
             player.seekTo(0)
             player.play()

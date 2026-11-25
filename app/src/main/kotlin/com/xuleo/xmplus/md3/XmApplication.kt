@@ -142,6 +142,16 @@ class XmApplication : Application(), PlaybackOwner {
     /** Where a song plays from: downloads, the media cache, the alternative plugin or the song's plugin. */
     val musicSources: MusicSources by lazy { MusicSources(this, plugins) }
 
+    /** Lyrics and comments of songs. */
+    val musicLyrics: com.xuleo.xmplus.md3.core.plugin.MusicLyrics by lazy {
+        com.xuleo.xmplus.md3.core.plugin.MusicLyrics(this, plugins)
+    }
+
+    /** 我喜欢. */
+    val musicFavorites: com.xuleo.xmplus.md3.core.media.MusicFavorites by lazy {
+        com.xuleo.xmplus.md3.core.media.MusicFavorites(this)
+    }
+
     /** Songs share the player with 听书; starting one stops the other. */
     override val music: MusicPlayback by lazy {
         val resolver = SongSourceResolver { song, quality ->

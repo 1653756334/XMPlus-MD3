@@ -50,11 +50,11 @@ Add a music platform to XMPlus-MD3 next to 听书:
 
 ### 播放 Player
 
-- [ ] Media source in MusicFree's order: local file → cache → alternative plugin → plugin, one retry
-- [ ] Quality: 低品质 / 标准 / 高品质 / 超高品质, default and fallback direction as in MusicFree
-- [ ] Play modes: 列表循环 / 单曲循环 / 随机
-- [ ] Lyrics: synced, translation, tap a line to seek, lyric search when a song has none
-- [ ] Comments when the plugin supports them
+- [x] Media source in MusicFree's order: local file → cache → alternative plugin → plugin, one retry
+- [x] Quality: 低品质 / 标准 / 高品质 / 超高品质, default and fallback direction as in MusicFree
+- [x] Play modes: 列表循环 / 单曲循环 / 随机
+- [x] Lyrics: synced, translation, tap a line to seek, lyric search when a song has none
+- [x] Comments when the plugin supports them
 - [ ] Editable queue: reorder, remove, clear, play next
 - [ ] Shared with 听书: mini player, sleep timer, notification, lock screen, Bluetooth, last session
 

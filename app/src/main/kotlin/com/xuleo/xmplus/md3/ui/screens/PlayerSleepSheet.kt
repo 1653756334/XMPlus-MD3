@@ -58,6 +58,9 @@ internal fun PlayerSleepSheet(
     onEpisodeEnd: () -> Unit,
     onOff: () -> Unit,
     onDismiss: () -> Unit,
+    /** The preset and status for pausing at the end of what is playing: the episode, or the song. */
+    @androidx.annotation.StringRes endPreset: Int = R.string.player_sleep_preset_episode_end,
+    @androidx.annotation.StringRes endStatus: Int = R.string.player_sleep_status_episode_end,
 ) {
     var minutes by remember { mutableIntStateOf(initialMinutes.coerceIn(MinSleepMinutes, MaxSleepMinutes)) }
     val sheet = rememberBottomSheetState(
@@ -78,7 +81,7 @@ internal fun PlayerSleepSheet(
     val remaining = timer.remainingMs
     val status = when {
         remaining != null -> stringResource(R.string.player_sleep_remaining, formatDuration(remaining / 1000.0))
-        timer.atEpisodeEnd -> stringResource(R.string.player_sleep_status_episode_end)
+        timer.atEpisodeEnd -> stringResource(endStatus)
         else -> null
     }
     ModalBottomSheet(
@@ -99,7 +102,7 @@ internal fun PlayerSleepSheet(
                 label = { choice ->
                     when (choice) {
                         is SleepChoice.Minutes -> stringResource(R.string.player_sleep_minutes, choice.minutes)
-                        SleepChoice.EpisodeEnd -> stringResource(R.string.player_sleep_preset_episode_end)
+                        SleepChoice.EpisodeEnd -> stringResource(endPreset)
                     }
                 },
                 onSelect = { choice ->

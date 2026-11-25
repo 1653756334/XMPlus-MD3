@@ -96,6 +96,9 @@ fun XmApp() {
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
         plugins = plugins, musicBrowse = musicBrowse, musicPage = musicPage, musicSearch = musicSearch,
+        musicPlayer = remember(application) {
+            MusicPlayerDeps(application.music, application.musicLyrics, application.musicCatalog, application.musicFavorites)
+        },
     )
 }
 
@@ -124,6 +127,7 @@ internal fun XmAppContent(
     musicBrowse: MusicBrowseViewModel? = null,
     musicPage: @Composable (AppRoute.MusicDetail) -> MusicDetailViewModel? = { null },
     musicSearch: MusicSearchViewModel? = null,
+    musicPlayer: MusicPlayerDeps? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -147,6 +151,7 @@ internal fun XmAppContent(
     val navigationType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
     val accountState = accounts?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
     val hotWords = search?.state?.collectAsStateWithLifecycle()?.value?.hotWords.orEmpty()
+    val playingSong = musicPlayer?.playback?.state?.collectAsStateWithLifecycle()?.value?.song
 
     BackHandler(enabled = !isPlayer && isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
     LaunchedEffect(isHome) { if (isHome) suite.show() else suite.hide() }
@@ -293,7 +298,7 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             if (musicSearch != null) {
                                 MusicSearchScreen(musicSearch, plugins?.plugins?.collectAsStateWithLifecycle()?.value.orEmpty(), { navigator.pop() },
-                                    onOpen = ::openMusic, onPlay = {},
+                                    onOpen = ::openMusic, onPlay = { musicPlayer?.playback?.playNow(it) }, playingKey = playingSong?.key,
                                     source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) })
                             }
                         }
@@ -304,7 +309,8 @@ internal fun XmAppContent(
                                 MusicDetailScreen(
                                     vm, { navigator.pop() },
                                     onOpenAlbum = { openMusic(MusicDetailKind.Album, it) },
-                                    onPlay = { _, _ -> },
+                                    onPlay = { songs, index -> musicPlayer?.playback?.playList(songs, index, vm.queuePages()) },
+                                    playingKey = playingSong?.key,
                                 )
                             }
                         }
@@ -342,10 +348,17 @@ internal fun XmAppContent(
                     }
                 },
             )
-            MiniPlayer(playback, onOpen = ::openPlayer)
+            MiniPlayer(playback, onOpen = ::openPlayer, music = musicPlayer?.playback)
         }
     }
-    if (isPlayer && playback != null) {
+    val songActive = playingSong != null
+    if (isPlayer && musicPlayer != null && songActive) {
+        MusicPlayerSheet(
+            musicPlayer,
+            onDismiss = { stack.remove(AppRoute.Player) },
+            onOpenMusic = ::openMusic,
+        )
+    } else if (isPlayer && playback != null) {
         PlayerSheet(
             playback,
             onDismiss = { stack.remove(AppRoute.Player) },

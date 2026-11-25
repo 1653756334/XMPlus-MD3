@@ -52,7 +52,13 @@ private fun tenthsLabel(tenths: Int) = speedLabel(tenths / 10f)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerSpeedSheet(speed: Float, onSpeed: (Float) -> Unit, onDismiss: () -> Unit) {
+internal fun PlayerSpeedSheet(
+    speed: Float,
+    onSpeed: (Float) -> Unit,
+    onDismiss: () -> Unit,
+    /** What the speed applies to; null hides the note. */
+    @androidx.annotation.StringRes scope: Int? = R.string.player_speed_scope,
+) {
     var shown by remember(speed) { mutableIntStateOf(tenths(speed)) }
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -101,8 +107,8 @@ internal fun PlayerSpeedSheet(speed: Float, onSpeed: (Float) -> Unit, onDismiss:
                     commit(it)
                 },
             )
-            Text(
-                stringResource(R.string.player_speed_scope),
+            if (scope != null) Text(
+                stringResource(scope),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

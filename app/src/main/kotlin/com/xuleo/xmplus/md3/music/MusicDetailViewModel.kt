@@ -61,6 +61,22 @@ class MusicDetailViewModel(private val catalog: MusicCatalog, val kind: MusicDet
     fun loadMoreSongs() = loadMore(mutableSongs, ::songPage)
     fun retrySongs() = retry(mutableSongs, ::songPage)
 
+    /** Reads the pages after those loaded so far, for a queue played from this list; it pages on its own. */
+    fun queuePages(): suspend () -> List<MusicItem>? {
+        var page = mutableSongs.value.page
+        var ended = mutableSongs.value.isEnd
+        return {
+            if (ended) {
+                emptyList()
+            } else {
+                val result = songPage(page + 1)
+                page += 1
+                ended = result.isEnd || result.items.isEmpty()
+                result.items
+            }
+        }
+    }
+
     fun startAlbums() = startList(mutableAlbums, ::albumPage)
     fun loadMoreAlbums() = loadMore(mutableAlbums, ::albumPage)
     fun retryAlbums() = retry(mutableAlbums, ::albumPage)

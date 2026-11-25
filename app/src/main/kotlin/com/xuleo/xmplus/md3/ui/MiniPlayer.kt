@@ -41,10 +41,26 @@ import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.screens.playbackMessage
 
 @Composable
-fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, modifier: Modifier = Modifier) {
-    val state = playback?.state?.collectAsStateWithLifecycle()?.value ?: PlaybackState()
-    val queue = playback?.queue?.collectAsStateWithLifecycle()?.value
-    val selection = state.selection
+fun MiniPlayer(
+    playback: PlaybackController? = null,
+    onOpen: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    music: com.xuleo.xmplus.md3.core.media.MusicPlayback? = null,
+) {
+    val episodeState = playback?.state?.collectAsStateWithLifecycle()?.value ?: PlaybackState()
+    val episodeQueue = playback?.queue?.collectAsStateWithLifecycle()?.value
+    val songState = music?.state?.collectAsStateWithLifecycle()?.value
+    // A song that is loaded wins: starting one stops 听书, and the other way round.
+    val song = songState?.song
+    val title = song?.title ?: episodeState.selection?.title
+    val subtitle = song?.artist ?: episodeState.selection?.subtitle.orEmpty()
+    val coverUrl = if (song != null) song.artwork else episodeState.selection?.coverUrl
+    val active = song != null || episodeState.selection != null
+    val phase = songState?.takeIf { song != null }?.phase ?: episodeState.phase
+    val wantsToPlay = songState?.takeIf { song != null }?.wantsToPlay ?: episodeState.wantsToPlay
+    val error = if (song != null) songState.errorCode else episodeState.errorCode ?: episodeQueue?.errorCode
+    val loadingQueue = song == null && episodeQueue?.isLoading == true
+    val toggle: () -> Unit = { if (song != null) music.toggle() else playback?.toggle() }
     val openLabel = stringResource(R.string.player_open)
     val cancelLabel = stringResource(R.string.action_cancel)
     Surface(
@@ -58,12 +74,12 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
     ) {
         Row(
             modifier = Modifier
-                .clickable(enabled = selection != null, onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
+                .clickable(enabled = active, onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
                 .padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (selection?.coverUrl != null) Cover(selection.coverUrl, Modifier.size(44.dp), RoundedCornerShape(12.dp))
+            if (coverUrl != null) Cover(coverUrl, Modifier.size(44.dp), RoundedCornerShape(12.dp))
             else Surface(
                 modifier = Modifier.size(44.dp),
                 shape = RoundedCornerShape(12.dp),
@@ -81,14 +97,13 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
                 modifier = Modifier.weight(1f),
             ) {
                 Text(
-                    text = selection?.title ?: stringResource(R.string.mini_player_idle),
+                    text = title ?: stringResource(R.string.mini_player_idle),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (selection == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    color = if (!active) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val error = state.errorCode ?: queue?.errorCode
-                val supporting = if (error != null) stringResource(playbackMessage(error)) else selection?.subtitle.orEmpty()
+                val supporting = if (error != null) stringResource(playbackMessage(error)) else subtitle
                 if (supporting.isNotEmpty()) {
                     Text(
                         supporting, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -96,14 +111,14 @@ fun MiniPlayer(playback: PlaybackController? = null, onOpen: () -> Unit = {}, mo
                     )
                 }
             }
-            IconButton(onClick = { playback?.toggle() }, enabled = selection != null) {
-                val retry = state.phase == PlaybackPhase.Failed
-                if (queue?.isLoading == true && !state.wantsToPlay) {
+            IconButton(onClick = toggle, enabled = active) {
+                val retry = phase == PlaybackPhase.Failed
+                if (loadingQueue && !wantsToPlay) {
                     CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelLabel }, strokeWidth = 2.dp)
                 } else {
                     Icon(
-                        imageVector = if (retry) XmIcons.Filled.Refresh else if (state.wantsToPlay) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow,
-                        contentDescription = stringResource(if (retry) R.string.action_retry else if (state.wantsToPlay) R.string.action_pause else R.string.action_play),
+                        imageVector = if (retry) XmIcons.Filled.Refresh else if (wantsToPlay) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow,
+                        contentDescription = stringResource(if (retry) R.string.action_retry else if (wantsToPlay) R.string.action_pause else R.string.action_play),
                     )
                 }
             }

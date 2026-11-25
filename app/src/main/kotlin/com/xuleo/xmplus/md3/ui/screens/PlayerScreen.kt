@@ -309,7 +309,7 @@ private enum class PlayerPage(@StringRes val label: Int) {
 
 /** 文稿 and 评论 keep to the column the cover and controls use, over the same backdrop. */
 @Composable
-private fun PlayerPageFrame(content: @Composable () -> Unit) {
+internal fun PlayerPageFrame(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Box(Modifier.widthIn(max = PlayerPageWidth).fillMaxSize()) { content() }
     }
@@ -325,7 +325,15 @@ private class EpisodeDownload(
 
 /** Minimize on the left and the page headings in the middle, styled like 发现's. */
 @Composable
-private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit) {
+private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -> Unit, onPage: (PlayerPage) -> Unit) =
+    PlayerTopBar(
+        pages = if (hasEpisode) PlayerPage.entries else emptyList(), page = page, label = { stringResource(it.label) },
+        onMinimize = onMinimize, onPage = onPage,
+    )
+
+/** Minimize on the left and the page headings in the middle; both players use it. */
+@Composable
+internal fun <T> PlayerTopBar(pages: List<T>, page: T, label: @Composable (T) -> String, onMinimize: () -> Unit, onPage: (T) -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -334,11 +342,11 @@ private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -
             Icon(XmIcons.Filled.KeyboardArrowDown, stringResource(R.string.player_minimize), Modifier.size(28.dp))
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            if (hasEpisode) {
+            if (pages.isNotEmpty()) {
                 ModeSwitch(
-                    items = PlayerPage.entries,
+                    items = pages,
                     selected = page,
-                    label = { stringResource(it.label) },
+                    label = label,
                     onSelect = onPage,
                     textStyle = MaterialTheme.typography.titleMedium,
                 )
@@ -353,7 +361,7 @@ private fun PlayerTopBar(hasEpisode: Boolean, page: PlayerPage, onMinimize: () -
  * smallest cover does not fit (short screens, large text) the page scrolls. Wide screens put the cover beside them.
  */
 @Composable
-private fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable () -> Unit, modifier: Modifier = Modifier) {
+internal fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable () -> Unit, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         val viewport = maxHeight
         val scroll = rememberScrollState()
@@ -397,7 +405,7 @@ private fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable ()
 
 /** The cover eases back a little with a spring while paused. */
 @Composable
-private fun PlayerCover(artwork: String?, playing: Boolean) {
+internal fun PlayerCover(artwork: String?, playing: Boolean) {
     val scale by animateFloatAsState(
         if (playing) 1f else PausedCoverScale,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
@@ -525,16 +533,26 @@ private fun RowScope.EpisodeAction(icon: ImageVector, @StringRes label: Int, onC
  * the pill shows where a drag will land.
  */
 @Composable
-private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
-    val trackId = state.selection?.track?.id
-    val enabled = state.canSeek
-    val duration = state.durationMs.coerceAtLeast(0L)
+private fun SeekBar(state: PlaybackState, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) =
+    PlayerSeekBar(state.positionMs, state.durationMs, state.canSeek, state.selection?.track?.id, onSeek, modifier)
+
+/** The seek bar of both players; [trackId] resets a drag when what is playing changes. */
+@Composable
+internal fun PlayerSeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    enabled: Boolean,
+    trackId: Any?,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val duration = durationMs.coerceAtLeast(0L)
     var dragging by remember(trackId, enabled) { mutableStateOf<Float?>(null) }
     var barWidth by remember { mutableIntStateOf(0) }
     var pillWidth by remember { mutableIntStateOf(0) }
-    val played = if (duration > 0) state.positionMs.toFloat() / duration else 0f
+    val played = if (duration > 0) positionMs.toFloat() / duration else 0f
     val fraction = (dragging ?: played).coerceIn(0f, 1f)
-    val shownMs = dragging?.let { (it * duration).toLong() } ?: state.positionMs
+    val shownMs = dragging?.let { (it * duration).toLong() } ?: positionMs
     val time = "${formatDuration(shownMs / 1000.0)} / ${formatDuration(duration / 1000.0)}"
     val seek by rememberUpdatedState(onSeek)
     val total by rememberUpdatedState(duration)
@@ -804,7 +822,7 @@ private fun PlayerActionsSheet(
 
 /** One entry of the 更多 sheet: a round icon, the title, an optional line under it, and a chevron when it opens something. */
 @Composable
-private fun MoreRow(
+internal fun MoreRow(
     icon: ImageVector,
     @StringRes title: Int,
     onClick: () -> Unit,
@@ -896,14 +914,19 @@ private fun SeekGlyph(seconds: Int, forward: Boolean, color: Color) {
 }
 
 @Composable
-private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onClick: () -> Unit) {
-    val retry = state.phase == PlaybackPhase.Failed
-    val waitingForQueue = loadingQueue && !state.wantsToPlay
-    val loading = state.phase == PlaybackPhase.Preparing || state.phase == PlaybackPhase.Buffering || waitingForQueue
+private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onClick: () -> Unit) =
+    PlayerPlayButton(state.phase, state.wantsToPlay, loadingQueue, onClick)
+
+/** The large play / pause button of both players. */
+@Composable
+internal fun PlayerPlayButton(phase: PlaybackPhase, wantsToPlay: Boolean, loadingQueue: Boolean, onClick: () -> Unit) {
+    val retry = phase == PlaybackPhase.Failed
+    val waitingForQueue = loadingQueue && !wantsToPlay
+    val loading = phase == PlaybackPhase.Preparing || phase == PlaybackPhase.Buffering || waitingForQueue
     val label = stringResource(when {
         waitingForQueue -> R.string.action_cancel
         retry -> R.string.action_retry
-        state.wantsToPlay -> R.string.action_pause
+        wantsToPlay -> R.string.action_pause
         else -> R.string.action_play
     })
     FilledIconButton(onClick, Modifier.size(72.dp).semantics { contentDescription = label }, shape = CircleShape) {
@@ -914,7 +937,7 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
         } else {
             val icon = when {
                 retry -> XmIcons.Filled.Refresh
-                state.wantsToPlay -> XmIcons.Filled.Pause
+                wantsToPlay -> XmIcons.Filled.Pause
                 else -> XmIcons.Filled.PlayArrow
             }
             Icon(icon, contentDescription = null, modifier = Modifier.size(36.dp))
