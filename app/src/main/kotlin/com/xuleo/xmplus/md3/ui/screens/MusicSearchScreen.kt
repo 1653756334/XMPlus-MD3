@@ -47,7 +47,28 @@ import com.xuleo.xmplus.md3.music.searchTypes
 import com.xuleo.xmplus.md3.ui.components.MusicAlbumRow
 import com.xuleo.xmplus.md3.ui.components.MusicArtistRow
 import com.xuleo.xmplus.md3.ui.components.MusicSheetRow
-import com.xuleo.xmplus.md3.ui.components.ScrollingDetailTabs
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import com.xuleo.xmplus.md3.ui.components.SongRow
 
 @StringRes
@@ -106,8 +127,7 @@ internal fun MusicSearchScreen(
             var typeKey by rememberSaveable { mutableStateOf(types.first().key) }
             val type = types.firstOrNull { it.key == typeKey } ?: types.first()
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Scrolls sideways when the types do not fit beside the source.
-                ScrollingDetailTabs(types.indexOf(type), types.map { stringResource(it.label()) }, { typeKey = types[it].key }, Modifier.weight(1f))
+                TypeTabs(types, type, { typeKey = it.key }, Modifier.weight(1f))
                 SourcePicker(sources, current.platform, onSource)
                 Spacer(Modifier.width(XmLayout.PagePadding))
             }
@@ -116,6 +136,59 @@ internal fun MusicSearchScreen(
                 val paged = state.results[current.platform to type] ?: Paged(loading = true)
                 SearchResults(paged, { viewModel.loadMore(current.platform, type) }, { viewModel.retry(current.platform, type) },
                     onOpen, onPlay, playingKey)
+            }
+        }
+    }
+}
+
+private val TabFade = 24.dp
+
+/**
+ * The search types as compact text tabs, as QQ 音乐 shows them: the chosen one in the accent colour with a short bar
+ * under it. They scroll sideways when they do not fit beside the source, and fade out at the edge that has more, so
+ * nothing looks cut off.
+ */
+@Composable
+private fun TypeTabs(types: List<SearchType>, selected: SearchType, onSelect: (SearchType) -> Unit, modifier: Modifier = Modifier) {
+    val list = rememberLazyListState()
+    val index = types.indexOf(selected).coerceAtLeast(0)
+    // A type chosen off screen, or restored after rotation, is brought into view.
+    LaunchedEffect(index) {
+        val info = list.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+        if (item == null || item.offset < 0 || item.offset + item.size > info.viewportEndOffset) list.animateScrollToItem(index)
+    }
+    LazyRow(
+        modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+            drawContent()
+            val fade = TabFade.toPx()
+            if (list.canScrollBackward) {
+                drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), 0f, fade), Offset.Zero, Size(fade, size.height), blendMode = BlendMode.DstIn)
+            }
+            if (list.canScrollForward) {
+                drawRect(Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), size.width - fade, size.width),
+                    Offset(size.width - fade, 0f), Size(fade, size.height), blendMode = BlendMode.DstIn)
+            }
+        },
+        state = list,
+        contentPadding = PaddingValues(start = XmLayout.PagePadding - 12.dp, end = 8.dp),
+    ) {
+        itemsIndexed(types, key = { _, type -> type.key }) { _, type ->
+            val chosen = type == selected
+            val spec = MaterialTheme.motionScheme.fastEffectsSpec<Color>()
+            val text by animateColorAsState(if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, spec, label = "tab")
+            val bar by animateColorAsState(if (chosen) MaterialTheme.colorScheme.primary else Color.Transparent, spec, label = "bar")
+            Column(
+                Modifier.heightIn(min = 48.dp).clip(MaterialTheme.shapes.small)
+                    .selectable(chosen, role = Role.Tab) { onSelect(type) }.padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            ) {
+                Text(
+                    stringResource(type.label()), color = text, maxLines = 1,
+                    style = MaterialTheme.typography.titleSmall, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
+                )
+                Box(Modifier.padding(top = 4.dp).width(16.dp).height(3.dp).clip(CircleShape).background(bar))
             }
         }
     }
