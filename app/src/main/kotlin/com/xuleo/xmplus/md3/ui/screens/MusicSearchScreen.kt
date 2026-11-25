@@ -15,16 +15,15 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -49,7 +48,9 @@ import com.xuleo.xmplus.md3.ui.components.MusicAlbumRow
 import com.xuleo.xmplus.md3.ui.components.MusicArtistRow
 import com.xuleo.xmplus.md3.ui.components.MusicSheetRow
 import com.xuleo.xmplus.md3.ui.components.ScrollingDetailTabs
+import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.SongRow
+import kotlinx.coroutines.launch
 
 @StringRes
 private fun SearchType.label(): Int = when (this) {
@@ -104,22 +105,29 @@ internal fun MusicSearchScreen(
         // Each plugin opens on its own default type; a type picked on one plugin does not carry to another.
         key(current.platform) {
             val types = current.searchTypes()
-            var typeKey by rememberSaveable { mutableStateOf(types.first().key) }
-            val type = types.firstOrNull { it.key == typeKey } ?: types.first()
+            val pager = rememberPagerState { types.size }
+            val scope = rememberCoroutineScope()
+            val type = types[pager.currentPage.coerceIn(0, types.lastIndex)]
             // The tabs take only the space left of the source, so they scroll under nothing and the source stays clear.
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 ScrollingDetailTabs(
-                    types.indexOf(type).coerceAtLeast(0), types.map { stringResource(it.label()) },
-                    { typeKey = types[it].key }, Modifier.weight(1f).clipToBounds(),
+                    types.indexOf(type), types.map { stringResource(it.label()) },
+                    { scope.launch { pager.scrollToPage(it) } }, Modifier.weight(1f).clipToBounds(),
                 )
                 SourcePicker(sources, current.platform, onSource)
                 Spacer(Modifier.width(XmLayout.PagePadding))
             }
             LaunchedEffect(keyword, current.platform, type) { viewModel.open(current.platform, type) }
-            key(keyword, type) {
-                val paged = state.results[current.platform to type] ?: Paged(loading = true)
-                SearchResults(paged, { viewModel.loadMore(current.platform, type) }, { viewModel.retry(current.platform, type) },
-                    onOpen, onPlay, playingKey)
+            // Swiping moves between the types as on the album page; a page is searched once it becomes current.
+            SettlingPager(pager, Modifier.weight(1f), key = { types[it].key }) { page ->
+                val pageType = types[page]
+                key(keyword) {
+                    Column(Modifier.fillMaxSize()) {
+                        val paged = state.results[current.platform to pageType] ?: Paged(loading = true)
+                        SearchResults(paged, { viewModel.loadMore(current.platform, pageType) },
+                            { viewModel.retry(current.platform, pageType) }, onOpen, onPlay, playingKey)
+                    }
+                }
             }
         }
     }
