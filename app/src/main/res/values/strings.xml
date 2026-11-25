@@ -475,4 +475,11 @@
     <string name="subscription_name">Name</string>
     <string name="subscription_empty">No subscriptions</string>
     <string name="subscription_update">Update from subscriptions</string>
+    <string name="plugin_installing">Installing</string>
+    <string name="plugin_updating">Updating</string>
+    <string name="plugin_progress">%1$d/%2$d</string>
+    <string name="plugin_result_already">Already installed</string>
+    <string name="plugin_result_latest">Up to date</string>
+    <string name="action_clear">Clear</string>
+    <string name="music_source">Source</string>
 </resources>

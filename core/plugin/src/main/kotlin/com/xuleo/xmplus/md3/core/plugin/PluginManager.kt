@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.core.plugin
 
 import android.content.Context
+import android.net.Uri
 import android.util.AtomicFile
 import java.io.File
 import java.io.IOException
@@ -46,14 +47,29 @@ data class PluginSubscription(val name: String, val url: String)
 
 /** The outcome of installing one plugin file or link. */
 sealed interface InstallResult {
-    data class Installed(val platform: String) : InstallResult
+    data class Installed(val platform: String, val version: String? = null) : InstallResult
     /** The same code is installed already; nothing changed. */
-    data class AlreadyInstalled(val platform: String) : InstallResult
+    data class AlreadyInstalled(val platform: String, val version: String? = null) : InstallResult
     data class Failed(val reason: InstallFailure, val source: String) : InstallResult
 }
 
 /** Error codes; the app turns them into text. */
 enum class InstallFailure { CannotParse, LowerVersion, BadLink, Network }
+
+/** How far a batch has got: [done] of [total] finished, [current] the file, link or plugin being installed. [total] is 0 while the links are still being read. */
+fun interface InstallProgress {
+    fun report(done: Int, total: Int, current: String?)
+
+    companion object {
+        val None = InstallProgress { _, _, _ -> }
+    }
+}
+
+/** The file name at the end of a link, for showing which plugin a batch is at; other text is returned as it is. */
+fun linkName(source: String): String {
+    if ("://" !in source) return source
+    return Uri.decode(source.substringBefore('?').substringBefore('#').trimEnd('/').substringAfterLast('/')).ifEmpty { source }
+}
 
 /**
  * Installed plugins, their per-platform meta and the subscriptions, following MusicFree's rules (`docs/MUSIC.md` ·
@@ -91,27 +107,60 @@ class PluginManager(context: Context, client: OkHttpClient) {
 
     // Install
 
-    suspend fun installFiles(files: List<Pair<String, String>>): List<InstallResult> =
-        files.map { (name, code) -> install(code, name) }
+    suspend fun installFiles(files: List<Pair<String, String>>, progress: InstallProgress = InstallProgress.None): List<InstallResult> =
+        batch(files, progress, { it.first }) { (name, code) -> install(code, name) }
 
     /** A `.json` link installs every plugin it lists, a `.js` link one plugin; other links are refused. */
-    suspend fun installLink(url: String): List<InstallResult> {
-        val link = url.trim()
+    suspend fun installLink(url: String, progress: InstallProgress = InstallProgress.None): List<InstallResult> =
+        installLinks(listOf(url), progress)
+
+    /** Reads every link first so the batch knows its size, then installs what they list, in order. */
+    private suspend fun installLinks(links: List<String>, progress: InstallProgress): List<InstallResult> {
+        progress.report(0, 0, null)
+        val failures = mutableListOf<InstallResult>()
+        val urls = links.flatMap { resolve(it.trim(), failures) }
+        return batch(urls, progress, ::linkName) { installCode(it) } + failures
+    }
+
+    private suspend fun resolve(link: String, failures: MutableList<InstallResult>): List<String> {
         val path = link.substringBefore('?').substringBefore('#').lowercase()
         return when {
             path.endsWith(".json") -> {
-                val text = fetch(link) ?: return listOf(InstallResult.Failed(InstallFailure.Network, link))
-                val list = try {
-                    (Json.parseToJsonElement(text).jsonObject["plugins"] as? JsonArray).orEmpty()
-                } catch (_: Exception) {
-                    return listOf(InstallResult.Failed(InstallFailure.CannotParse, link))
+                val text = fetch(link)
+                if (text == null) {
+                    failures += InstallResult.Failed(InstallFailure.Network, link)
+                    return emptyList()
                 }
-                list.mapNotNull { (it as? JsonObject)?.text("url") }.map { installCode(it) }
+                try {
+                    (Json.parseToJsonElement(text).jsonObject["plugins"] as? JsonArray).orEmpty()
+                        .mapNotNull { (it as? JsonObject)?.text("url") }
+                } catch (_: Exception) {
+                    failures += InstallResult.Failed(InstallFailure.CannotParse, link)
+                    emptyList()
+                }
             }
-            path.endsWith(".js") -> listOf(installCode(link))
-            else -> listOf(InstallResult.Failed(InstallFailure.BadLink, link))
+            path.endsWith(".js") -> listOf(link)
+            else -> {
+                failures += InstallResult.Failed(InstallFailure.BadLink, link)
+                emptyList()
+            }
         }
     }
+
+    private suspend fun <T> batch(
+        items: List<T>,
+        progress: InstallProgress,
+        name: (T) -> String,
+        install: suspend (T) -> InstallResult,
+    ): List<InstallResult> {
+        val results = items.mapIndexed { index, item ->
+            progress.report(index, items.size, name(item))
+            install(item)
+        }
+        progress.report(items.size, items.size, null)
+        return results
+    }
+
 
     private suspend fun installCode(url: String): InstallResult {
         val code = fetch(url) ?: return InstallResult.Failed(InstallFailure.Network, url)
@@ -127,7 +176,7 @@ class PluginManager(context: Context, client: OkHttpClient) {
         }
         if (info.platform.isEmpty()) return InstallResult.Failed(InstallFailure.CannotParse, source)
         return lock.withLock {
-            if (records.any { it.second.hash == info.hash }) return@withLock InstallResult.AlreadyInstalled(info.platform)
+            if (records.any { it.second.hash == info.hash }) return@withLock InstallResult.AlreadyInstalled(info.platform, info.version)
             val old = records.filter { it.second.platform == info.platform }
             if (old.any { compareVersions(it.second.version, info.version) > 0 }) {
                 return@withLock InstallResult.Failed(InstallFailure.LowerVersion, source)
@@ -145,7 +194,7 @@ class PluginManager(context: Context, client: OkHttpClient) {
             records = records.filterNot { it.second.platform == info.platform } + (file to info)
             if (info.platform !in metas) metas = metas + (info.platform to PluginMeta(order = nextOrder()))
             save()
-            InstallResult.Installed(info.platform)
+            InstallResult.Installed(info.platform, info.version)
         }
     }
 
@@ -159,13 +208,14 @@ class PluginManager(context: Context, client: OkHttpClient) {
     }
 
     /** Updates every plugin that has a `srcUrl`; one failure does not stop the others. */
-    suspend fun updateAll(): List<InstallResult> {
+    suspend fun updateAll(progress: InstallProgress = InstallProgress.None): List<InstallResult> {
         val platforms = lock.withLock { records.filter { it.second.srcUrl != null }.map { it.second.platform } }
-        return platforms.map { update(it) }
+        return batch(platforms, progress, { it }) { update(it) }
     }
 
     /** Installs from every subscription, in order. */
-    suspend fun updateSubscriptions(): List<InstallResult> = subscriptions.value.flatMap { installLink(it.url) }
+    suspend fun updateSubscriptions(progress: InstallProgress = InstallProgress.None): List<InstallResult> =
+        installLinks(subscriptions.value.map { it.url }, progress)
 
     // Remove and settings
 

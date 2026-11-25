@@ -4,9 +4,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.annotation.StringRes
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -33,10 +36,15 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.core.plugin.InstallResult
 import com.xuleo.xmplus.md3.core.plugin.InstalledPlugin
+import com.xuleo.xmplus.md3.core.plugin.linkName
 import com.xuleo.xmplus.md3.core.plugin.PluginErrorReason
 import com.xuleo.xmplus.md3.core.plugin.PluginSubscription
+import com.xuleo.xmplus.md3.music.InstallJob
 import com.xuleo.xmplus.md3.music.PluginEvent
+import com.xuleo.xmplus.md3.music.failureText
+import com.xuleo.xmplus.md3.music.installSummary
 import com.xuleo.xmplus.md3.music.PluginsViewModel
 import com.xuleo.xmplus.md3.music.installMessage
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
@@ -77,6 +85,9 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
     var uninstallFor by rememberSaveable { mutableStateOf<String?>(null) }
     val list = plugins.orEmpty()
     fun find(platform: String?) = list.firstOrNull { it.platform == platform }
+    val job = viewModel.job
+    // A batch shows its progress and results in a sheet; a single plugin only the line under the bar, then a snackbar.
+    val jobSheet = job != null && !viewModel.hidden && (!job.running || job.total > 1)
 
     Scaffold(
         topBar = {
@@ -119,7 +130,7 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (viewModel.busy) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
+            if (viewModel.busy && !jobSheet) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
             when {
                 plugins == null -> Unit
                 list.isEmpty() -> PluginsEmpty { showInstall = true }
@@ -136,6 +147,7 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
         }
     }
 
+    if (jobSheet && job != null) InstallJobSheet(job, onDismiss = viewModel::dismissJob)
     if (showInstall) InstallSheet(
         onDismiss = { showInstall = false },
         onFile = { showInstall = false; pickFiles.launch(arrayOf("*/*")) },
@@ -353,9 +365,86 @@ private fun SheetAction(@StringRes label: Int, icon: androidx.compose.ui.graphic
     ) { Text(stringResource(label)) }
 }
 
+/** Progress of a batch with a bar and the plugin it is at, then what each one came to, failures first. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstallJobSheet(job: InstallJob, onDismiss: () -> Unit) {
+    val running by rememberUpdatedState(job.running)
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden || !running })
+    val resources = LocalContext.current.resources
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state) {
+        val results = job.results
+        if (results == null) {
+            Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(if (job.update) R.string.plugin_updating else R.string.plugin_installing),
+                        style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        stringResource(R.string.plugin_progress, (job.done + 1).coerceAtMost(job.total), job.total),
+                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                val progress by animateFloatAsState(
+                    job.done.toFloat() / job.total.coerceAtLeast(1), MaterialTheme.motionScheme.defaultEffectsSpec(), label = "installProgress",
+                )
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    job.current?.let(::linkName).orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            Text(
+                installSummary(resources, results), style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            LazyColumn(Modifier.weight(1f, fill = false)) {
+                items(results.sortedBy { it !is InstallResult.Failed }) { InstallResultRow(it, job.update) }
+            }
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
+                Text(stringResource(R.string.plugin_done))
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstallResultRow(result: InstallResult, update: Boolean) {
+    val failed = result is InstallResult.Failed
+    val name = when (result) {
+        is InstallResult.Installed -> result.platform
+        is InstallResult.AlreadyInstalled -> result.platform
+        is InstallResult.Failed -> linkName(result.source)
+    }
+    val detail = when (result) {
+        is InstallResult.Installed -> result.version?.let { stringResource(R.string.plugin_version, it) }
+        is InstallResult.AlreadyInstalled -> stringResource(if (update) R.string.plugin_result_latest else R.string.plugin_result_already)
+        is InstallResult.Failed -> stringResource(failureText(result.reason))
+    }
+    ListItem(
+        headlineContent = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = detail?.let { { Text(it, color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) } },
+        leadingContent = if (failed) ({ Icon(XmIcons.Outlined.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) }) else null,
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+    )
+}
+
+/** Starts with the link on the clipboard, if there is one. */
 @Composable
 private fun LinkDialog(@StringRes title: Int, @StringRes confirm: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var text by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
+    var text by rememberSaveable {
+        val clip = try {
+            context.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+        } catch (_: Exception) {
+            null
+        }
+        mutableStateOf(clip?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }.orEmpty())
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(title)) },
@@ -363,6 +452,9 @@ private fun LinkDialog(@StringRes title: Int, @StringRes confirm: Int, onDismiss
             OutlinedTextField(
                 text, { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text(stringResource(R.string.plugin_link_hint)) },
+                trailingIcon = if (text.isNotEmpty()) ({
+                    IconButton(onClick = { text = "" }) { Icon(XmIcons.Outlined.Cancel, stringResource(R.string.action_clear)) }
+                }) else null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
         },

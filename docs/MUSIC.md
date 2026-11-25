@@ -110,7 +110,7 @@ Source: MusicFree `src/core/pluginManager/plugin.ts`, `index.ts`, `meta.ts`, `sr
 
 - Plugins run off the main thread, so the UI never waits on them. Nothing is added beyond MusicFree: no install confirmation, no warnings, no extra limits.
 - A failing call fails that request only; the page shows its error state with 重试.
-- Install results as in MusicFree: success, or the failure reason; several at once → how many succeeded and failed, with the failed ones listed.
+- Install results as in MusicFree: success, or the failure reason; several at once → how many succeeded and failed, with the failed ones listed. A batch (a link listing several plugins, 全部更新, 从订阅更新) shows a sheet with a progress bar, n/total and the plugin being installed, then the result of each, failures first, and 完成. One plugin shows the progress line and a snackbar. 从链接安装 starts with the link on the clipboard.
 
 ## 3. Modules
 
@@ -183,7 +183,7 @@ The whole app, 听书 included, follows these; 听书 screens are brought in lin
 
 ### 音乐
 
-- Header: 推荐 · 榜单, search icon at the end. Under it, the enabled plugins that support the current mode as scrollable tabs, in plugin order. A plugin without that ability is not shown.
+- Header: 推荐 · 榜单, then the current source (plugin name with ▾) and the search icon at the end. The source opens a menu of the enabled plugins that support the current mode, in plugin order, the current one checked; a plugin without that ability is not listed. The choice is kept and shared by both modes; a mode it cannot show uses the first plugin that can, without changing the choice. With one plugin only its name shows, without ▾.
 - 推荐: tag chips (pinned tags first, 全部 opens a sheet of grouped tags), then a 2- or 3-column grid of sheet covers with play counts where given.
 - 榜单: groups with titles; each ranking a row with cover, name and its first three songs.
 - Without plugins: centred message 还没有音乐来源 and one 导入插件 button, which opens 插件. No other content.

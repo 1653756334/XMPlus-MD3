@@ -10,56 +10,93 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
-import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 import com.xuleo.xmplus.md3.core.plugin.InstalledPlugin
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
-/** 推荐 lists sheets by tag, 榜单 the top lists; a plugin shows under a mode only when it has that method. */
+/** 推荐 lists sheets by tag, 榜单 the top lists; a plugin is offered for a mode only when it has that method. */
 enum class MusicMode(@StringRes val label: Int, val method: String) {
     Recommend(R.string.music_mode_recommend, "getRecommendSheetsByTag"),
     Ranking(R.string.music_mode_ranking, "getTopLists"),
 }
 
 /**
- * The 音乐 tab: mode headings as on 听书, the enabled plugins of that mode as tabs under them. Without plugins it shows
- * only the way to import one. The plugin content arrives in M2.
+ * The 音乐 tab: mode headings as on 听书, and at the end of the same row the plugin the content comes from, changed
+ * from a menu since it rarely changes. Both modes share the chosen plugin; a mode it cannot show uses the first
+ * plugin that can, without changing the choice. Without plugins it shows only the way to import one. The plugin
+ * content arrives in M2.
  */
 @Composable
-fun MusicScreen(plugins: List<InstalledPlugin>?, onPlugins: () -> Unit, onSearch: (() -> Unit)? = null) {
+fun MusicScreen(
+    plugins: List<InstalledPlugin>?,
+    onPlugins: () -> Unit,
+    onSearch: (() -> Unit)? = null,
+    source: String? = null,
+    onSource: (String) -> Unit = {},
+) {
     var mode by rememberSaveable { mutableStateOf(MusicMode.Recommend) }
     val usable = plugins.orEmpty().filter { it.enabled }
+    val supporting = usable.filter { mode.method in it.info.methods }
+    val current = supporting.firstOrNull { it.platform == source } ?: supporting.firstOrNull()
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
             ModeSwitch(MusicMode.entries, mode, { stringResource(it.label) }, { mode = it }, Modifier.weight(1f))
+            if (current != null) SourcePicker(supporting, current.platform, onSource)
             if (onSearch != null && usable.isNotEmpty()) {
-                IconButton(onSearch, Modifier.padding(end = 4.dp)) { Icon(XmIcons.Filled.Search, stringResource(R.string.search_submit)) }
+                IconButton(onSearch) { Icon(XmIcons.Filled.Search, stringResource(R.string.search_submit)) }
             }
+            Spacer(Modifier.width(4.dp))
         }
         when {
             plugins == null -> Unit
             usable.isEmpty() -> MusicMessage(R.string.music_empty, R.string.music_import_plugin, onPlugins, filled = true)
-            else -> {
-                val supporting = usable.filter { mode.method in it.info.methods }
-                if (supporting.isEmpty()) {
-                    MusicMessage(R.string.music_unsupported, R.string.plugins_title, onPlugins, filled = false)
-                } else {
-                    var tab by rememberSaveable(mode) { mutableIntStateOf(0) }
-                    val selected = tab.coerceIn(0, supporting.lastIndex)
-                    PrimaryScrollableTabRow(selected, containerColor = Color.Transparent, edgePadding = XmLayout.PagePadding, divider = {}) {
-                        supporting.forEachIndexed { index, plugin ->
-                            Tab(index == selected, onClick = { tab = index }, text = { Text(plugin.platform, maxLines = 1) })
-                        }
-                    }
-                    Box(Modifier.weight(1f).fillMaxWidth())
-                }
+            current == null -> MusicMessage(R.string.music_unsupported, R.string.plugins_title, onPlugins, filled = false)
+            else -> Box(Modifier.weight(1f).fillMaxWidth())
+        }
+    }
+}
+
+/** The plugin's name with a menu of the others; just the name when there is no other. */
+@Composable
+private fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSelect: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val label = stringResource(R.string.music_source)
+    Box {
+        val name: @Composable () -> Unit = {
+            Text(selected, Modifier.widthIn(max = 128.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+        }
+        if (plugins.size > 1) {
+            TextButton(
+                onClick = { open = true },
+                contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                modifier = Modifier.semantics { contentDescription = "$label $selected" },
+            ) {
+                name()
+                Icon(XmIcons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        } else {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                Box(Modifier.padding(horizontal = 12.dp)) { name() }
+            }
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            plugins.forEach { plugin ->
+                val chosen = plugin.platform == selected
+                DropdownMenuItem(
+                    text = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    trailingIcon = if (chosen) ({ Icon(XmIcons.Outlined.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }) else null,
+                    onClick = { open = false; if (!chosen) onSelect(plugin.platform) },
+                )
             }
         }
     }
