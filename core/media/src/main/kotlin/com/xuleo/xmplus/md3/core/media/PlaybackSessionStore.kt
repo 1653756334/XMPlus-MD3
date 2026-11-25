@@ -85,6 +85,7 @@ class PlaybackSessionStore(context: Context) {
 
     private fun encode(session: PlaybackSession) = buildJsonObject {
         put("version", FormatVersion)
+        put("queue", AlbumQueueKind)
         put("account", session.account)
         put("track", session.trackId)
         put("detail", encodeDetail(session.detail))
@@ -97,6 +98,8 @@ class PlaybackSessionStore(context: Context) {
     private fun decode(element: JsonElement): PlaybackSession? {
         val root = element as? JsonObject ?: return null
         if (root.int("version") != FormatVersion) return null
+        // Sessions saved before music existed name no queue; they are 听书 album queues.
+        if ((root.text("queue") ?: AlbumQueueKind) != AlbumQueueKind) return null
         return PlaybackSession(
             account = root.text("account") ?: return null,
             trackId = root.text("track") ?: return null,
@@ -210,5 +213,7 @@ class PlaybackSessionStore(context: Context) {
 
     private companion object {
         const val FormatVersion = 1
+        /** The queue kind of a 听书 album session. Music list sessions (M3) get their own kind. */
+        const val AlbumQueueKind = "album"
     }
 }

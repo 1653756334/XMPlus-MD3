@@ -4,6 +4,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import com.xuleo.xmplus.md3.core.model.ContentKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -68,6 +69,7 @@ class DownloadStore(private val file: File) {
         put("createdAt", createdAt)
         put("coverUrl", coverUrl)
         put("confirmedSeconds", confirmedSeconds)
+        put("kind", kind.key)
     }
 
     private fun JsonObject.toTask(): DownloadTask {
@@ -92,6 +94,7 @@ class DownloadStore(private val file: File) {
             createdAt = text("createdAt")?.toLongOrNull() ?: 0L,
             coverUrl = text("coverUrl"),
             confirmedSeconds = text("confirmedSeconds")?.toIntOrNull(),
+            kind = ContentKind.fromKey(text("kind")),
         )
     }
 }

@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import com.xuleo.xmplus.md3.core.model.Album
+import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.core.model.Track
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,10 @@ data class ListenRecord(
     val durationMs: Long,
     val positionMs: Long,
     val playedAtMs: Long,
+    /** 听书 rows are one per album; songs (from M4) one per song, with [albumId] holding the song's key. */
+    val kind: ContentKind = ContentKind.Episode,
+    /** A song's full plugin object as JSON, passed back to the plugin when it is played again. */
+    val item: String? = null,
 )
 
 /**
@@ -119,6 +124,8 @@ class ListenHistoryStore internal constructor(
             put("duration_ms", record.durationMs)
             put("position_ms", record.positionMs)
             put("played_ms", record.playedAtMs)
+            put("kind", record.kind.key)
+            put("item", record.item)
         }
         val db = database.writableDatabase
         db.insertWithOnConflict(Table, null, values, conflict)
@@ -130,7 +137,7 @@ class ListenHistoryStore internal constructor(
 
     private suspend fun read(): List<ListenRecord> = withContext(Dispatchers.IO) {
         database.readableDatabase.rawQuery(
-            "SELECT album, album_title, anchor, cover, track, track_title, duration_ms, position_ms, played_ms " +
+            "SELECT album, album_title, anchor, cover, track, track_title, duration_ms, position_ms, played_ms, kind, item " +
                 "FROM $Table ORDER BY played_ms DESC, rowid DESC",
             null,
         ).use { cursor ->
@@ -147,6 +154,8 @@ class ListenHistoryStore internal constructor(
                             durationMs = cursor.getLong(6),
                             positionMs = cursor.getLong(7),
                             playedAtMs = cursor.getLong(8),
+                            kind = ContentKind.fromKey(cursor.getString(9)),
+                            item = cursor.getString(10),
                         ),
                     )
                 }
@@ -157,7 +166,7 @@ class ListenHistoryStore internal constructor(
     private fun episodeKey(record: ListenRecord) = "${record.albumId}/${record.trackId}"
 
     private class Database(context: Context) : SQLiteOpenHelper(
-        context, File(context.noBackupFilesDir, "listen-history.db").absolutePath, null, 2,
+        context, File(context.noBackupFilesDir, "listen-history.db").absolutePath, null, 3,
     ) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
@@ -172,6 +181,8 @@ class ListenHistoryStore internal constructor(
                     duration_ms INTEGER NOT NULL,
                     position_ms INTEGER NOT NULL,
                     played_ms INTEGER NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'episode',
+                    item TEXT,
                     PRIMARY KEY (album)
                 )
                 """.trimIndent(),
@@ -180,9 +191,17 @@ class ListenHistoryStore internal constructor(
         }
 
         // Version 1 kept one row per episode. Its rows cannot be read as one per album, so the table is rebuilt.
+        // Version 2 rows are all 听书; version 3 adds the content kind and keeps them.
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            db.execSQL("DROP TABLE IF EXISTS $Table")
-            onCreate(db)
+            if (oldVersion < 2) {
+                db.execSQL("DROP TABLE IF EXISTS $Table")
+                onCreate(db)
+                return
+            }
+            if (oldVersion < 3) {
+                db.execSQL("ALTER TABLE $Table ADD COLUMN kind TEXT NOT NULL DEFAULT 'episode'")
+                db.execSQL("ALTER TABLE $Table ADD COLUMN item TEXT")
+            }
         }
     }
 

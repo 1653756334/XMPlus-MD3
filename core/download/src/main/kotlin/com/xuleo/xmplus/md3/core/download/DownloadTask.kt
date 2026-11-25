@@ -1,5 +1,6 @@
 package com.xuleo.xmplus.md3.core.download
 
+import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.core.model.Track
 
 /** Where one episode is in its download. */
@@ -44,6 +45,8 @@ data class DownloadTask(
      * free: if the server asks for listening time after all, the download stops instead of charging.
      */
     val confirmedSeconds: Int? = null,
+    /** Songs (from M5) never use listening time: [accountIdentity], [receiptId] and [confirmedSeconds] stay null. */
+    val kind: ContentKind = ContentKind.Episode,
 )
 
 /** One episode to queue, with the listening time agreed for it; null when it was shown as free. */
