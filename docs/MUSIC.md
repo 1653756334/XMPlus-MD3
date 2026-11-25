@@ -16,7 +16,8 @@ Add a music platform to XMPlus-MD3 next to 听书:
 |---|---|
 | Plugin format | MusicFree plugins (one JS file each), as of MusicFree 0.6.2 (`../MusicFree`, commit `d118b18`) |
 | Behaviour source | `../MusicFree` source. Plugin runtime, install and update rules, media-source order, cache control, lyric order and backup format are ported one to one. When unsure, read the TypeScript, do not guess |
-| JS engine | Embedded QuickJS. Not WebView: it cannot set Referer, User-Agent or Cookie and is bound by CORS, which breaks most plugins |
+| JS engine | Embedded QuickJS through `quickjs-kt` (stable, coroutine-friendly for the http bridge). Not WebView: it cannot set Referer, User-Agent or Cookie and is bound by CORS, which breaks most plugins |
+| Bundled packages | Built once with npm and esbuild into one asset that is committed; the app build does not need Node |
 | Version reported to plugins | MusicFree's version (`0.6.2`), not MD3's, because plugins declare `appVersion` ranges against MusicFree. Raised only after checking the newer MusicFree source |
 | Copyright | No built-in plugin, no default subscription, no link to any plugin source, in the app or in the docs. Without plugins the app plays no music |
 | 听时 | Music never touches UsageLedger or Ximalaya accounts |
@@ -59,7 +60,7 @@ Add a music platform to XMPlus-MD3 next to 听书:
 
 ### 听过 Library (both kinds of content)
 
-- [ ] One overview page instead of seven swipe tabs (see 4 · 听过)
+- [ ] One overview page instead of seven swipe tabs (see 5 · 听过)
 - [ ] 最近播放: 听书 episodes and songs in one list, filter 全部 / 听书 / 音乐, resume from where each stopped
 - [ ] 我喜欢, a built-in sheet
 - [ ] 自建歌单: create, rename, delete, reorder songs, move and copy between sheets
@@ -123,7 +124,42 @@ core/download    one download manager for both (extended)
 - The bundled JS packages are built into one asset by a script kept in the repository; the asset is versioned with the app.
 - `core/plugin` returns error codes, never user-facing text, as `core/protocol` does.
 
-## 4. UI
+## 4. Data structure
+
+One set of types for both kinds of content, so the player, mini player, notification, 最近播放 and downloads never branch on where an item came from.
+
+### Keys
+
+- 听书: `xmly:<id>`, as today. Stored data keeps working unchanged.
+- 音乐: `mf:<platform>:<id>`. A plugin whose `platform` happens to be `xmly` cannot collide with 听书.
+- A song is identified by `platform` + `id`, as in MusicFree.
+
+### Playable items
+
+- Two kinds only: 听书 episode and song.
+- Both expose title, subtitle, cover and duration; shared UI uses only these.
+- 听书 episodes keep the existing `Track` and `Album`.
+
+### Plugin items
+
+- Song, sheet, album and artist keep the fields the UI shows, plus the plugin's full object stored as is.
+- Calls to a plugin pass that full object back unchanged, so unknown fields survive.
+
+### Queues
+
+- The queue is an interface with two implementations: the existing 听书 album queue (paging rules unchanged) and a music list queue that loads further pages when the list has them.
+- The saved session records which kind of queue it was.
+
+### History and downloads
+
+- 最近播放 and download tasks get a content kind; existing rows are 听书.
+- 听时 fields (receipt, confirmed seconds, account identity) belong to 听书 only. Deduction runs only for 听书.
+
+### Music library
+
+- A separate store for 我喜欢, 自建歌单 and 收藏歌单, as in MusicFree: songs are kept as full objects keyed by `platform` + `id`.
+
+## 5. UI
 
 ### Comfort baseline
 
@@ -229,7 +265,7 @@ Why this layout: the queue holds one kind of content at a time, so 继续听 is 
 - As in 听书: shared covers between lists, detail pages and the player; predictive back; skeletons instead of spinners.
 - Lyric scrolling uses `MaterialTheme.motionScheme` and stops when animations are removed.
 
-## 5. Phases
+## 6. Phases
 
 听书's remaining work (its phases 6 and 7 and unchecked items in `DESIGN.md`) is paused and resumes after M6.
 
@@ -240,7 +276,7 @@ Why this layout: the queue holds one kind of content at a time, so 继续听 is 
 - M5 Downloads: songs in the download manager, tags and lyrics, offline play.
 - M6 Migration: MusicFree backup import.
 
-## 6. Risks
+## 7. Risks
 
 - Engine differences: plugins were run on Hermes in MusicFree. QuickJS gaps (for example `Intl`) may break some plugins; they are filled in M1 where plugins need them.
 - Plugin quality varies and plugins change often. Failures stay inside the call and never block the app.
