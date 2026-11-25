@@ -1,7 +1,11 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -10,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,38 +70,53 @@ fun MusicScreen(
     }
 }
 
-/** The plugin's name with a menu of the others; just the name when there is no other. */
+/**
+ * The plugin's name in a tonal pill, opening the expressive menu of the others: one rounded group whose chosen item
+ * is filled and checked. Just the name when there is no other.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val label = stringResource(R.string.music_source)
+    val single = plugins.size <= 1
+    val arrow by animateFloatAsState(if (open) 180f else 0f, MaterialTheme.motionScheme.fastSpatialSpec(), label = "arrow")
     Box {
-        val name: @Composable () -> Unit = {
-            Text(selected, Modifier.widthIn(max = 128.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-        }
-        if (plugins.size > 1) {
-            TextButton(
-                onClick = { open = true },
-                contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                modifier = Modifier.semantics { contentDescription = "$label $selected" },
+        Surface(
+            onClick = { open = true },
+            enabled = !single,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.heightIn(min = 32.dp).semantics { contentDescription = "$label $selected" },
+        ) {
+            Row(
+                Modifier.padding(start = 14.dp, end = if (single) 14.dp else 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                name()
-                Icon(XmIcons.Filled.ArrowDropDown, contentDescription = null)
-            }
-        } else {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                Box(Modifier.padding(horizontal = 12.dp)) { name() }
+                Text(selected, Modifier.widthIn(max = 120.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                if (!single) {
+                    Icon(XmIcons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(20.dp).graphicsLayer { rotationZ = arrow })
+                }
             }
         }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            plugins.forEach { plugin ->
-                val chosen = plugin.platform == selected
-                DropdownMenuItem(
-                    text = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    trailingIcon = if (chosen) ({ Icon(XmIcons.Outlined.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }) else null,
-                    onClick = { open = false; if (!chosen) onSelect(plugin.platform) },
-                )
+        DropdownMenuPopup(open, onDismissRequest = { open = false }) {
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 1),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                plugins.forEachIndexed { index, plugin ->
+                    val chosen = plugin.platform == selected
+                    SelectableDropdownMenuItem(
+                        selected = chosen,
+                        onClick = { open = false; if (!chosen) onSelect(plugin.platform) },
+                        text = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        shapes = MenuDefaults.itemShape(index, plugins.size),
+                        selectedLeadingIcon = {
+                            Icon(XmIcons.Outlined.Check, contentDescription = null, Modifier.size(MenuDefaults.LeadingIconSize))
+                        },
+                    )
+                }
             }
         }
     }
