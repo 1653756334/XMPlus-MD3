@@ -383,3 +383,44 @@ Detail pages
 - BR-22 A plugin without `getMusicSheetInfo` / `getAlbumInfo` shows the item's own `musicList`; album songs carry the album's title.
 - BR-23 歌手 shows 单曲 and 专辑 from `getArtistWorks`; 专辑 loads when its tab is first opened.
 - BR-24 Every object passed back to a plugin keeps the fields it returned, with `platform` set to the plugin's.
+
+## Phase M3 — Playback
+
+Source: MusicFree `src/core/trackPlayer/index.ts`, `src/core/pluginManager/plugin.ts` (`getMediaSource`), `src/utils/qualities.ts`. Design: `docs/MUSIC.md` · Player (music).
+
+Media source
+
+- MP-01 A downloaded song plays from its file without calling the plugin.
+- MP-02 A cached link for the quality is used when the plugin's `cacheControl` is `cache`, or `no-cache` while offline; `no-store` never writes the cache.
+- MP-03 An alternative plugin with `getMediaSource` gets the link; otherwise the song's own plugin. A plugin without `getMediaSource` uses `qualities[quality].url`, then `url`.
+- MP-04 A thrown error is retried once after 150 ms; an empty link is not retried. When no quality gives a link, one message shows and the next song starts after 0.5 s.
+- MP-05 Switching songs while a link is loading drops the old result; the new song plays.
+
+Quality
+
+- MP-10 Qualities are tried from the default: higher ones first, then lower ones going down. The first that gives a link is shown on the tag and remembered.
+- MP-11 Picking a quality in the sheet reloads at the same position; if it fails, the old one keeps playing.
+
+Play modes
+
+- MP-20 The mode button cycles 列表循环 → 随机 → 单曲循环 → 列表循环, and the mode is kept across restarts.
+- MP-21 随机 shuffles the queue; leaving it restores the original order. Next and Previous wrap at both ends.
+- MP-22 单曲循环 repeats the song when it ends; Next and Previous still move.
+
+Queue
+
+- MP-30 Tapping a song plays the list from it; the queue continues into further pages.
+- MP-31 下一首播放 puts the song after the current one, moving it if already queued; with an empty queue it starts playing.
+- MP-32 Drag to reorder, remove a row (removing the playing song plays the next), 清空 stops playback, locate scrolls to the playing song.
+- MP-33 After a restart the queue, song, position, mode and quality come back; the link is fetched again.
+
+Lyrics
+
+- MP-40 The current line follows playback, larger and in the accent colour. Dragging shows a time line with a play button; auto-scroll returns after a few seconds.
+- MP-41 译 shows only when there is a translation. No lyrics → 暂无歌词 with 搜索歌词.
+
+Player and system
+
+- MP-50 The player reads as `docs/MUSIC.md` · Player (music); 评论 shows only when the plugin has `getMusicComments`.
+- MP-51 Songs play as music: a notification sound lowers the volume instead of pausing. 听书 still plays as speech.
+- MP-52 Songs never touch the 听时 ledger. 听书 and songs share one player, mini player, notification and sleep timer; switching between them replaces the queue.
