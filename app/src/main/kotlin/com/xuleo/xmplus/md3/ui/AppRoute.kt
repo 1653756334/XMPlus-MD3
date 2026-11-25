@@ -19,6 +19,7 @@ internal sealed interface AppRoute : NavKey {
     }
     @Serializable data object Player : AppRoute
     @Serializable data object Accounts : AppRoute
+    @Serializable data object Plugins : AppRoute
     @Serializable data object PhoneLogin : AppRoute
     @Serializable data class ImportLogin(val recoveryIdentity: String? = null) : AppRoute
 }

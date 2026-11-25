@@ -46,6 +46,7 @@ import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.download.DownloadActions
 import com.xuleo.xmplus.md3.download.DownloadsViewModel
 import com.xuleo.xmplus.md3.library.LibraryViewModel
+import com.xuleo.xmplus.md3.music.PluginsViewModel
 import com.xuleo.xmplus.md3.ui.screens.*
 
 @Composable
@@ -62,6 +63,7 @@ fun XmApp() {
     val rankings: RankingsViewModel = viewModel(factory = RankingsViewModel.factory(application.discovery))
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.factory(application))
     val downloads: DownloadsViewModel = viewModel(factory = DownloadsViewModel.factory(application))
+    val plugins: PluginsViewModel = viewModel(factory = PluginsViewModel.factory(application))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
     // Album and anchor pages live as long as their route is on the stack.
     val routeStores: RouteStores = viewModel()
@@ -75,6 +77,7 @@ fun XmApp() {
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
+        plugins = plugins,
     )
 }
 
@@ -99,6 +102,7 @@ internal fun XmAppContent(
     comments: CommentActions? = null,
     downloads: DownloadsViewModel? = null,
     downloadActions: DownloadActions? = null,
+    plugins: PluginsViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -107,7 +111,7 @@ internal fun XmAppContent(
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
-                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player -> Unit
+                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -217,7 +221,7 @@ internal fun XmAppContent(
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload, library, downloads, ::openAlbum, ::openAnchor, { albumId, trackId, positionMs -> playback?.playSaved(albumId, trackId, positionMs) },
-                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) })
+                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) }, plugins, { navigator.push(AppRoute.Plugins) })
                             }
                         }
                     }
@@ -252,6 +256,9 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             anchorPage(route)?.let { AnchorScreen(it, ::openAlbum) { navigator.pop() } }
                         }
+                    }
+                    entry<AppRoute.Plugins> {
+                        Surface(Modifier.fillMaxSize()) { if (plugins != null) PluginsScreen(plugins) { navigator.pop() } }
                     }
                     entry<AppRoute.Accounts> {
                         Surface(Modifier.fillMaxSize()) {
@@ -309,13 +316,15 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
     categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks,
     onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
     library: LibraryViewModel?, downloads: DownloadsViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit,
-    onPlayEpisode: (String, String) -> Unit) {
+    onPlayEpisode: (String, String) -> Unit, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {}) {
+    val installed = plugins?.plugins?.collectAsStateWithLifecycle()?.value
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
+            Destination.Music -> MusicScreen(if (plugins == null) emptyList() else installed, onPlugins)
             Destination.Library -> if (library != null) LibraryScreen(library, onAlbum, onAnchor, onPlay) else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
-            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload)
+            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins)
         }
     }
 }

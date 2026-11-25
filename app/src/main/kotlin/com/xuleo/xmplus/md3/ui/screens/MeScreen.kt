@@ -31,7 +31,8 @@ import com.xuleo.xmplus.md3.ui.Destination
 import coil3.compose.AsyncImage
 
 @Composable
-fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?) {
+fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
+    pluginCount: Int? = null, onPlugins: () -> Unit = {}) {
     val configuration = LocalConfiguration.current
     val language = remember(configuration) { AppLanguage.current() }
     val state = viewModel?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
@@ -39,7 +40,8 @@ fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> 
         onManage = onManage, onImport = onLogin, onImportBackup = onImportBackup,
         onRefresh = { viewModel?.refreshQuota(it) }, onRetry = { viewModel?.retryLoad() },
         avatars = viewModel?.avatars.orEmpty(),
-        generalExtras = { if (historyUpload != null) HistoryUploadSettings(historyUpload) })
+        generalExtras = { if (historyUpload != null) HistoryUploadSettings(historyUpload) },
+        pluginCount = pluginCount, onPlugins = onPlugins)
 }
 
 @Composable
@@ -56,6 +58,8 @@ internal fun MeContent(
     onRetry: () -> Unit = {},
     avatars: Map<String, String> = emptyMap(),
     generalExtras: @Composable () -> Unit = {},
+    pluginCount: Int? = null,
+    onPlugins: (() -> Unit)? = null,
 ) {
     var showLanguage by rememberSaveable { mutableStateOf(false) }
     TabScaffold(Destination.Me.label) { padding ->
@@ -102,6 +106,16 @@ internal fun MeContent(
                     }
                 }
                 AccountOperationFeedback(busy, errorCode)
+                if (onPlugins != null) ListItem(
+                    onClick = onPlugins,
+                    leadingContent = { Icon(XmIcons.Outlined.QueueMusic, contentDescription = null) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (pluginCount != null && pluginCount > 0) Text(pluginCount.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(XmIcons.Outlined.ChevronRight, contentDescription = null)
+                        }
+                    },
+                ) { Text(stringResource(R.string.plugins_title)) }
                 Column {
                     Text(stringResource(R.string.settings_general), style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))

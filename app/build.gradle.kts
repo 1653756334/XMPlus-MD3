@@ -64,6 +64,8 @@ dependencies {
     implementation(project(":core:protocol"))
     implementation(project(":core:media"))
     implementation(project(":core:download"))
+    implementation(project(":core:plugin"))
+    implementation(libs.okhttp)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3.navigation.suite)
     implementation(libs.compose.material3.adaptive)

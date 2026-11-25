@@ -20,6 +20,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
 import com.xuleo.xmplus.md3.core.media.PlaybackSessionStore
+import com.xuleo.xmplus.md3.core.plugin.PluginManager
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
 import com.xuleo.xmplus.md3.core.protocol.XmlyBrowse
@@ -46,6 +47,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 
 class XmApplication : Application(), PlaybackOwner {
     /** Work that belongs to the process rather than to a screen. */
@@ -122,9 +125,13 @@ class XmApplication : Application(), PlaybackOwner {
     /** One login session per process: it owns the SMS cooldowns and the pending challenge. */
     val login: XmlyLogin by lazy { XmlyLogin() }
 
+    /** Music plugins. Their own client, so Ximalaya's headers and cookies never reach a plugin's requests. */
+    val plugins: PluginManager by lazy { PluginManager(this, OkHttpClient()) }
+
     override fun onCreate() {
         super.onCreate()
         RewardScheduler(accounts, processScope)
         usageReady.start()
+        processScope.launch { plugins.start() }
     }
 }
