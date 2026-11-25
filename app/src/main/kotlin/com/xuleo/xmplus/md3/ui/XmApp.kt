@@ -293,7 +293,8 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             if (musicSearch != null) {
                                 MusicSearchScreen(musicSearch, plugins?.plugins?.collectAsStateWithLifecycle()?.value.orEmpty(), { navigator.pop() },
-                                    onOpen = ::openMusic, onPlay = {})
+                                    onOpen = ::openMusic, onPlay = {},
+                                    source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) })
                             }
                         }
                     }

@@ -191,7 +191,7 @@ The whole app, 听书 included, follows these; 听书 screens are brought in lin
 
 ### Search (音乐)
 
-- Search field with history and clear. Results: plugin tabs on top, type chips under them (only types the plugin supports, its `defaultSearchType` first). Paged by scrolling.
+- Search field with history and clear. Results: one row of type tabs (only types the plugin supports, its `defaultSearchType` first; scrolls sideways when they do not fit) with the source (plugin name with ▾) at its end, the same source and menu as 音乐. Paged by scrolling.
 - Tapping a song plays it now and inserts it after the current song; the queue is kept.
 
 ### Song rows

@@ -86,7 +86,7 @@ fun MusicScreen(
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSelect: (String) -> Unit) {
+internal fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val label = stringResource(R.string.music_source)
     val single = plugins.size <= 1

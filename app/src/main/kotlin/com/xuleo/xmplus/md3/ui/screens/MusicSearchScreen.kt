@@ -1,9 +1,11 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,14 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -61,8 +60,8 @@ private fun SearchType.label(): Int = when (this) {
 }
 
 /**
- * 音乐's search: the field and history as on 听书; results with the plugins as tabs and their types as chips under
- * them. Each plugin and type is searched when it is first shown, and pages as it scrolls.
+ * 音乐's search: the field and history as on 听书; under it one row with the types as tabs and the source at its end,
+ * the same source and menu as 音乐. Each plugin and type is searched when it is first shown, and pages as it scrolls.
  */
 @Composable
 internal fun MusicSearchScreen(
@@ -72,6 +71,8 @@ internal fun MusicSearchScreen(
     onOpen: (PluginMedia) -> Unit,
     onPlay: (MusicItem) -> Unit,
     playingKey: String? = null,
+    source: String? = null,
+    onSource: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sources = plugins.filter { it.enabled && "search" in it.info.methods }
@@ -96,29 +97,24 @@ internal fun MusicSearchScreen(
             )
             return@Column
         }
-        var platform by rememberSaveable { mutableStateOf<String?>(null) }
-        val source = sources.firstOrNull { it.platform == platform } ?: sources.first()
-        if (sources.size > 1) {
-            ScrollingDetailTabs(sources.indexOf(source), sources.map { it.platform }, { platform = sources[it].platform })
-        }
+        // The source is the one 音乐 shows; a plugin that cannot search falls back to the first that can, without
+        // changing the choice, as on 音乐.
+        val current = sources.firstOrNull { it.platform == source } ?: sources.first()
         // Each plugin opens on its own default type; a type picked on one plugin does not carry to another.
-        key(source.platform) {
-            val types = source.searchTypes()
+        key(current.platform) {
+            val types = current.searchTypes()
             var typeKey by rememberSaveable { mutableStateOf(types.first().key) }
             val type = types.firstOrNull { it.key == typeKey } ?: types.first()
-            if (types.size > 1) {
-                LazyRow(
-                    Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = XmLayout.PagePadding, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(types) { FilterChip(it == type, { typeKey = it.key }, { Text(stringResource(it.label())) }) }
-                }
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Scrolls sideways when the types do not fit beside the source.
+                ScrollingDetailTabs(types.indexOf(type), types.map { stringResource(it.label()) }, { typeKey = types[it].key }, Modifier.weight(1f))
+                SourcePicker(sources, current.platform, onSource)
+                Spacer(Modifier.width(XmLayout.PagePadding))
             }
-            LaunchedEffect(keyword, source.platform, type) { viewModel.open(source.platform, type) }
+            LaunchedEffect(keyword, current.platform, type) { viewModel.open(current.platform, type) }
             key(keyword, type) {
-                val paged = state.results[source.platform to type] ?: Paged(loading = true)
-                SearchResults(paged, { viewModel.loadMore(source.platform, type) }, { viewModel.retry(source.platform, type) },
+                val paged = state.results[current.platform to type] ?: Paged(loading = true)
+                SearchResults(paged, { viewModel.loadMore(current.platform, type) }, { viewModel.retry(current.platform, type) },
                     onOpen, onPlay, playingKey)
             }
         }
