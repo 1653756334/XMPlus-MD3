@@ -14,6 +14,9 @@ import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
 import com.xuleo.xmplus.md3.core.media.SleepTimerStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
+import com.xuleo.xmplus.md3.core.media.MusicPlayback
+import com.xuleo.xmplus.md3.core.media.ResolvedSong
+import com.xuleo.xmplus.md3.core.media.SongSourceResolver
 import com.xuleo.xmplus.md3.core.media.ListenHistoryStore
 import com.xuleo.xmplus.md3.core.media.PlaybackBookmarkStore
 import com.xuleo.xmplus.md3.core.media.PlaybackController
@@ -21,6 +24,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
 import com.xuleo.xmplus.md3.core.media.PlaybackSessionStore
 import com.xuleo.xmplus.md3.core.plugin.MusicCatalog
+import com.xuleo.xmplus.md3.core.plugin.MusicSources
 import com.xuleo.xmplus.md3.core.plugin.PluginManager
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
@@ -134,6 +138,20 @@ class XmApplication : Application(), PlaybackOwner {
 
     /** What 音乐 reads from the plugins: sheets, rankings, search and details. */
     val musicCatalog: MusicCatalog by lazy { MusicCatalog(plugins) }
+
+    /** Where a song plays from: downloads, the media cache, the alternative plugin or the song's plugin. */
+    val musicSources: MusicSources by lazy { MusicSources(this, plugins) }
+
+    /** Songs share the player with 听书; starting one stops the other. */
+    override val music: MusicPlayback by lazy {
+        val resolver = SongSourceResolver { song, quality ->
+            musicSources.mediaSource(song, quality.key)?.let { ResolvedSong(it.url, it.headers, it.localFile) }
+        }
+        MusicPlayback(this, resolver).also { music ->
+            music.onStart = { playback.stopForSong() }
+            playback.onStart = { music.stopForEpisode() }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()

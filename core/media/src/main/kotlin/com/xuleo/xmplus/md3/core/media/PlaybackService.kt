@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 
 interface PlaybackOwner {
     val playback: PlaybackController
+    val music: MusicPlayback
 }
 
 /** Hosts the only ExoPlayer. The service stays foreground while media is playing. */
@@ -29,12 +30,13 @@ class PlaybackService : MediaSessionService() {
     private lateinit var sessionPlayer: SessionPlayer
     private lateinit var session: MediaSession
     private val playback get() = (application as PlaybackOwner).playback
+    private val music get() = (application as PlaybackOwner).music
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
         player = createPlayer(this)
-        sessionPlayer = SessionPlayer(player, playback)
+        sessionPlayer = SessionPlayer(player, playback, music)
         val builder = MediaSession.Builder(this, sessionPlayer)
         packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
             val openApp = PendingIntent.getActivity(
@@ -45,8 +47,11 @@ class PlaybackService : MediaSessionService() {
         }
         session = builder.build()
         playback.attach(player)
+        music.attach(player)
         // Whether a next episode exists comes from the album, not the player, so the session is told when that changes.
         scope.launch { playback.queue.map { it.hasNext }.distinctUntilChanged().collect { sessionPlayer.refreshCommands() } }
+        scope.launch { music.queue.map { it.items.isNotEmpty() }.distinctUntilChanged().collect { sessionPlayer.refreshCommands() } }
+        scope.launch { music.state.map { it.song != null }.distinctUntilChanged().collect { sessionPlayer.refreshCommands() } }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
@@ -54,6 +59,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         scope.cancel()
+        music.detach(player)
         playback.detach(player)
         session.release()
         player.release()
@@ -63,7 +69,14 @@ class PlaybackService : MediaSessionService() {
 
 /** A system client may control the selected episode, never install media or play before authorization. */
 @UnstableApi
-private class SessionPlayer(player: Player, private val playback: PlaybackController) : ForwardingSimpleBasePlayer(player) {
+private class SessionPlayer(
+    player: Player,
+    private val playback: PlaybackController,
+    private val music: MusicPlayback,
+) : ForwardingSimpleBasePlayer(player) {
+    /** A song holds the player; starting either side stops the other, so only one has a current item. */
+    private val songActive get() = music.state.value.song != null
+
     override fun getState(): State {
         val current = super.getState()
         val commands = Player.Commands.Builder()
@@ -74,7 +87,7 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
         // The player holds one episode; the album decides what comes before and after it.
         commands.add(Player.COMMAND_SEEK_TO_PREVIOUS)
         commands.add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
-        if (playback.queue.value.hasNext) {
+        if (if (songActive) music.queue.value.items.isNotEmpty() else playback.queue.value.hasNext) {
             commands.add(Player.COMMAND_SEEK_TO_NEXT)
             commands.add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
         }
@@ -85,11 +98,24 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
     fun refreshCommands() = invalidateState()
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        if (playWhenReady) playback.resume() else playback.pause()
+        when {
+            songActive -> if (playWhenReady) music.resume() else music.pause()
+            playWhenReady -> playback.resume()
+            else -> playback.pause()
+        }
         return Futures.immediateVoidFuture()
     }
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
+        if (songActive) {
+            when (seekCommand) {
+                Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> music.next()
+                Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ->
+                    if (music.state.value.positionMs > RestartThresholdMs) music.seekTo(0) else music.previous()
+                else -> return super.handleSeek(mediaItemIndex, positionMs, seekCommand)
+            }
+            return Futures.immediateVoidFuture()
+        }
         when (seekCommand) {
             Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> playback.nextEpisode()
             // Like a player's previous key: restart an episode that is under way, go back from its beginning.
@@ -101,7 +127,7 @@ private class SessionPlayer(player: Player, private val playback: PlaybackContro
     }
 
     override fun handleStop(): ListenableFuture<*> {
-        playback.stop()
+        if (songActive) music.pause() else playback.stop()
         return Futures.immediateVoidFuture()
     }
 

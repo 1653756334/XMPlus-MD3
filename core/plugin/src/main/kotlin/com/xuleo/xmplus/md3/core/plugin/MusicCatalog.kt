@@ -46,8 +46,8 @@ data class SheetGroup(val title: String, val sheets: List<MusicSheet>)
 /** A sheet, ranking or album page: the item itself (completed by the plugin on page 1) and its songs. */
 data class SongListPage<out T : PluginMedia>(val item: T, val songs: PluginPage<MusicItem>)
 
-/** Where a song plays from. */
-data class MediaSource(val url: String, val headers: Map<String, String>, val quality: String?)
+/** Where a song plays from: a link with the headers it needs, or a downloaded [localFile]. */
+data class MediaSource(val url: String, val headers: Map<String, String>, val quality: String?, val localFile: java.io.File? = null)
 
 /**
  * What 音乐 asks plugins for, with the same rules as MusicFree's `PluginMethodsWrapper`: a missing method is an empty
@@ -126,26 +126,6 @@ class MusicCatalog(private val manager: PluginManager) {
         return PluginPage(items, root.isEnd())
     }
 
-    /**
-     * The plugin's link for [song], or the song's own `qualities` / `url` when the plugin has no `getMediaSource`.
-     * Null when there is none. Cache, alternative plugins and quality fallback arrive with M3.
-     */
-    suspend fun mediaSource(song: MusicItem, quality: String = DefaultQuality): MediaSource? {
-        val reply = call(song.platform, "getMediaSource", song.raw, JsonPrimitive(quality))
-        if (reply == null) {
-            val own = ((song.raw["qualities"] as? JsonObject)?.get(quality) as? JsonObject)?.text("url") ?: song.raw.text("url")
-            return own?.takeIf { it.isNotBlank() }?.let { MediaSource(it, emptyMap(), null) }
-        }
-        val root = reply as? JsonObject ?: return null
-        val url = root.text("url")?.takeIf { it.isNotBlank() } ?: return null
-        val headers = (root["headers"] as? JsonObject)?.mapNotNull { (key, value) ->
-            (value as? JsonPrimitive)?.contentOrNull?.let { key to it }
-        }?.toMap().orEmpty().toMutableMap()
-        root.text("userAgent")?.takeIf { it.isNotBlank() && headers.keys.none { it.equals("user-agent", true) } }
-            ?.let { headers["user-agent"] = it }
-        return MediaSource(url, headers, root.text("quality") ?: quality)
-    }
-
     private suspend fun <T> artistWorks(artist: MusicArtist, page: Int, type: SearchType, item: (JsonObject) -> T?): PluginPage<T> {
         val reply = call(artist.platform, "getArtistWorks", artist.raw, JsonPrimitive(page), JsonPrimitive(type.key))
         val root = reply as? JsonObject ?: return PluginPage.End
@@ -182,7 +162,6 @@ class MusicCatalog(private val manager: PluginManager) {
 
     private companion object {
         const val DefaultTagTitle = "默认"
-        const val DefaultQuality = "standard"
     }
 }
 

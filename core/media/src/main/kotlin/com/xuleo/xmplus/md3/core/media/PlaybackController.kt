@@ -96,6 +96,8 @@ class PlaybackController(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val ordered = Mutex()
     private val engine = MutableStateFlow<ExoPlayer?>(null)
+    /** Called when an episode is about to start, so that music stops. */
+    var onStart: () -> Unit = {}
     private val mutableState = MutableStateFlow(PlaybackState())
     val state = mutableState.asStateFlow()
     private val mutableQueue = MutableStateFlow(PlaybackQueueState())
@@ -827,6 +829,16 @@ class PlaybackController(
         if (mutableSleep.value.active) mutableSleep.value = SleepTimerState()
     }
 
+    /** A song took the player: the episode stops, its progress is kept, and it is not brought back at the next launch. */
+    fun stopForSong() {
+        if (mutableState.value.selection == null && albumQueue == null) {
+            forgetSession()
+            return
+        }
+        stop()
+        forgetSession()
+    }
+
     fun stop() {
         clearQueue()
         cancelSleepTimer()
@@ -940,6 +952,8 @@ class PlaybackController(
                 source.chosenStartMs = position?.takeIf { it != 0L }
             }
             opened = source
+            onStart()
+            player.setAudioAttributes(SpeechAttributes, true)
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
             applyVolume()

@@ -41,14 +41,21 @@ internal fun createPlayer(context: Context): ExoPlayer {
         },
     )
     return ExoPlayer.Builder(context, sources)
-        // Spoken audio: another app's short sound pauses the story instead of talking over it.
-        .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
+        .setAudioAttributes(SpeechAttributes, true)
         .setHandleAudioBecomingNoisy(true)
         .setWakeMode(C.WAKE_MODE_NETWORK)
         .setSeekBackIncrementMs(PlaybackSkipMillis)
         .setSeekForwardIncrementMs(PlaybackSkipMillis)
         .build()
 }
+
+/** Spoken audio: another app's short sound pauses the story instead of talking over it. */
+internal val SpeechAttributes: AudioAttributes =
+    AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build()
+
+/** Music: another app's short sound lowers the song for a moment instead of pausing it. */
+internal val MusicAttributes: AudioAttributes =
+    AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build()
 
 private object PlaybackRedirects : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
