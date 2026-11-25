@@ -10,7 +10,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import com.xuleo.xmplus.md3.ui.components.XmSwap
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -67,6 +70,9 @@ import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 private val PluginRowHeight = 64.dp
 
+/** What the top bar is showing; a change swaps its title, navigation icon and actions together. */
+private enum class BarMode { Normal, Selecting, Sorting }
+
 /** 我的 → 插件: install, update, order, enable and set up the plugins music comes from. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +113,11 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
     val job = viewModel.job
     // A batch shows its progress and results in a sheet; a single plugin only the line under the bar, then a snackbar.
     val jobSheet = job != null && !viewModel.hidden && (!job.running || job.total > 1)
+    val mode = when {
+        selecting -> BarMode.Selecting
+        sorting -> BarMode.Sorting
+        else -> BarMode.Normal
+    }
     val stopSelecting = { selecting = false; selected = emptySet() }
     BackHandler(enabled = selecting, onBack = stopSelecting)
     // Plugins that leave the list leave the selection too; with none left there is nothing to select.
@@ -120,29 +131,34 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        when {
-                            selecting -> stringResource(R.string.history_selected, selected.size)
-                            sorting -> stringResource(R.string.plugin_sort)
-                            else -> stringResource(R.string.plugins_title)
-                        },
-                    )
+                    XmSwap(mode, contentAlignment = Alignment.CenterStart) { shown ->
+                        Text(
+                            when (shown) {
+                                BarMode.Selecting -> stringResource(R.string.history_selected, selected.size)
+                                BarMode.Sorting -> stringResource(R.string.plugin_sort)
+                                BarMode.Normal -> stringResource(R.string.plugins_title)
+                            },
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = { if (selecting) stopSelecting() else if (sorting) sorting = false else onBack() }) {
-                        Icon(if (selecting || sorting) XmIcons.Outlined.Close else XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back))
+                        XmSwap(mode == BarMode.Normal) { normal ->
+                            Icon(if (normal) XmIcons.Outlined.ArrowBack else XmIcons.Outlined.Close, stringResource(R.string.action_back))
+                        }
                     }
                 },
-                actions = {
-                    if (selecting) {
+                actions = { XmSwap(mode, contentAlignment = Alignment.CenterEnd) { shown -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (shown == BarMode.Selecting) {
                         val all = list.isNotEmpty() && selected.size == list.size
+                        val tint by animateColorAsState(
+                            if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            MaterialTheme.motionScheme.fastEffectsSpec(), label = "selectAll",
+                        )
                         IconButton(onClick = { selected = if (all) emptySet() else list.mapTo(HashSet()) { it.platform } }) {
-                            Icon(
-                                XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
-                                tint = if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                            )
+                            Icon(XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all), tint = tint)
                         }
-                    } else if (sorting) {
+                    } else if (shown == BarMode.Sorting) {
                         TextButton(onClick = { viewModel.reorder(order); sorting = false }) { Text(stringResource(R.string.plugin_done)) }
                     } else {
                         IconButton(onClick = { showInstall = true }, enabled = !viewModel.busy) {
@@ -168,7 +184,7 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
                             }
                         }
                     }
-                },
+                } } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -195,7 +211,10 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
                             }
                         }
                         // Keeps the last rows clear of the toolbar.
-                        Spacer(Modifier.height(if (selecting) SelectionToolbarSpace else XmLayout.SectionGap))
+                        val gap by animateDpAsState(
+                            if (selecting) SelectionToolbarSpace else XmLayout.SectionGap, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "toolbarGap",
+                        )
+                        Spacer(Modifier.height(gap))
                     }
                 }
             }
@@ -332,26 +351,22 @@ private fun PluginRow(
         if (error != null) Text(stringResource(errorText(error)), color = MaterialTheme.colorScheme.error, maxLines = 1)
         else pluginMeta(plugin)?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
-    val name: @Composable () -> Unit = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-    if (selecting) {
-        ListItem(
-            checked = selected,
-            onCheckedChange = onSelect,
-            modifier = Modifier.heightIn(min = PluginRowHeight),
-            supportingContent = supporting,
-            trailingContent = { Checkbox(checked = selected, onCheckedChange = null) },
-            content = name,
-        )
-    } else {
-        ListItem(
-            onClick = onOpen,
-            modifier = Modifier.heightIn(min = PluginRowHeight),
-            supportingContent = supporting,
-            trailingContent = if (error == null) ({ Switch(checked = !plugin.meta.disabled, onCheckedChange = onToggle) }) else null,
-            onLongClick = onLongClick,
-            content = name,
-        )
-    }
+    // One row for both modes, so entering selection only swaps the switch for a check box and tints the picked rows.
+    ListItem(
+        selected = selecting && selected,
+        onClick = if (selecting) ({ onSelect(!selected) }) else onOpen,
+        modifier = Modifier.heightIn(min = PluginRowHeight),
+        supportingContent = supporting,
+        trailingContent = {
+            XmSwap(selecting) { picking ->
+                when {
+                    picking -> Checkbox(checked = selected, onCheckedChange = null)
+                    error == null -> Switch(checked = !plugin.meta.disabled, onCheckedChange = onToggle)
+                }
+            }
+        },
+        onLongClick = onLongClick,
+    ) { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
 
 private val SelectionToolbarSpace = 112.dp

@@ -328,7 +328,7 @@ private fun HistoryRow(record: ListenRecord, selecting: Boolean, checked: Boolea
         meta = joinMeta(progressText(record.positionMs, record.durationMs), formatDate(record.playedAtMs, locale)),
         onOpen = if (selecting) onToggle else onPlay,
         modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-        trailing = { if (selecting) Checkbox(checked = checked, onCheckedChange = null) },
+        trailing = { com.xuleo.xmplus.md3.ui.components.XmSwap(selecting) { if (it) Checkbox(checked = checked, onCheckedChange = null) } },
     )
 }
 @Composable
