@@ -40,6 +40,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import com.xuleo.xmplus.md3.ui.components.XmTextField
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -592,18 +596,20 @@ private fun LinkDialog(@StringRes title: Int, @StringRes confirm: Int, onDismiss
         }
         mutableStateOf(clip?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }.orEmpty())
     }
+    val focus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(title)) },
         text = {
-            OutlinedTextField(
-                text, { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.plugin_link_hint)) },
-                trailingIcon = if (text.isNotEmpty()) ({
-                    IconButton(onClick = { text = "" }) { Icon(XmIcons.Outlined.Cancel, stringResource(R.string.action_clear)) }
-                }) else null,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            XmTextField(
+                text, { text = it }, Modifier.fillMaxWidth().focusRequester(focus),
+                placeholder = stringResource(R.string.plugin_link_hint),
+                leadingIcon = XmIcons.Outlined.Link,
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Done,
+                onImeAction = { if (text.isNotBlank()) onConfirm(text.trim()) },
             )
+            LaunchedEffect(Unit) { focus.requestFocus() }
         },
         confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text(stringResource(confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
@@ -622,11 +628,10 @@ private fun VariablesDialog(plugin: InstalledPlugin, onDismiss: () -> Unit, onSa
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 plugin.info.variables.forEach { variable ->
-                    OutlinedTextField(
-                        values[variable.key].orEmpty(), { values[variable.key] = it },
-                        label = { Text(variable.name?.takeIf { it.isNotBlank() } ?: variable.key) },
-                        placeholder = variable.hint?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    XmTextField(
+                        values[variable.key].orEmpty(), { values[variable.key] = it }, Modifier.fillMaxWidth(),
+                        label = variable.name?.takeIf { it.isNotBlank() } ?: variable.key,
+                        placeholder = variable.hint?.takeIf { it.isNotBlank() },
                     )
                 }
             }
@@ -705,9 +710,11 @@ private fun SubscriptionDialog(onDismiss: () -> Unit, onAdd: (PluginSubscription
         title = { Text(stringResource(R.string.subscription_add)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.subscription_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.plugin_link_hint)) }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+                XmTextField(name, { name = it }, Modifier.fillMaxWidth(), label = stringResource(R.string.subscription_name), imeAction = ImeAction.Next)
+                XmTextField(
+                    url, { url = it }, Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.plugin_link_hint), leadingIcon = XmIcons.Outlined.Link, keyboardType = KeyboardType.Uri,
+                )
             }
         },
         confirmButton = {
