@@ -28,7 +28,7 @@ Add a music platform to XMPlus-MD3 next to 听书:
 ### 插件 Plugins
 
 - [ ] Runtime: the injected environment and bundled packages exactly as MusicFree (see 2)
-- [ ] Install from a local file or a link; confirm with name, version and author first
+- [ ] Install from local files (several at once) or a link, as MusicFree does
 - [ ] Subscriptions: a list of `.js` / `.json` links, updated on demand
 - [ ] Update one plugin from its `srcUrl`, or all; same-name plugins replace older versions only
 - [ ] Enable / disable, drag to reorder, user variables, alternative plugin (替代插件), description, uninstall
@@ -57,14 +57,16 @@ Add a music platform to XMPlus-MD3 next to 听书:
 - [ ] Editable queue: reorder, remove, clear, play next
 - [ ] Shared with 听书: mini player, sleep timer, notification, lock screen, Bluetooth, last session
 
-### 听过 · 音乐 Library
+### 听过 Library (both kinds of content)
 
-- [ ] 最近播放 (this device)
+- [ ] One overview page instead of seven swipe tabs (see 4 · 听过)
+- [ ] 最近播放: 听书 episodes and songs in one list, filter 全部 / 听书 / 音乐, resume from where each stopped
 - [ ] 我喜欢, a built-in sheet
-- [ ] 我的歌单: create, rename, delete, reorder songs, move and copy between sheets
+- [ ] 自建歌单: create, rename, delete, reorder songs, move and copy between sheets
 - [ ] 收藏歌单
 - [ ] Import a sheet or a song from a link through a plugin (`importMusicSheet`, `importMusicItem`)
-- [ ] Search across the music library
+- [ ] 听书 sections (云历史, 听更新, 订阅, 收藏, 书签, 关注的主播) as pages opened from the overview, content unchanged
+- [ ] Search across the library
 
 ### 下载 Downloads
 
@@ -74,7 +76,7 @@ Add a music platform to XMPlus-MD3 next to 听书:
 
 ### 迁移 Migration (last)
 
-- [ ] Import a MusicFree backup: sheets, and plugins reinstalled from their links after confirmation
+- [ ] Import a MusicFree backup: sheets, and plugins reinstalled from their links, as MusicFree restores them
 
 ## 2. Plugin runtime
 
@@ -103,11 +105,11 @@ Source: MusicFree `src/core/pluginManager/plugin.ts`, `index.ts`, `meta.ts`, `sr
 - Meta per `platform`: order, disabled, user variables, alternative plugin. Kept across updates, removed when the last plugin of that `platform` is uninstalled.
 - Subscriptions accept links ending in `.js` or `.json`; `.json` lists are read in MusicFree's format.
 
-### Safety
+### Threads and errors
 
-- Only the environment above is exposed: no file, storage or device access.
-- Each plugin runs off the main thread with a memory limit and an interrupt for runaway code. A failing or hung call fails that request only; the UI shows a short error with 重试.
-- Installing shows the plugin's name, version and author, and a one-line warning to install only plugins from sources the user trusts.
+- Plugins run off the main thread, so the UI never waits on them. Nothing is added beyond MusicFree: no install confirmation, no warnings, no extra limits.
+- A failing call fails that request only; the page shows its error state with 重试.
+- Install results as in MusicFree: success, or the failure reason; several at once → how many succeeded and failed, with the failed ones listed.
 
 ## 3. Modules
 
@@ -123,7 +125,18 @@ core/download    one download manager for both (extended)
 
 ## 4. UI
 
-One pattern everywhere: a header row of mode headings (as 听书's 推荐 / 分类 / 排行) and scrollable tabs under it.
+### Comfort baseline
+
+The whole app, 听书 included, follows these; 听书 screens are brought in line as they are touched.
+
+- One navigation pattern: a header row of mode headings (as 听书's 推荐 / 分类 / 排行), scrollable tabs under it when needed. Never more than two levels of tabs on one screen.
+- One row style for every list: 64dp minimum, 48dp cover (8dp corners, circle for people), title on one line, one quiet meta line, a single trailing action. Grids: 12dp corners, title up to two lines, no meta under 2 columns of text.
+- Covers carry the colour: placeholders are tinted surfaces with an icon, never grey boxes; pages that open from a cover keep the shared transition.
+- Calm surfaces: no dividers between rows, no outlined cards on lists; spacing groups content. One filled button per screen at most.
+- Text is short: no section subtitles, no explanations beside controls; counts in labels (歌单 12) instead of separate badges.
+- States: skeletons while loading, one line plus one action when empty or failed, a snackbar (with 撤销 where it undoes) after an action. No toasts, no blocking dialogs except to confirm deletion.
+- Touch: 48dp targets, long press for multi-select everywhere, haptics on toggles; the mini player never covers the last row.
+- Reachability: main actions in the lower half (播放全部 under the header, actions in sheets), top bar only for page-level actions.
 
 ### Shell
 
@@ -174,13 +187,29 @@ Same player shell as 听书; only the content differs.
 
 ### 听过
 
-- Header: 听书 · 音乐, remembered. 听书 keeps its seven tabs.
-- 音乐 tabs: 最近 · 我喜欢 · 歌单 · 收藏.
-  - 最近: this device's songs, newest first, with select and remove like 历史.
-  - 我喜欢: songs, newest first, with 播放全部.
-  - 歌单: the user's sheets as rows with cover (from the first song), name and count; 新建歌单 and 导入歌单 in the top bar. 导入歌单 asks for a link and a plugin that can import, showing the plugin's hints.
-  - 收藏: starred plugin sheets; they open the live sheet.
-- Search in the top bar covers the current kind of content.
+One page for everything the user has listened to or kept, styled after QQ 音乐's 我的: a short overview that scrolls, with each collection one tap away. It replaces 听书's seven swipe tabs; their content and rules (`DESIGN.md` · 听过) are kept, each as its own page.
+
+Top bar: title 听过, search (covers the whole library: episodes, albums, songs, sheets), and 更多 → 管理歌单.
+
+From top to bottom:
+
+1. 继续听 — a horizontal row of the latest 10 items, both kinds mixed, newest first. Card: cover (square, 12dp corners), title on two lines; episodes show a thin progress bar on the cover, the playing item shows the equalizer. Tap resumes: an episode from its saved position, a song plays and the queue becomes the list it was played from when that list is still known, otherwise just the song. The row's title opens 最近播放. Hidden when there is nothing yet.
+2. Shortcut grid — 4 columns of icon tiles, each with a label and count (or a dot for news):
+   - 我喜欢 · 听更新 · 订阅 · 书签
+   - 收藏专辑 · 关注 · 云历史 · 下载 (opens the 下载 tab)
+   - Tiles that need a Ximalaya account (听更新, 订阅, 收藏专辑, 关注, 云历史) are left out when no account is signed in; the grid closes up, never shows empty slots.
+3. 歌单 — headings 自建 n · 收藏 n (switch in place, remembered), trailing icons 新建 and 导入. Rows: cover from the first song (or the sheet's own), name, song count. Empty 自建 → one line and 新建歌单. 我喜欢 is not repeated here.
+
+Pages opened from the overview:
+
+- 最近播放: filter chips 全部 · 听书 · 音乐; rows of both kinds (episode rows show where playback stopped, song rows the artist). Long press selects; remove with an undo snackbar. This replaces 历史 and adds songs.
+- 我喜欢: the sheet page (header with cover mosaic, 播放全部), newest first.
+- 听更新, 订阅, 收藏专辑, 书签, 关注, 云历史: the existing section lists, unchanged, each on its own page.
+- 歌单 rows open the sheet page; 收藏 rows open the live plugin sheet.
+- 新建: a dialog with one name field. 导入: a sheet with a link field and the plugins that can import (chips), showing the chosen plugin's hints; the result opens as a new 自建 sheet.
+- 管理歌单: drag to reorder, multi-select delete, in place on the overview.
+
+Why this layout: the queue holds one kind of content at a time, so 继续听 is the way back to whatever was replaced; the overview fits both kinds without a second row of tabs; collections the user opens rarely stay one tap away without taking space.
 
 ### 下载
 
@@ -215,6 +244,5 @@ Same player shell as 听书; only the content differs.
 
 - Engine differences: plugins were run on Hermes in MusicFree. QuickJS gaps (for example `Intl`) may break some plugins; they are filled in M1 where plugins need them.
 - Plugin quality varies and plugins change often. Failures stay inside the call and never block the app.
-- Plugins run arbitrary code with network access. The environment stays limited to what MusicFree exposes.
 - Copyright: the app stays a neutral player; nothing in it points to a source.
 - MusicFree updates its plugin API. Changes are ported only from its source, and the reported version is raised with them.

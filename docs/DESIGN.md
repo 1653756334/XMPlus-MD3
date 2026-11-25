@@ -246,7 +246,7 @@ Rules:
 
 ### 听过 Library
 
-- Header 听书 · 音乐 (see `docs/MUSIC.md` for 音乐). 听书 has seven sections that swipe left and right: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签 and 关注的主播.
+- Being redesigned as one overview page for 听书 and 音乐 (`docs/MUSIC.md` · 听过). The sections below are kept as pages opened from it. Seven sections: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签 and 关注的主播.
 - 历史 is this device's own record, one row per album: the latest episode, where playback stopped and when. 选择 in the top bar selects rows (全选 selects all) and removes them with an undo snackbar. Swiping never removes, so the tabs still swipe.
 - Account sections load the first time they are shown. Subscriptions and favourites can be removed in place; other rows open their album or anchor page.
 - 书签 lists the device's bookmarks across all albums, whichever account is signed in, with the album and episode names kept when each bookmark was made. Tapping one plays its episode from the saved position in the player. Bookmarks made before the names were kept are completed from the catalogue, cover included, once per launch.

@@ -338,12 +338,12 @@ Calls and safety
 
 - PL-20 A method the plugin lacks → empty result (`isEnd: true`), no error.
 - PL-21 Returned items get the plugin's `platform`; unknown fields survive a round trip to the next call.
-- PL-22 An endless loop or a call over the time limit → that call fails with 重试; the UI stays responsive.
+- PL-22 A call that throws or never answers → only that request fails, with 重试; the UI stays responsive.
 - PL-23 A plugin cannot read files, app storage or other plugins' variables.
 
 Install, update, remove
 
-- PL-30 Install from a file or a link → confirmation shows name, version and author before anything is saved.
+- PL-30 Install from several files at once or a link → installed without an extra confirmation; the result says how many succeeded and lists failures with their reasons, as MusicFree does.
 - PL-31 Same hash as installed → already installed, nothing changes.
 - PL-32 Same `platform`, lower version than installed → refused; higher → replaces, keeping order, enabled state, user variables and alternative plugin.
 - PL-33 Uninstall the last plugin of a `platform` → its meta is removed.
