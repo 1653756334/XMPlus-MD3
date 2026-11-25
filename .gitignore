@@ -35,3 +35,6 @@ Thumbs.db
 # Project policy: verification sources are temporary and never committed
 **/src/test/
 **/src/androidTest/
+
+# Plugin runtime build inputs
+node_modules/
