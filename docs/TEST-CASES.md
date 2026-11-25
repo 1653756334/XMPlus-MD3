@@ -357,3 +357,29 @@ Shell
 - PL-41 Back on 音乐, 听过, 下载 or 我的 → 听书; back on 听书 leaves the app.
 - PL-42 No plugin installed → 音乐 shows only the empty message and 导入插件, which opens 插件.
 - PL-43 No plugin, subscription link or plugin website appears anywhere in the app.
+
+## Phase M2 — Browsing
+
+Source: MusicFree `src/core/pluginManager/plugin.ts` (`PluginMethodsWrapper`), `src/pages/recommendSheets`, `src/pages/topList`, `src/pages/searchPage`. Design: `docs/MUSIC.md` · 音乐, Search, Detail pages.
+
+音乐 tab
+
+- BR-01 推荐 opens the plugin's default list (tag `{ id: "" }`) with 默认 selected; pinned tags follow; 全部 opens the grouped tags and a picked tag shows next to 默认.
+- BR-02 Sheets page by scrolling; `isEnd` missing or not `false` ends the list; a sheet repeated across pages is shown once.
+- BR-03 榜单 shows the plugin's groups with titles; each ranking opens its songs through `getTopListDetail`.
+- BR-04 The chosen source is kept across restarts and shared by 推荐 and 榜单; a plugin without the method is not offered for that mode.
+- BR-05 A plugin that throws or times out → that list shows one line and 重试; other plugins and tabs keep working.
+
+Search
+
+- BR-10 History is kept apart from 听书's; tapping an entry searches it; long press removes it; clear asks first.
+- BR-11 Only enabled plugins with `search` are tabs; type chips follow `supportedSearchType` (all when absent) with `defaultSearchType` first.
+- BR-12 Each plugin and type is searched when first shown, pages by scrolling, and shows again at once when switched back.
+
+Detail pages
+
+- BR-20 歌单, 榜单 and 专辑 show the header as opened; page 1 adds what the plugin returns (`sheetItem` / `topListItem` / `albumItem`).
+- BR-21 Later pages are asked with the item as opened; an empty page ends the list.
+- BR-22 A plugin without `getMusicSheetInfo` / `getAlbumInfo` shows the item's own `musicList`; album songs carry the album's title.
+- BR-23 歌手 shows 单曲 and 专辑 from `getArtistWorks`; 专辑 loads when its tab is first opened.
+- BR-24 Every object passed back to a plugin keeps the fields it returned, with `platform` set to the plugin's.
