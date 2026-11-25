@@ -423,6 +423,9 @@
     <string name="music_empty">还没有音乐来源</string>
     <string name="music_import_plugin">导入插件</string>
     <string name="music_unsupported">当前插件不支持</string>
+    <string name="music_tag_default">默认</string>
+    <string name="music_tag_all">全部</string>
+    <string name="music_nothing">这里还没有内容</string>
     <string name="plugins_title">插件</string>
     <string name="plugins_empty">还没有插件</string>
     <string name="plugin_sort">排序</string>

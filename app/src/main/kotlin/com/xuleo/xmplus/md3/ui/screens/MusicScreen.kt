@@ -22,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
+import com.xuleo.xmplus.md3.core.model.MusicSheet
 import com.xuleo.xmplus.md3.core.plugin.InstalledPlugin
+import com.xuleo.xmplus.md3.music.MusicBrowseViewModel
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.XmMenu
 import com.xuleo.xmplus.md3.ui.components.XmMenuChoice
@@ -37,8 +39,8 @@ enum class MusicMode(@StringRes val label: Int, val method: String) {
 /**
  * The 音乐 tab: mode headings as on 听书, and at the end of the same row the plugin the content comes from, changed
  * from a menu since it rarely changes. Both modes share the chosen plugin; a mode it cannot show uses the first
- * plugin that can, without changing the choice. Without plugins it shows only the way to import one. The plugin
- * content arrives in M2.
+ * plugin that can, without changing the choice. Without plugins it shows only the way to import one.
+ * [onOpenSheet] says whether the sheet is a ranking, whose songs come from another method.
  */
 @Composable
 fun MusicScreen(
@@ -47,6 +49,8 @@ fun MusicScreen(
     onSearch: (() -> Unit)? = null,
     source: String? = null,
     onSource: (String) -> Unit = {},
+    browse: MusicBrowseViewModel? = null,
+    onOpenSheet: (MusicSheet, Boolean) -> Unit = { _, _ -> },
 ) {
     var mode by rememberSaveable { mutableStateOf(MusicMode.Recommend) }
     val usable = plugins.orEmpty().filter { it.enabled }
@@ -65,7 +69,13 @@ fun MusicScreen(
             plugins == null -> Unit
             usable.isEmpty() -> MusicMessage(R.string.music_empty, R.string.music_import_plugin, onPlugins, filled = true)
             current == null -> MusicMessage(R.string.music_unsupported, R.string.plugins_title, onPlugins, filled = false)
-            else -> Box(Modifier.weight(1f).fillMaxWidth())
+            browse == null -> Box(Modifier.weight(1f).fillMaxWidth())
+            else -> Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (mode) {
+                    MusicMode.Recommend -> RecommendPane(current.platform, browse) { onOpenSheet(it, false) }
+                    MusicMode.Ranking -> RankingPane(current.platform, browse) { onOpenSheet(it, true) }
+                }
+            }
         }
     }
 }

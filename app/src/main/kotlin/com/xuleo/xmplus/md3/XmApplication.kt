@@ -20,6 +20,7 @@ import com.xuleo.xmplus.md3.core.media.PlaybackController
 import com.xuleo.xmplus.md3.core.media.PlaybackOwner
 import com.xuleo.xmplus.md3.core.media.PlaybackProgressStore
 import com.xuleo.xmplus.md3.core.media.PlaybackSessionStore
+import com.xuleo.xmplus.md3.core.plugin.MusicCatalog
 import com.xuleo.xmplus.md3.core.plugin.PluginManager
 import com.xuleo.xmplus.md3.core.protocol.XmlyAlbum
 import com.xuleo.xmplus.md3.core.protocol.XmlyAnchor
@@ -127,6 +128,9 @@ class XmApplication : Application(), PlaybackOwner {
 
     /** Music plugins. Their own client, so Ximalaya's headers and cookies never reach a plugin's requests. */
     val plugins: PluginManager by lazy { PluginManager(this, OkHttpClient()) }
+
+    /** What 音乐 reads from the plugins: sheets, rankings, search and details. */
+    val musicCatalog: MusicCatalog by lazy { MusicCatalog(plugins) }
 
     override fun onCreate() {
         super.onCreate()

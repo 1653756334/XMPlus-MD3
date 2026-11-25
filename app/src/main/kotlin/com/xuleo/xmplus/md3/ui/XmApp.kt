@@ -46,6 +46,7 @@ import com.xuleo.xmplus.md3.library.LibraryActions
 import com.xuleo.xmplus.md3.download.DownloadActions
 import com.xuleo.xmplus.md3.download.DownloadsViewModel
 import com.xuleo.xmplus.md3.library.LibraryViewModel
+import com.xuleo.xmplus.md3.music.MusicBrowseViewModel
 import com.xuleo.xmplus.md3.music.PluginsViewModel
 import com.xuleo.xmplus.md3.ui.screens.*
 
@@ -64,6 +65,7 @@ fun XmApp() {
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.factory(application))
     val downloads: DownloadsViewModel = viewModel(factory = DownloadsViewModel.factory(application))
     val plugins: PluginsViewModel = viewModel(factory = PluginsViewModel.factory(application))
+    val musicBrowse: MusicBrowseViewModel = viewModel(factory = MusicBrowseViewModel.factory(application))
     var selected by rememberSaveable { mutableStateOf(Destination.Discover) }
     // Album and anchor pages live as long as their route is on the stack.
     val routeStores: RouteStores = viewModel()
@@ -77,7 +79,7 @@ fun XmApp() {
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
-        plugins = plugins,
+        plugins = plugins, musicBrowse = musicBrowse,
     )
 }
 
@@ -103,6 +105,7 @@ internal fun XmAppContent(
     downloads: DownloadsViewModel? = null,
     downloadActions: DownloadActions? = null,
     plugins: PluginsViewModel? = null,
+    musicBrowse: MusicBrowseViewModel? = null,
 ) {
     val stack = rememberNavBackStack(AppRoute.Home)
     val navigator = remember(stack, accounts) {
@@ -221,7 +224,7 @@ internal fun XmAppContent(
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload, library, downloads, ::openAlbum, ::openAnchor, { albumId, trackId, positionMs -> playback?.playSaved(albumId, trackId, positionMs) },
-                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) }, plugins, { navigator.push(AppRoute.Plugins) })
+                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) }, plugins, { navigator.push(AppRoute.Plugins) }, musicBrowse)
                             }
                         }
                     }
@@ -316,13 +319,14 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
     categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks,
     onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
     library: LibraryViewModel?, downloads: DownloadsViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit,
-    onPlayEpisode: (String, String) -> Unit, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {}) {
+    onPlayEpisode: (String, String) -> Unit, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {},
+    musicBrowse: MusicBrowseViewModel? = null) {
     val installed = plugins?.plugins?.collectAsStateWithLifecycle()?.value
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
             Destination.Music -> MusicScreen(if (plugins == null) emptyList() else installed, onPlugins,
-                source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) })
+                source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) }, browse = musicBrowse)
             Destination.Library -> if (library != null) LibraryScreen(library, onAlbum, onAnchor, onPlay) else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins)
