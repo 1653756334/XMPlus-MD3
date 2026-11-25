@@ -136,7 +136,7 @@ private fun ColumnScope.SongList(
 
 /** A list that pages itself, with a skeleton before its first page and a retry when that page fails. */
 @Composable
-private fun <T> ColumnScope.PagedList(
+internal fun <T> ColumnScope.PagedList(
     paged: Paged<T>,
     list: LazyListState,
     onLoadMore: () -> Unit,

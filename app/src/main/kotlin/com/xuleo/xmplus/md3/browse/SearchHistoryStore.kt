@@ -4,12 +4,12 @@ import android.content.Context
 import com.xuleo.xmplus.md3.core.model.SearchHistory
 import org.json.JSONArray
 
-/** The search history, kept only on this device. */
-class SearchHistoryStore(context: Context) {
+/** The search history, kept only on this device. 听书 and 音乐 each keep their own under [Key]. */
+class SearchHistoryStore(context: Context, private val key: String = Key) {
     private val preferences = context.applicationContext.getSharedPreferences("search-history", Context.MODE_PRIVATE)
 
     fun read(): List<String> {
-        val stored = preferences.getString(Key, null) ?: return emptyList()
+        val stored = preferences.getString(key, null) ?: return emptyList()
         return try {
             val array = JSONArray(stored)
             SearchHistory.sanitize((0 until array.length()).mapNotNull { array.opt(it) as? String })
@@ -20,11 +20,12 @@ class SearchHistoryStore(context: Context) {
 
     fun write(history: List<String>) {
         val editor = preferences.edit()
-        if (history.isEmpty()) editor.remove(Key) else editor.putString(Key, JSONArray(history).toString())
+        if (history.isEmpty()) editor.remove(key) else editor.putString(key, JSONArray(history).toString())
         editor.apply()
     }
 
-    private companion object {
-        const val Key = "keywords"
+    companion object {
+        private const val Key = "keywords"
+        const val MusicKey = "music-keywords"
     }
 }

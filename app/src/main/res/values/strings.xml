@@ -443,6 +443,10 @@
     <string name="music_tag_default">Default</string>
     <string name="music_tag_all">All</string>
     <string name="music_nothing">Nothing here yet</string>
+    <string name="music_type_artist">Artists</string>
+    <string name="music_type_sheet">Playlists</string>
+    <string name="music_type_lyric">Lyrics</string>
+    <string name="music_search_hint">Songs, artists, albums</string>
     <string name="music_tab_songs">Songs</string>
     <string name="music_tab_albums">Albums</string>
     <string name="music_play_all">Play all</string>

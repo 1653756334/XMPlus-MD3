@@ -21,6 +21,7 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class MusicDetail(val kind: String, val platform: String, val id: String, val raw: String) : AppRoute {
         val contentKey: String get() = "music:$kind:$platform:$id"
     }
+    @Serializable data object MusicSearch : AppRoute
     @Serializable data object Player : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object Plugins : AppRoute

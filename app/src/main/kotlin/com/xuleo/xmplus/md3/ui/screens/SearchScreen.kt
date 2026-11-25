@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -108,42 +109,7 @@ internal fun SearchContent(
         }
     }
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
-        Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.Top) {
-            IconButton(onBack, Modifier.padding(top = 4.dp)) {
-                Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
-            }
-            TextField(
-                state = query,
-                modifier = Modifier.weight(1f).padding(vertical = 4.dp).focusRequester(focusRequester),
-                placeholder = { Text(stringResource(R.string.search_hint), maxLines = 1) },
-                leadingIcon = { Icon(XmIcons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (query.text.isNotEmpty()) {
-                        IconButton({
-                            query.setTextAndPlaceCursorAtEnd("")
-                            onClear()
-                            focusRequester.requestFocus()
-                        }) { Icon(XmIcons.Filled.Close, stringResource(R.string.search_clear)) }
-                    }
-                },
-                supportingText = if (state.invalid) {
-                    { Text(stringResource(R.string.search_invalid)) }
-                } else null,
-                isError = state.invalid,
-                lineLimits = TextFieldLineLimits.SingleLine,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                onKeyboardAction = KeyboardActionHandler { submit(query.text.toString()) },
-                shape = CircleShape,
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                    errorIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-            )
-            TextButton({ submit(query.text.toString()) }, Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.search_submit)) }
-        }
+        SearchFieldRow(query, focusRequester, state.invalid, R.string.search_hint, onBack, onClear, ::submit)
         if (state.keyword == null) {
             Suggestions(
                 state.history, state.hotWords, hotLoading = !state.hotWordsSettled && state.hotWords.isEmpty(),
@@ -159,13 +125,62 @@ internal fun SearchContent(
     }
 }
 
+/** Back, the rounded search field with its clear button, and 搜索; shared by 听书 and 音乐. */
+@Composable
+internal fun SearchFieldRow(
+    query: TextFieldState,
+    focusRequester: FocusRequester,
+    invalid: Boolean,
+    @StringRes hint: Int,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    submit: (String) -> Unit,
+) {
+        Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.Top) {
+            IconButton(onBack, Modifier.padding(top = 4.dp)) {
+                Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
+            }
+            TextField(
+                state = query,
+                modifier = Modifier.weight(1f).padding(vertical = 4.dp).focusRequester(focusRequester),
+                placeholder = { Text(stringResource(hint), maxLines = 1) },
+                leadingIcon = { Icon(XmIcons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.text.isNotEmpty()) {
+                        IconButton({
+                            query.setTextAndPlaceCursorAtEnd("")
+                            onClear()
+                            focusRequester.requestFocus()
+                        }) { Icon(XmIcons.Filled.Close, stringResource(R.string.search_clear)) }
+                    }
+                },
+                supportingText = if (invalid) {
+                    { Text(stringResource(R.string.search_invalid)) }
+                } else null,
+                isError = invalid,
+                lineLimits = TextFieldLineLimits.SingleLine,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                onKeyboardAction = KeyboardActionHandler { submit(query.text.toString()) },
+                shape = CircleShape,
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                    errorIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            )
+            TextButton({ submit(query.text.toString()) }, Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.search_submit)) }
+        }
+}
+
 private val ChipHeight = 32.dp
 private val ChipGap = 8.dp
 private const val HotPlaceholders = 8
 
 /** Before a search: this device's history on top, then the popular searches as a ranked list; the two scroll together. */
 @Composable
-private fun Suggestions(
+internal fun Suggestions(
     history: List<String>,
     hotWords: List<HotWord>,
     hotLoading: Boolean,

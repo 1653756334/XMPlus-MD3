@@ -426,6 +426,10 @@
     <string name="music_tag_default">默认</string>
     <string name="music_tag_all">全部</string>
     <string name="music_nothing">这里还没有内容</string>
+    <string name="music_type_artist">歌手</string>
+    <string name="music_type_sheet">歌单</string>
+    <string name="music_type_lyric">歌词</string>
+    <string name="music_search_hint">搜索歌曲、歌手、专辑</string>
     <string name="music_tab_songs">单曲</string>
     <string name="music_tab_albums">专辑</string>
     <string name="music_play_all">播放全部</string>

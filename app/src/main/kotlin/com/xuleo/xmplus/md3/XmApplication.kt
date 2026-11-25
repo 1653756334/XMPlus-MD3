@@ -71,6 +71,9 @@ class XmApplication : Application(), PlaybackOwner {
 
     /** Keywords searched on this device; never part of a backup. */
     val searchHistory by lazy { com.xuleo.xmplus.md3.browse.SearchHistoryStore(this) }
+    val musicSearchHistory by lazy {
+        com.xuleo.xmplus.md3.browse.SearchHistoryStore(this, com.xuleo.xmplus.md3.browse.SearchHistoryStore.MusicKey)
+    }
     val transcript by lazy { XmlyTranscript(http) }
     val library by lazy { XmlyLibrary(http) }
     val libraryActions by lazy { LibraryActions(accounts, library) }

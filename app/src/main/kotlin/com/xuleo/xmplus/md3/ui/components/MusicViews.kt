@@ -26,6 +26,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.model.MusicAlbum
+import com.xuleo.xmplus.md3.core.model.MusicArtist
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.res.stringResource
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.model.MusicSheet
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
@@ -99,6 +102,54 @@ fun MusicAlbumRow(album: MusicAlbum, modifier: Modifier = Modifier, onClick: () 
             Text(album.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val count = album.worksNum?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.music_song_count, it, it) }
             val meta = listOfNotNull(album.date.takeIf { it.isNotBlank() }, count).joinToString(" · ")
+            if (meta.isNotEmpty()) {
+                Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** An artist in a list: round avatar, name, and fans or works when the plugin gives them. */
+@Composable
+fun MusicArtistRow(artist: MusicArtist, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Row(
+        modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp)
+            .padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    ) {
+        MusicCover(artist.avatar, Modifier.size(48.dp), CircleShape)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(artist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val meta = listOfNotNull(
+                artist.fans?.takeIf { it > 0 }?.let { stringResource(R.string.music_fans, formatCount(it)) },
+                artist.worksNum?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.music_song_count, it, it) },
+            ).joinToString(" · ")
+            if (meta.isNotEmpty()) {
+                Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** A sheet in a list: cover, title, and who made it with its song count. */
+@Composable
+fun MusicSheetRow(sheet: MusicSheet, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Row(
+        modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp)
+            .padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    ) {
+        MusicCover(sheet.coverUrl, Modifier.size(56.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(sheet.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val meta = listOfNotNull(
+                sheet.artist.takeIf { it.isNotBlank() },
+                sheet.worksNum?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.music_song_count, it, it) },
+            ).joinToString(" · ")
             if (meta.isNotEmpty()) {
                 Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
