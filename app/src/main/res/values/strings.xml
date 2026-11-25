@@ -443,6 +443,14 @@
     <string name="music_tag_default">Default</string>
     <string name="music_tag_all">All</string>
     <string name="music_nothing">Nothing here yet</string>
+    <string name="music_tab_songs">Songs</string>
+    <string name="music_tab_albums">Albums</string>
+    <string name="music_play_all">Play all</string>
+    <string name="music_fans">%s fans</string>
+    <plurals name="music_song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <string name="plugins_title">Plugins</string>
     <string name="plugins_empty">No plugins yet</string>
     <string name="plugin_sort">Sort</string>

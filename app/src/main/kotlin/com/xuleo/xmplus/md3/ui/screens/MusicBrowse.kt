@@ -176,8 +176,8 @@ private fun SheetGrid(square: SheetSquare, onLoadMore: () -> Unit, onRetry: () -
 
 /** A list the plugin returned empty. */
 @Composable
-private fun MusicNothing() {
-    Box(Modifier.fillMaxSize().padding(XmLayout.FormPadding), contentAlignment = Alignment.Center) {
+internal fun MusicNothing(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().padding(XmLayout.FormPadding), contentAlignment = Alignment.Center) {
         Text(
             stringResource(R.string.music_nothing), style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,

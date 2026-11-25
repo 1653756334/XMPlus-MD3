@@ -17,6 +17,10 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class AnchorPage(val id: String, val resolveFromAlbum: Boolean = false) : AppRoute {
         val contentKey: String get() = "anchor:${if (resolveFromAlbum) "album" else "uid"}:$id"
     }
+    /** A plugin's sheet, ranking, album or artist. [raw] is the plugin's object, which every later call gets back. */
+    @Serializable data class MusicDetail(val kind: String, val platform: String, val id: String, val raw: String) : AppRoute {
+        val contentKey: String get() = "music:$kind:$platform:$id"
+    }
     @Serializable data object Player : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object Plugins : AppRoute
