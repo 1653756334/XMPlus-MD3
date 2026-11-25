@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -198,14 +197,16 @@ internal fun ImportAccountContent(
     var visible by remember { mutableStateOf(false) }
     FormPage(XmIcons.Outlined.Key, if (recovery) R.string.account_reimport else R.string.account_import,
         R.string.account_import_detail, onBack) {
-        OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.account_login_info)) },
+        com.xuleo.xmplus.md3.ui.components.XmTextField(draft, onDraft, Modifier.fillMaxWidth(),
+            label = stringResource(R.string.account_login_info),
             enabled = !busy, minLines = 5, maxLines = 8, isError = errorCode != null,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+            keyboardType = KeyboardType.Password, autoCorrect = false,
             trailingIcon = { IconButton(onClick = { visible = !visible }) {
-                Icon(if (visible) XmIcons.Outlined.VisibilityOff else XmIcons.Outlined.Visibility,
-                    stringResource(if (visible) R.string.account_hide_info else R.string.account_show_info))
+                com.xuleo.xmplus.md3.ui.components.XmSwap(visible) { shown ->
+                    Icon(if (shown) XmIcons.Outlined.VisibilityOff else XmIcons.Outlined.Visibility,
+                        stringResource(if (shown) R.string.account_hide_info else R.string.account_show_info))
+                }
             } })
         if (!recovery && showPrimaryOption) PrimaryAccountOption(makePrimary, !busy, onPrimary)
         AccountOperationFeedback(busy, errorCode)

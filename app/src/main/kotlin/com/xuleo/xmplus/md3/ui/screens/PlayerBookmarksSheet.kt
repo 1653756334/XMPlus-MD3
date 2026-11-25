@@ -29,7 +29,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -343,17 +342,14 @@ private fun BookmarkEditorDialog(
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 }
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    modifier = Modifier.fillMaxWidth(),
+                com.xuleo.xmplus.md3.ui.components.XmTextField(
+                    note, { note = it }, Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.bookmark_note),
                     enabled = !busy,
                     minLines = 2,
                     maxLines = 5,
-                    shape = MaterialTheme.shapes.medium,
-                    label = { Text(stringResource(R.string.bookmark_note)) },
                     isError = !valid,
-                    supportingText = if (valid) null else ({ Text(stringResource(R.string.bookmark_note_limit, BookmarkNoteLimit)) }),
+                    supportingText = if (valid) null else stringResource(R.string.bookmark_note_limit, BookmarkNoteLimit),
                 )
                 if (failed) BookmarkError()
             }

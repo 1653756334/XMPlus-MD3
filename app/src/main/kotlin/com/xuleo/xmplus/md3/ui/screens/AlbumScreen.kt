@@ -49,7 +49,6 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -505,20 +504,17 @@ private fun RangeDialog(total: Int, onDismiss: () -> Unit, onConfirm: (List<Int>
         icon = { Icon(XmIcons.Outlined.FormatListNumbered, contentDescription = null) },
         title = { Text(stringResource(R.string.album_range_title)) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = {
+            com.xuleo.xmplus.md3.ui.components.XmTextField(
+                text,
+                {
                     text = it
                     invalid = false
                 },
-                singleLine = true,
+                placeholder = stringResource(R.string.album_range_hint),
                 isError = invalid,
-                placeholder = { Text(stringResource(R.string.album_range_hint)) },
-                supportingText = {
-                    Text(if (invalid) stringResource(R.string.download_error_range) else stringResource(R.string.album_total, total))
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { submit() }),
+                supportingText = if (invalid) stringResource(R.string.download_error_range) else stringResource(R.string.album_total, total),
+                imeAction = ImeAction.Done,
+                onImeAction = { submit() },
             )
         },
         confirmButton = { TextButton(onClick = ::submit, enabled = text.isNotBlank()) { Text(stringResource(R.string.player_download)) } },

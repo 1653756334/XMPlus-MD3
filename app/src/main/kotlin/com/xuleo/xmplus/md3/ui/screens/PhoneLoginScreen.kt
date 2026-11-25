@@ -1,11 +1,9 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,25 +61,25 @@ internal fun PhoneLoginContent(
         if (signInPending) {
             Text(stringResource(R.string.login_phone_verified), style = MaterialTheme.typography.bodyLarge)
         } else {
-            OutlinedTextField(
-                value = mobile, onValueChange = onMobile, modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.login_phone_number)) },
-                leadingIcon = { Icon(XmIcons.Outlined.Phone, contentDescription = null) },
-                enabled = !busy && !awaitingCode, singleLine = true, isError = errorCode == "invalid_mobile",
-                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Phone),
+            com.xuleo.xmplus.md3.ui.components.XmTextField(
+                mobile, onMobile, Modifier.fillMaxWidth(),
+                label = stringResource(R.string.login_phone_number),
+                leadingIcon = XmIcons.Outlined.Phone,
+                enabled = !busy && !awaitingCode, isError = errorCode == "invalid_mobile",
+                keyboardType = KeyboardType.Phone, autoCorrect = false,
             )
             // Once a code was sent, the code field takes over and resending moves inside it.
             if (!awaitingCode) PrimaryAction(stringResource(R.string.login_send), onSend, !busy && mobile.isNotEmpty())
         }
         if (awaitingCode) {
-            OutlinedTextField(
-                value = code, onValueChange = onCode, modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large, label = { Text(stringResource(R.string.login_phone_code)) },
-                leadingIcon = { Icon(XmIcons.Outlined.Sms, contentDescription = null) },
+            com.xuleo.xmplus.md3.ui.components.XmTextField(
+                code, onCode, Modifier.fillMaxWidth(),
+                label = stringResource(R.string.login_phone_code),
+                leadingIcon = XmIcons.Outlined.Sms,
                 trailingIcon = { ResendButton(cooldownSeconds, enabled = !busy, onSend) },
-                enabled = !busy, singleLine = true,
-                supportingText = { Text(stringResource(R.string.login_phone_code_hint)) },
-                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.NumberPassword),
+                enabled = !busy,
+                supportingText = stringResource(R.string.login_phone_code_hint),
+                keyboardType = KeyboardType.NumberPassword, autoCorrect = false,
             )
         }
         if (showPrimaryOption) PrimaryAccountOption(makePrimary, !busy, onPrimary)
