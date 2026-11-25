@@ -3,9 +3,7 @@ package com.xuleo.xmplus.md3.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -26,6 +24,8 @@ import com.xuleo.xmplus.md3.core.designsystem.XmPreview
 import com.xuleo.xmplus.md3.core.designsystem.XmPreviews
 import com.xuleo.xmplus.md3.core.plugin.InstalledPlugin
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
+import com.xuleo.xmplus.md3.ui.components.XmMenu
+import com.xuleo.xmplus.md3.ui.components.XmMenuChoice
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** 推荐 lists sheets by tag, 榜单 the top lists; a plugin is offered for a mode only when it has that method. */
@@ -100,23 +100,10 @@ private fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSel
                 }
             }
         }
-        DropdownMenuPopup(open, onDismissRequest = { open = false }) {
-            DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, 1),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            ) {
-                plugins.forEachIndexed { index, plugin ->
-                    val chosen = plugin.platform == selected
-                    SelectableDropdownMenuItem(
-                        selected = chosen,
-                        onClick = { open = false; if (!chosen) onSelect(plugin.platform) },
-                        text = { Text(plugin.platform, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        shapes = MenuDefaults.itemShape(index, plugins.size),
-                        selectedLeadingIcon = {
-                            Icon(XmIcons.Outlined.Check, contentDescription = null, Modifier.size(MenuDefaults.LeadingIconSize))
-                        },
-                    )
-                }
+        XmMenu(open, onDismissRequest = { open = false }) {
+            plugins.forEachIndexed { index, plugin ->
+                val chosen = plugin.platform == selected
+                XmMenuChoice(plugin.platform, chosen, { open = false; if (!chosen) onSelect(plugin.platform) }, index, plugins.size)
             }
         }
     }

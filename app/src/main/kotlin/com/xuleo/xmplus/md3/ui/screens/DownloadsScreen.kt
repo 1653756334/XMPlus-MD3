@@ -20,8 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.xuleo.xmplus.md3.ui.components.XmMenu
+import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -239,23 +239,9 @@ private fun AlbumRow(album: DownloadedAlbum, open: Boolean, onToggle: () -> Unit
         Icon(XmIcons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.graphicsLayer { rotationZ = turn }, tint = scheme.onSurfaceVariant)
         Box {
             IconButton(onClick = { menu = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.player_more), tint = scheme.onSurfaceVariant) }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.downloads_open_album)) },
-                    leadingIcon = { Icon(XmIcons.Outlined.Album, contentDescription = null) },
-                    onClick = {
-                        menu = false
-                        onOpenAlbum()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.downloads_delete_album)) },
-                    leadingIcon = { Icon(XmIcons.Outlined.DeleteOutline, contentDescription = null) },
-                    onClick = {
-                        menu = false
-                        onDelete()
-                    },
-                )
+            XmMenu(menu, onDismissRequest = { menu = false }) {
+                XmMenuItem(stringResource(R.string.downloads_open_album), { menu = false; onOpenAlbum() }, 0, 2, XmIcons.Outlined.Album)
+                XmMenuItem(stringResource(R.string.downloads_delete_album), { menu = false; onDelete() }, 1, 2, XmIcons.Outlined.DeleteOutline)
             }
         }
     }

@@ -42,6 +42,8 @@ import com.xuleo.xmplus.md3.core.plugin.linkName
 import com.xuleo.xmplus.md3.core.plugin.PluginErrorReason
 import com.xuleo.xmplus.md3.core.plugin.PluginSubscription
 import com.xuleo.xmplus.md3.music.InstallJob
+import com.xuleo.xmplus.md3.ui.components.XmMenu
+import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import com.xuleo.xmplus.md3.music.PluginEvent
 import com.xuleo.xmplus.md3.music.failureText
 import com.xuleo.xmplus.md3.music.installSummary
@@ -110,16 +112,13 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
                         }
                         Box {
                             IconButton(onClick = { showMore = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.plugin_more)) }
-                            DropdownMenu(showMore, onDismissRequest = { showMore = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.plugin_sort)) },
-                                    enabled = list.size > 1,
-                                    onClick = { showMore = false; order = list.map { it.platform }; sorting = true },
+                            XmMenu(showMore, onDismissRequest = { showMore = false }) {
+                                XmMenuItem(
+                                    stringResource(R.string.plugin_sort),
+                                    { showMore = false; order = list.map { it.platform }; sorting = true },
+                                    0, 2, enabled = list.size > 1,
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.plugin_subscriptions)) },
-                                    onClick = { showMore = false; showSubscriptions = true },
-                                )
+                                XmMenuItem(stringResource(R.string.plugin_subscriptions), { showMore = false; showSubscriptions = true }, 1, 2)
                             }
                         }
                     }
