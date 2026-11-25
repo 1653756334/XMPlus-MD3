@@ -1,6 +1,8 @@
 # XMPlus-MD3 Design
 
-Status: Draft · 2026-11-17
+Status: Draft · 2026-11-17 · Paused 2026-11-25
+
+> 听书 is paused at the end of phase 5. Unchecked items and phases 6–7 resume after the music phases. Music is designed in `docs/MUSIC.md`.
 
 ## Goal
 
@@ -19,7 +21,7 @@ Rebuild XMPlus (`../XMPlus`, Flutter) as a native Android app that follows Mater
 | SDK levels | minSdk 26, compileSdk and targetSdk 36 |
 | App ID | `com.xuleo.xmplus.md3`, a separate app installed alongside XMPlus. Users move data by importing an XMPlus backup |
 | Project identity | Maintained by GitHub user 1653756334 at `github.com/1653756334/XMPlus-MD3`. Links, updates and feedback point only to this repository |
-| Navigation | 发现 · 听过 · 下载 · 我的 |
+| Navigation | 听书 · 音乐 · 听过 · 下载 · 我的 (发现 is renamed 听书; 音乐 is in `docs/MUSIC.md`) |
 | Tests | No test code in git. Temporary tests only, deleted after use |
 | License | AGPL-3.0-or-later, as a port of XMPlus |
 
@@ -39,7 +41,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 
 ## 1. Feature parity checklist
 
-### 发现 Discover
+### 听书 Discover (former 发现)
 
 - [x] Channels with tabs and recommended sections
 - [x] Ranking preview and full rankings with all tabs
@@ -187,11 +189,11 @@ Rules:
 
 #### Navigation
 
-- Bottom navigation bar: 发现 · 听过 · 下载 · 我的.
+- Bottom navigation bar: 听书 · 音乐 · 听过 · 下载 · 我的. 听书 is the former 发现 tab.
 - Navigation rail at 600dp and up; two panes at 840dp and up.
 - Floating mini player above the navigation bar: rounded card with cover, progress ring around the play button, swipe left/right to change episode. Tap or drag up to open the full player.
 
-### 发现 Discover
+### 听书 Discover (former 发现)
 
 - One header row of mode headings (推荐 / 分类 / 排行) with a search icon at the end; scrollable channel tabs below. The header collapses on scroll.
 - Featured carousel, then rows of album covers.
@@ -208,7 +210,7 @@ Rules:
 ### Full player
 
 - Color scheme taken from the cover, changing smoothly between episodes.
-- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 发现's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 播放, 文稿 and 评论 are three pages that swipe sideways under the top bar; 文稿 and 评论 sit on the same backdrop and keep to the same column (480 dp, 24 dp margins) as the cover and controls. 评论: avatar, name, the comment, then the date, replies and a compact like with its count on one quiet line; the box to write one is a filled pill with the send icon in the accent colour.
+- Top bar: minimize on the left, the page headings 播放 / 文稿 / 评论 in the middle (styled like 听书's mode headings). 更多 is the last button in the 点赞 · 收藏 · 书签 · 下载 row under the title. 播放, 文稿 and 评论 are three pages that swipe sideways under the top bar; 文稿 and 评论 sit on the same backdrop and keep to the same column (480 dp, 24 dp margins) as the cover and controls. 评论: avatar, name, the comment, then the date, replies and a compact like with its count on one quiet line; the box to write one is a filled pill with the send icon in the accent colour.
 - The cover takes the largest square left above the controls and shrinks slightly with a spring when paused.
 - Under the cover, top to bottom:
   - Episode title (two lines), then the album name, which opens the album.
@@ -244,7 +246,7 @@ Rules:
 
 ### 听过 Library
 
-- Seven sections that swipe left and right: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签 and 关注的主播.
+- Header 听书 · 音乐 (see `docs/MUSIC.md` for 音乐). 听书 has seven sections that swipe left and right: 历史 (this device), 云历史, 听更新, 订阅, 收藏, 书签 and 关注的主播.
 - 历史 is this device's own record, one row per album: the latest episode, where playback stopped and when. 选择 in the top bar selects rows (全选 selects all) and removes them with an undo snackbar. Swiping never removes, so the tabs still swipe.
 - Account sections load the first time they are shown. Subscriptions and favourites can be removed in place; other rows open their album or anchor page.
 - 书签 lists the device's bookmarks across all albums, whichever account is signed in, with the album and episode names kept when each bookmark was made. Tapping one plays its episode from the saved position in the player. Bookmarks made before the names were kept are completed from the catalogue, cover included, once per launch.
@@ -279,7 +281,7 @@ Rules:
 - Spring-based M3 Expressive motion throughout; honors the system "remove animations" setting.
 - Shared-element transitions: cover between a list and the album page; cover between the mini player and the full player; avatar into the anchor page.
 - Predictive back on every screen, including collapsing the player as the finger moves.
-- Back is exactly the opening slide in reverse, whatever starts it: the back button, or a back swipe from either edge. A page opens by sliding in from the end side (the right, left to right) while the one below drifts a third of the way out; on back it slides off to that same side and the page below comes back from the other. The page follows the finger during the swipe; cancelling puts it back. Sideways pages (tabs, the player's 播放 / 文稿 / 评论) ease onto their place without overshooting, and the first and last stop flat instead of stretching. Sheets (the player, queue, speed and other sheets) keep Material's own sheet back. Switching from another tab back to 发现 is instant.
+- Back is exactly the opening slide in reverse, whatever starts it: the back button, or a back swipe from either edge. A page opens by sliding in from the end side (the right, left to right) while the one below drifts a third of the way out; on back it slides off to that same side and the page below comes back from the other. The page follows the finger during the swipe; cancelling puts it back. Sideways pages (tabs, the player's 播放 / 文稿 / 评论) ease onto their place without overshooting, and the first and last stop flat instead of stretching. Sheets (the player, queue, speed and other sheets) keep Material's own sheet back. Switching from another tab back to 听书 is instant.
 - Lists: items animate when added, removed or reordered; skeleton placeholders instead of spinners; pull to refresh.
 - Small touches: play/pause morph, burst on like, equalizer on the playing episode, haptics on long-press and toggles.
 - Tabs keep their own state when switching.
@@ -296,6 +298,8 @@ Rules:
 ## 8. Phases
 
 Each phase ends with a side-by-side check against XMPlus on the same account.
+
+Phases 0–5 are done. Phases 6 and 7 are paused until the music phases M1–M6 (`docs/MUSIC.md`) are finished.
 
 0. Skeleton: Gradle setup, modules, design system, translation lint, CI (checks and debug build; release signing with this project's own keystore).
 1. Protocol and accounts: API layer port; SMS / Geetest / Cookie login; quota, rewards, usage ledger; XMPlus backup import so testers can bring their accounts.

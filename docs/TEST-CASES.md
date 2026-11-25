@@ -311,3 +311,49 @@ Settings
 - DL-20 Concurrent downloads 1–6 (default 3). Rate-limit retries 0–1000 (default 3; 0 = no automatic retry), waiting at least 5 minutes after a rate limit. Minimum free space 512–1,048,576 MiB (default 512).
 - DL-21 Duplicate names: skip (after checking the existing file), overwrite, or add a number.
 - DL-22 A downloaded episode plays from the local file without using 听时 (LG-01).
+
+## Phase M1 — Plugin runtime
+
+Source: MusicFree `src/core/pluginManager/plugin.ts`, `index.ts`, `meta.ts`, `src/types/plugin.d.ts`. Design: `docs/MUSIC.md`. Plugins used for checking stay in a local temporary folder and are never committed.
+
+Loading
+
+- PL-01 A plugin exporting `platform` and `version` loads; `module.exports.default` is used when present, otherwise `module.exports`.
+- PL-02 A plugin without `platform` → listed as unreadable with the reason, never called.
+- PL-03 `appVersion` `>0.4.0` loads; `>1.0.0` → listed as incompatible (reported version is MusicFree 0.6.2).
+- PL-04 `require` returns `axios`, `cheerio`, `crypto-js`, `dayjs`, `big-integer`, `qs`, `he`, `webdav`; `@react-native-cookies/cookies` returns the no-op stub; any other name → `undefined`, no crash.
+- PL-05 `env.getUserVariables()` returns the saved values; `env.os` = `android`, `env.lang` = `zh-CN` in both UI languages; `process.platform` = `android`.
+- PL-06 `userVariables` entries without `key` are dropped.
+- PL-07 The plugin's hash equals SHA-256 of its code, as computed by MusicFree for the same file.
+- PL-08 Syntax error or exception at load → unreadable with the reason; other plugins keep working.
+
+HTTP
+
+- PL-10 `axios.get` with custom `Referer`, `User-Agent` and `Cookie` → the server receives them unchanged.
+- PL-11 No timeout given → the request fails after 2 s.
+- PL-12 A single `set-cookie` header is split on commas; the original stays in `x-set-cookie`.
+- PL-13 JSON, text and binary (`responseType: arraybuffer`) responses match MusicFree's results for the same request.
+
+Calls and safety
+
+- PL-20 A method the plugin lacks → empty result (`isEnd: true`), no error.
+- PL-21 Returned items get the plugin's `platform`; unknown fields survive a round trip to the next call.
+- PL-22 An endless loop or a call over the time limit → that call fails with 重试; the UI stays responsive.
+- PL-23 A plugin cannot read files, app storage or other plugins' variables.
+
+Install, update, remove
+
+- PL-30 Install from a file or a link → confirmation shows name, version and author before anything is saved.
+- PL-31 Same hash as installed → already installed, nothing changes.
+- PL-32 Same `platform`, lower version than installed → refused; higher → replaces, keeping order, enabled state, user variables and alternative plugin.
+- PL-33 Uninstall the last plugin of a `platform` → its meta is removed.
+- PL-34 Subscription `.js` link installs one plugin; `.json` list installs each entry in MusicFree's format; other links → refused.
+- PL-35 全部更新 updates each plugin from its `srcUrl`; one failure does not stop the others and is reported.
+- PL-36 Disable, reorder and set user variables survive an app restart.
+
+Shell
+
+- PL-40 Bottom bar shows 听书 · 音乐 · 听过 · 下载 · 我的 in both languages; the rail shows the same at 600dp and up.
+- PL-41 Back on 音乐, 听过, 下载 or 我的 → 听书; back on 听书 leaves the app.
+- PL-42 No plugin installed → 音乐 shows only the empty message and 导入插件, which opens 插件.
+- PL-43 No plugin, subscription link or plugin website appears anywhere in the app.

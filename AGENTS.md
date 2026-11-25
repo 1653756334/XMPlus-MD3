@@ -2,10 +2,15 @@
 
 # 项目
 
-- XMPlus-MD3 是 XMPlus（`../XMPlus`，Flutter）的原生 Android 重写：Kotlin + Jetpack Compose + Material 3，包名 `com.xuleo.xmplus.md3`。
-- 设计以 `docs/DESIGN.md` 为准，验收以 `docs/TEST-CASES.md` 为准。
-- 功能行为以 `../XMPlus` 源码为准。协议、加解密、听时扣时、下载与播放规则必须逐条移植；不确定时先读 Dart 源码，不要猜。
+- XMPlus-MD3 是听书 + 听歌应用：Kotlin + Jetpack Compose + Material 3，包名 `com.xuleo.xmplus.md3`。听书部分是 XMPlus（`../XMPlus`，Flutter）的原生 Android 重写；听歌部分是兼容 MusicFree 插件的插件化平台。
+- 当前阶段：音乐（M1–M6）。听书剩余工作（原第 6、7 阶段及未勾选项）暂停，音乐阶段完成后继续。
+- 设计：听书以 `docs/DESIGN.md` 为准，音乐以 `docs/MUSIC.md` 为准；验收以 `docs/TEST-CASES.md` 为准。
+- 听书功能行为以 `../XMPlus` 源码为准。协议、加解密、听时扣时、下载与播放规则必须逐条移植；不确定时先读 Dart 源码，不要猜。
+- 音乐与插件行为以 `../MusicFree` 源码为准。插件运行环境、注入接口、安装更新规则、取链顺序、缓存与歌词规则必须逐条移植，保证 MusicFree 插件无需改动即可使用；不确定时先读 TypeScript 源码，不要猜。
+- 不内置任何音乐插件、订阅地址或插件来源链接，应用与文档中都不出现。兼容性测试用的插件只放在本地临时目录，用完删除。
+- 听时扣时只适用于喜马拉雅内容，音乐的播放与下载不得经过听时逻辑。
 - 不沿用原作者（teikengstudio）的账号与服务：GitHub 发布页、Telegram、Sentry、莘应用。
+- 听书与音乐共用播放器、迷你播放器、下载管理和设计语言；新功能优先复用现有模块，不另起一套。
 
 # 代码
 
