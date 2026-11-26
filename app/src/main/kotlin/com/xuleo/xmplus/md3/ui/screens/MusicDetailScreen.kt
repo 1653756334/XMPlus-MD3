@@ -1,5 +1,25 @@
 package com.xuleo.xmplus.md3.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.unit.Dp
+import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
+import com.xuleo.xmplus.md3.ui.components.LocalSongDownloads
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbar
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbarSpace
+import com.xuleo.xmplus.md3.ui.components.ToolbarAction
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -82,31 +102,112 @@ internal fun MusicDetailScreen(
     val item by viewModel.item.collectAsStateWithLifecycle()
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val title = item.title()
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val resources = LocalResources.current
+    val showMessage = rememberShowMessage()
+    val downloads = LocalSongDownloads.current
+    val library = LocalMusicLibrary.current
+    // A long press on a song selects it; 加入歌单 and 下载 then act on all the chosen songs.
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var adding by remember { mutableStateOf<List<MusicItem>?>(null) }
+    val chosen = songs.items.filter { it.key in selected }
+    fun endSelection() {
+        selecting = false
+        selected = emptySet()
+    }
+    BackHandler(enabled = selecting, onBack = ::endSelection)
+    val selection = SongSelection(
+        active = selecting,
+        selected = selected,
+        onToggle = { song -> selected = if (song.key in selected) selected - song.key else selected + song.key },
+        onStart = { song ->
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            selecting = true
+            selected = setOf(song.key)
+        },
+    )
     DetailPage(
-        onBack, title, header = { MusicHero(item) },
+        onBack,
+        if (selecting) stringResource(R.string.history_selected, selected.size) else title,
+        header = { MusicHero(item) },
+        navigation = if (selecting) ({
+            IconButton(onClick = ::endSelection) { Icon(XmIcons.Outlined.Close, stringResource(R.string.action_cancel)) }
+        }) else null,
+        pinTitle = selecting,
         actions = {
-            // MusicFree lets a plugin sheet be starred; the other kinds have nothing to keep.
-            val sheet = item as? MusicSheet
-            val library = LocalMusicLibrary.current
-            if (sheet != null && library != null) StarAction(library, sheet)
+            if (selecting) {
+                val all = songs.items.isNotEmpty() && songs.items.all { it.key in selected }
+                IconButton(onClick = { selected = if (all) emptySet() else songs.items.mapTo(HashSet()) { it.key } }) {
+                    Icon(
+                        XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
+                        tint = if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
+            } else {
+                // MusicFree lets a plugin sheet be starred; the other kinds have nothing to keep.
+                val sheet = item as? MusicSheet
+                if (sheet != null && library != null) StarAction(library, sheet)
+            }
         },
     ) {
-        if (viewModel.kind == MusicDetailKind.Artist) {
-            ArtistPages(viewModel, songs, onOpenAlbum, onPlay, onPlayNext, playingKey)
-        } else {
-            val list = rememberLazyListState()
-            SongList(songs, list, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = item.count())
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.fillMaxSize()) {
+                if (viewModel.kind == MusicDetailKind.Artist) {
+                    ArtistPages(viewModel, songs, onOpenAlbum, onPlay, onPlayNext, playingKey, selection)
+                } else {
+                    val list = rememberLazyListState()
+                    SongList(songs, list, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = item.count(), selection)
+                }
+            }
+            SelectionToolbar(selecting) {
+                val any = chosen.isNotEmpty()
+                if (library != null) ToolbarAction(R.string.music_add_to_sheet, XmIcons.Outlined.PlaylistAdd, any) { adding = chosen }
+                if (downloads != null) ToolbarAction(R.string.player_download, XmIcons.Outlined.Download, any) {
+                    val queue = chosen
+                    endSelection()
+                    scope.launch {
+                        // Each song downloads in the download quality setting; songs already listed are skipped.
+                        val added = queue.count { downloads.download(it, null) }
+                        if (added > 0) showMessage(resources.getQuantityString(R.plurals.music_download_added, added, added))
+                    }
+                }
+            }
         }
     }
+    adding?.let { AddToSheetSheet(it, onDismiss = { adding = null }, onDone = ::endSelection) }
 }
+
+/** Multi-select on a plugin's song list: whether it is on, what is chosen, and how a row changes it. */
+private class SongSelection(
+    val active: Boolean,
+    val selected: Set<String>,
+    val onToggle: (MusicItem) -> Unit,
+    val onStart: (MusicItem) -> Unit,
+)
 
 @Composable
 private fun StarAction(library: MusicLibrary, sheet: MusicSheet) {
     val starred by library.starred.collectAsStateWithLifecycle()
     val on = starred.any { it.platform == sheet.platform && it.id == sheet.id }
-    IconButton(onClick = { if (on) library.unstar(sheet) else library.star(sheet) }) {
+    val haptics = LocalHapticFeedback.current
+    val showMessage = rememberShowMessage()
+    val starredText = stringResource(R.string.music_star_done)
+    val unstarredText = stringResource(R.string.music_unstar_done)
+    IconButton(onClick = {
+        if (on) {
+            library.unstar(sheet)
+            haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+            showMessage(unstarredText)
+        } else {
+            library.star(sheet)
+            haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+            showMessage(starredText)
+        }
+    }) {
         Icon(
-            XmIcons.Outlined.Star,
+            if (on) XmIcons.Filled.Star else XmIcons.Outlined.Star,
             stringResource(if (on) R.string.library_unstar else R.string.library_star),
             tint = if (on) MaterialTheme.colorScheme.primary else LocalContentColor.current,
         )
@@ -121,6 +222,7 @@ private fun ColumnScope.ArtistPages(
     onPlay: (List<MusicItem>, Int) -> Unit,
     onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String?,
+    selection: SongSelection,
 ) {
     val pager = rememberPagerState { 2 }
     val songList = rememberLazyListState()
@@ -131,7 +233,7 @@ private fun ColumnScope.ArtistPages(
     SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
         Column(Modifier.fillMaxWidth()) {
             if (page == 0) {
-                SongList(songs, songList, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = null)
+                SongList(songs, songList, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = null, selection)
             } else {
                 PagedList(albums, albumList, viewModel::loadMoreAlbums, viewModel::retryAlbums) {
                     itemsIndexed(albums.items, key = { index, album -> "$index:${album.id}" }) { _, album ->
@@ -153,11 +255,22 @@ private fun ColumnScope.SongList(
     onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String?,
     total: Int?,
+    selection: SongSelection,
 ) {
-    PagedList(songs, list, onLoadMore, onRetry) {
-        item(key = "play_all") { PlayAllRow(total ?: songs.items.size.takeIf { songs.isEnd }) { onPlay(songs.items, 0) } }
+    PagedList(songs, list, onLoadMore, onRetry, bottomSpace = if (selection.active) SelectionToolbarSpace else 8.dp) {
+        item(key = "play_all") {
+            PlayAllRow(total ?: songs.items.size.takeIf { songs.isEnd }) { if (!selection.active) onPlay(songs.items, 0) }
+        }
         itemsIndexed(songs.items, key = { index, song -> "$index:${song.id}" }) { index, song ->
-            SongRow(song, playing = song.key == playingKey, onPlayNext = { onPlayNext(song) }) { onPlay(songs.items, index) }
+            SongRow(
+                song,
+                playing = song.key == playingKey,
+                onPlayNext = { onPlayNext(song) },
+                onLongClick = if (selection.active) null else ({ selection.onStart(song) }),
+                trailing = if (selection.active) ({
+                    Checkbox(checked = song.key in selection.selected, onCheckedChange = null, Modifier.padding(12.dp))
+                }) else null,
+            ) { if (selection.active) selection.onToggle(song) else onPlay(songs.items, index) }
         }
     }
 }
@@ -169,6 +282,7 @@ internal fun <T> ColumnScope.PagedList(
     list: LazyListState,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
+    bottomSpace: Dp = 8.dp,
     content: LazyListScope.() -> Unit,
 ) {
     when {
@@ -178,7 +292,7 @@ internal fun <T> ColumnScope.PagedList(
         else -> {
             LoadMoreEffect({ list.layoutInfo.visibleItemsInfo.lastOrNull()?.index }, { list.layoutInfo.totalItemsCount }, list, paged.page,
                 paged.loading, onLoadMore = onLoadMore)
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().widthIn(max = XmLayout.ContentWidth), list, PaddingValues(bottom = 8.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().widthIn(max = XmLayout.ContentWidth), list, PaddingValues(bottom = bottomSpace)) {
                 content()
                 item(key = "footer") { PagingFooter(paged.loading, paged.failed, !paged.isEnd, onRetry) }
             }
