@@ -5,27 +5,12 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.setProgress
-import androidx.compose.ui.semantics.stateDescription
 import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
@@ -419,7 +404,7 @@ private fun MusicControls(
         }
         val hasQueue = queue.items.isNotEmpty()
         Row(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
+            Modifier.fillMaxWidth().padding(top = TransportGap),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -841,7 +826,7 @@ private fun Modifier.lyricFade(): Modifier =
 private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, music: MusicPlayback, onOpenQueue: () -> Unit) {
     val hasQueue = queue.items.isNotEmpty()
     Column(Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding, top = ControlsGap, bottom = 24.dp)) {
-        LyricProgress(
+        PlayerSeekBar(
             positionMs = state.positionMs,
             durationMs = state.durationMs,
             enabled = state.durationMs > 0 && state.phase != PlaybackPhase.Failed && state.phase != PlaybackPhase.Preparing,
@@ -849,7 +834,7 @@ private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, mu
             onSeek = music::seekTo,
         )
         Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp),
+            Modifier.fillMaxWidth().padding(top = TransportGap),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -870,83 +855,11 @@ private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, mu
     }
 }
 
-/** A thin bar between the played and the total time; tap or drag to seek. */
-@Composable
-private fun LyricProgress(positionMs: Long, durationMs: Long, enabled: Boolean, trackId: Any?, onSeek: (Long) -> Unit) {
-    val duration = durationMs.coerceAtLeast(0L)
-    var dragging by remember(trackId, enabled) { mutableStateOf<Float?>(null) }
-    var width by remember { mutableIntStateOf(0) }
-    val played = if (duration > 0) positionMs.toFloat() / duration else 0f
-    val fraction = (dragging ?: played).coerceIn(0f, 1f)
-    val shownMs = dragging?.let { (it * duration).toLong() } ?: positionMs
-    val seek by rememberUpdatedState(onSeek)
-    val total by rememberUpdatedState(duration)
-    fun fractionAt(x: Float): Float = if (width <= 0) 0f else (x / width).coerceIn(0f, 1f)
-
-    val scheme = MaterialTheme.colorScheme
-    val activeColor = if (enabled) scheme.onSurface else scheme.outline
-    val trackColor = scheme.onSurface.copy(alpha = 0.2f)
-    val timeStyle = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum")
-    val label = stringResource(R.string.player_progress)
-    val time = "${formatDuration(shownMs / 1000.0)} / ${formatDuration(duration / 1000.0)}"
-    val thumb = if (dragging != null) 7.dp else 5.dp
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(formatDuration(shownMs / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
-        Box(
-            Modifier.weight(1f).height(32.dp)
-                .onSizeChanged { width = it.width }
-                .pointerInput(enabled, trackId) {
-                    if (enabled) detectTapGestures { seek((fractionAt(it.x) * total).toLong()) }
-                }
-                .pointerInput(enabled, trackId) {
-                    if (enabled) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragging = fractionAt(it.x) },
-                            onDragEnd = {
-                                dragging?.let { seek((it * total).toLong()) }
-                                dragging = null
-                            },
-                            onDragCancel = { dragging = null },
-                        ) { change, _ ->
-                            change.consume()
-                            dragging = fractionAt(change.position.x)
-                        }
-                    }
-                }
-                .clearAndSetSemantics {
-                    contentDescription = label
-                    stateDescription = time
-                    progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
-                    if (enabled) {
-                        setProgress { target ->
-                            seek((target.coerceIn(0f, 1f) * total).toLong())
-                            true
-                        }
-                    } else {
-                        disabled()
-                    }
-                },
-        ) {
-            Canvas(Modifier.matchParentSize()) {
-                val y = size.height / 2f
-                val stroke = 3.dp.toPx()
-                val radius = thumb.toPx()
-                val head = size.width * fraction
-                drawLine(trackColor, Offset(0f, y), Offset(size.width, y), stroke, StrokeCap.Round)
-                drawLine(activeColor, Offset(0f, y), Offset(head, y), stroke, StrokeCap.Round)
-                drawCircle(activeColor, radius, Offset(head.coerceIn(radius, (size.width - radius).coerceAtLeast(radius)), y))
-            }
-        }
-        Text(formatDuration(duration / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
-    }
-}
-
 /** The gap between the groups of the player's controls. */
 private val ControlsGap = 16.dp
+
+/** The gap above the transport, wider so the tall play button does not crowd the progress bar. */
+private val TransportGap = 20.dp
 
 private const val ActiveLyricScale = 1.05f
 private const val LyricFadeEdge = 0.1f
