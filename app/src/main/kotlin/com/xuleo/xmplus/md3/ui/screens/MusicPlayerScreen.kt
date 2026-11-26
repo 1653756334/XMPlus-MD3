@@ -3,6 +3,8 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 
+import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.ui.draw.drawWithContent
@@ -771,7 +773,7 @@ private fun LyricLines(
                 // The line in focus brightens and a small pill with its time sits at its end to play from there.
                 Row(
                     Modifier.align(Alignment.TopStart).offset(y = maxHeight * LyricAnchor - 24.dp)
-                        .fillMaxWidth().height(48.dp).padding(start = PlayerPagePadding, end = 16.dp),
+                        .fillMaxWidth().height(48.dp).padding(start = PlayerPagePadding, end = LyricBandInset + 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Spacer(Modifier.weight(1f))
@@ -829,9 +831,16 @@ private fun LyricRow(
         label = "lyricScale",
     )
     val color = MaterialTheme.colorScheme.onSurface
+    // While browsing, the line the pill plays from sits on a light band.
+    val band by animateColorAsState(
+        color.copy(alpha = if (focused) FocusedLyricBand else 0f),
+        if (animated) motion.defaultEffectsSpec() else snap(),
+        label = "lyricBand",
+    )
     Column(
-        Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(start = PlayerPagePadding, end = PlayerPagePadding + 16.dp, top = 10.dp, bottom = 10.dp)
+        Modifier.fillMaxWidth().padding(horizontal = LyricBandInset).clip(MaterialTheme.shapes.medium).background(band)
+            .clickable(onClick = onClick)
+            .padding(start = PlayerPagePadding - LyricBandInset, end = PlayerPagePadding + 4.dp, top = 10.dp, bottom = 10.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -910,6 +919,8 @@ private val ControlsGap = 16.dp
 private val TransportGap = 20.dp
 
 private const val ActiveLyricScale = 1.05f
+private const val FocusedLyricBand = 0.08f
+private val LyricBandInset = 12.dp
 private const val LyricFadeEdge = 0.1f
 
 /** Where the line being sung settles, as a share of the lyric's height. */
