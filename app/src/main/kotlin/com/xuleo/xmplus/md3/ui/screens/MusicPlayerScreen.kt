@@ -116,6 +116,7 @@ import com.xuleo.xmplus.md3.core.plugin.parseLrc
 import com.xuleo.xmplus.md3.library.ListPage
 import com.xuleo.xmplus.md3.library.ListSection
 import com.xuleo.xmplus.md3.music.MusicDetailKind
+import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
 import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.InlineError
@@ -175,7 +176,6 @@ internal fun MusicPlayerSheet(
     val sleep by music.sleepTimer.collectAsStateWithLifecycle()
     val liked by deps.library.liked.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val addedText = stringResource(R.string.music_added)
     val qualityFailed = stringResource(R.string.music_quality_failed)
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -243,10 +243,6 @@ internal fun MusicPlayerSheet(
                                     currentLine = lyric.lyric?.lineAt(state.positionMs),
                                     music = music,
                                     onLike = { deps.library.toggleLike(song) },
-                                    onAddToFavorites = {
-                                        deps.library.like(song)
-                                        Toast.makeText(context, addedText, Toast.LENGTH_SHORT).show()
-                                    },
                                     onOpenArtist = artist?.let { { closeThen { onOpenMusic(MusicDetailKind.Artist, it) } } },
                                     onOpenAlbum = album?.let { { closeThen { onOpenMusic(MusicDetailKind.Album, it) } } },
                                     onOpenLyrics = { openPage(MusicPage.Lyrics) },
@@ -334,7 +330,6 @@ private fun MusicControls(
     currentLine: String?,
     music: MusicPlayback,
     onLike: () -> Unit,
-    onAddToFavorites: () -> Unit,
     onOpenArtist: (() -> Unit)?,
     onOpenAlbum: (() -> Unit)?,
     onOpenLyrics: () -> Unit,
@@ -377,10 +372,10 @@ private fun MusicControls(
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         SongActions(
+            song = song,
             liked = liked,
             platform = song.platform,
             onLike = onLike,
-            onAddToFavorites = onAddToFavorites,
             onOpenArtist = onOpenArtist,
             onOpenAlbum = onOpenAlbum,
             onOpenQuality = onOpenQuality,
@@ -438,10 +433,10 @@ private fun MusicControls(
 /** 喜欢, 加入歌单 and 更多; the last two open menus under their buttons. */
 @Composable
 private fun SongActions(
+    song: MusicItem,
     liked: Boolean,
     platform: String,
     onLike: () -> Unit,
-    onAddToFavorites: () -> Unit,
     onOpenArtist: (() -> Unit)?,
     onOpenAlbum: (() -> Unit)?,
     onOpenQuality: () -> Unit,
@@ -474,16 +469,6 @@ private fun SongActions(
                     onClick = { adding = true },
                     colors = IconButtonDefaults.iconButtonColors(contentColor = scheme.onSurfaceVariant),
                 ) { Icon(XmIcons.Outlined.PlaylistAdd, stringResource(R.string.music_add_to_sheet)) }
-                XmMenu(adding, onDismissRequest = { adding = false }) {
-                    XmMenuItem(
-                        stringResource(R.string.music_favorites),
-                        onClick = {
-                            adding = false
-                            onAddToFavorites()
-                        },
-                        index = 0, count = 1, icon = XmIcons.Outlined.FavoriteBorder,
-                    )
-                }
             }
         }
         ActionSlot {
@@ -529,6 +514,7 @@ private fun SongActions(
             }
         }
     }
+    if (adding) AddToSheetSheet(listOf(song), onDismiss = { adding = false })
 }
 
 @Composable

@@ -35,7 +35,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.xuleo.xmplus.md3.ui.components.ReorderHandle
 import com.xuleo.xmplus.md3.ui.components.ReorderState
-import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
 import com.xuleo.xmplus.md3.ui.components.rememberReorderState
 import com.xuleo.xmplus.md3.ui.components.reorderItem
 import androidx.compose.material3.Text
@@ -71,6 +70,7 @@ import com.xuleo.xmplus.md3.ui.Destination
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.MusicCover
+import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** How many items 继续听 shows. */

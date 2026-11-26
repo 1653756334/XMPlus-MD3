@@ -3,6 +3,7 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,9 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.MusicPlayback
 import com.xuleo.xmplus.md3.core.model.MusicItem
+import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
+import com.xuleo.xmplus.md3.ui.components.XmMenu
+import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import com.xuleo.xmplus.md3.ui.components.XmSwap
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import kotlinx.coroutines.launch
@@ -204,13 +208,16 @@ private fun QueueRow(
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
+    Box {
     Surface(
         modifier.fillMaxWidth(),
         color = if (dragging) scheme.surfaceContainerHighest else scheme.surfaceContainerLow,
         shadowElevation = if (dragging) 4.dp else 0.dp,
     ) {
         Row(
-            Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp)
+            Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true }).heightIn(min = 56.dp)
                 .padding(start = XmLayout.PagePadding, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -240,4 +247,13 @@ private fun QueueRow(
             }
         }
     }
+    // A long press keeps the row's own buttons clear: the menu holds 加入歌单 only.
+    XmMenu(menu, { menu = false }) {
+        XmMenuItem(
+            stringResource(R.string.music_add_to_sheet), { menu = false; adding = true }, 0, 1,
+            icon = XmIcons.Outlined.PlaylistAdd,
+        )
+    }
+    }
+    if (adding) AddToSheetSheet(listOf(song), onDismiss = { adding = false })
 }
