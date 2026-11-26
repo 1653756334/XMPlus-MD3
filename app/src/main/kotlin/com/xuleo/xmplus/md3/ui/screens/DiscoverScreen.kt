@@ -288,20 +288,14 @@ private fun Shelf(section: AlbumSection, onAllAlbums: (Int) -> Unit, onAlbum: (S
 @Composable
 private fun RankingCard(ranking: HotRanking, onFullRanking: () -> Unit, onAlbum: (String) -> Unit) {
     val section = ranking.section
-    Surface(
-        Modifier.padding(horizontal = XmLayout.PagePadding).fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(Modifier.padding(vertical = XmLayout.PagePadding), verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
-            SectionHeader(
-                if (ranking.wholeSite) stringResource(R.string.discover_ranking_whole)
-                else section.title.ifEmpty { stringResource(R.string.discover_ranking_default) },
-                actionLabel = stringResource(R.string.ranking_full), onAction = onFullRanking,
-            )
-            section.albums.take(5).forEachIndexed { index, album ->
-                RankRow(index + 1, album, section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding)) { onAlbum(album.id) }
-            }
+    SectionCard(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+        SectionHeader(
+            if (ranking.wholeSite) stringResource(R.string.discover_ranking_whole)
+            else section.title.ifEmpty { stringResource(R.string.discover_ranking_default) },
+            actionLabel = stringResource(R.string.ranking_full), onAction = onFullRanking,
+        )
+        section.albums.take(5).forEachIndexed { index, album ->
+            RankRow(index + 1, album, section.stats[album.id], Modifier.padding(horizontal = XmLayout.PagePadding)) { onAlbum(album.id) }
         }
     }
 }

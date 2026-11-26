@@ -544,6 +544,7 @@
     <string name="music_queue_clear_title">Clear the queue?</string>
     <string name="music_cache_usage">%1$s of %2$s used</string>
     <string name="library_continue">Continue</string>
+    <string name="library_continue_all">All</string>
     <string name="library_recent">Recently played</string>
     <string name="library_recent_empty">What you play will show up here</string>
     <string name="library_following">Following</string>

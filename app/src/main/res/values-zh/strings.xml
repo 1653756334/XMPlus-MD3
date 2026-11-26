@@ -525,6 +525,7 @@
     <string name="music_queue_clear_title">清空播放列表？</string>
     <string name="music_cache_usage">已用 %1$s，上限 %2$s</string>
     <string name="library_continue">继续听</string>
+    <string name="library_continue_all">全部</string>
     <string name="library_recent">最近播放</string>
     <string name="library_recent_empty">播放过的内容会显示在这里</string>
     <string name="library_following">关注</string>
