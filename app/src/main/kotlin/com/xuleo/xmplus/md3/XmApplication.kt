@@ -147,9 +147,9 @@ class XmApplication : Application(), PlaybackOwner {
         com.xuleo.xmplus.md3.core.plugin.MusicLyrics(this, plugins)
     }
 
-    /** 我喜欢. */
-    val musicFavorites: com.xuleo.xmplus.md3.core.media.MusicFavorites by lazy {
-        com.xuleo.xmplus.md3.core.media.MusicFavorites(this)
+    /** 我喜欢, the user's own sheets and starred plugin sheets. */
+    val musicLibrary: com.xuleo.xmplus.md3.core.media.MusicLibrary by lazy {
+        com.xuleo.xmplus.md3.core.media.MusicLibrary(this)
     }
 
     /** Songs heard lately, kept on disk. One instance only: Media3 locks the folder. */

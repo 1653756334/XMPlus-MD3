@@ -95,7 +95,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
-import com.xuleo.xmplus.md3.core.media.MusicFavorites
+import com.xuleo.xmplus.md3.core.media.MusicLibrary
 import com.xuleo.xmplus.md3.core.media.MusicPlayMode
 import com.xuleo.xmplus.md3.core.media.MusicPlayback
 import com.xuleo.xmplus.md3.core.media.MusicPlaybackState
@@ -151,7 +151,7 @@ class MusicPlayerDeps(
     val playback: MusicPlayback,
     val lyrics: MusicLyrics,
     val catalog: MusicCatalog,
-    val favorites: MusicFavorites,
+    val library: MusicLibrary,
 )
 
 /** The music player's pages, in the order they swipe. 评论 is left out when the song's plugin has no comments. */
@@ -173,7 +173,7 @@ internal fun MusicPlayerSheet(
     val queue by music.queue.collectAsStateWithLifecycle()
     val speed by music.speed.collectAsStateWithLifecycle()
     val sleep by music.sleepTimer.collectAsStateWithLifecycle()
-    val liked by deps.favorites.songs.collectAsStateWithLifecycle()
+    val liked by deps.library.liked.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val addedText = stringResource(R.string.music_added)
     val qualityFailed = stringResource(R.string.music_quality_failed)
@@ -242,9 +242,9 @@ internal fun MusicPlayerSheet(
                                     liked = liked.any { it.isSame(song) },
                                     currentLine = lyric.lyric?.lineAt(state.positionMs),
                                     music = music,
-                                    onLike = { deps.favorites.toggle(song) },
+                                    onLike = { deps.library.toggleLike(song) },
                                     onAddToFavorites = {
-                                        deps.favorites.add(song)
+                                        deps.library.like(song)
                                         Toast.makeText(context, addedText, Toast.LENGTH_SHORT).show()
                                     },
                                     onOpenArtist = artist?.let { { closeThen { onOpenMusic(MusicDetailKind.Artist, it) } } },

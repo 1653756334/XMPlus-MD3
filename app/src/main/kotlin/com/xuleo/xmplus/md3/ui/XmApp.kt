@@ -97,7 +97,7 @@ fun XmApp() {
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
         plugins = plugins, musicBrowse = musicBrowse, musicPage = musicPage, musicSearch = musicSearch,
         musicPlayer = remember(application) {
-            MusicPlayerDeps(application.music, application.musicLyrics, application.musicCatalog, application.musicFavorites)
+            MusicPlayerDeps(application.music, application.musicLyrics, application.musicCatalog, application.musicLibrary)
         },
     )
 }
