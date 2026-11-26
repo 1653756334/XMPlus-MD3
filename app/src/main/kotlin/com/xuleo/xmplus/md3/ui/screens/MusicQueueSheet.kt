@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,13 +58,18 @@ import kotlinx.coroutines.launch
 
 /**
  * The music queue: the play mode and count at the top with 清空; each row plays on tap, moves by its handle and has
- * a remove button. The current song is in the accent colour and the list opens at it.
+ * a remove button. The current song is in the accent colour with the equalizer, and the list opens at it with one row
+ * above. The sheet opens fully, so 回到当前 always lands on a row that is in view.
  */
 @Composable
 internal fun MusicQueueSheet(music: MusicPlayback, onClear: () -> Unit, onDismiss: () -> Unit) {
     val queue by music.queue.collectAsStateWithLifecycle()
     val animated = rememberAnimationsEnabled()
-    val list = rememberLazyListState()
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val list = rememberLazyListState(
+        initialFirstVisibleItemIndex = (queue.items.indexOfFirst { it.key == queue.currentKey } - 1).coerceAtLeast(0),
+    )
+    var confirmClear by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // While a row is dragged the sheet shows its own order; the queue changes once, when the finger lifts.
     var order by remember { mutableStateOf<List<MusicItem>?>(null) }
@@ -71,14 +78,11 @@ internal fun MusicQueueSheet(music: MusicPlayback, onClear: () -> Unit, onDismis
     var offset by remember { mutableFloatStateOf(0f) }
     val items = order ?: queue.items
     val currentIndex = items.indexOfFirst { it.key == queue.currentKey }
-    LaunchedEffect(Unit) {
-        val index = queue.items.indexOfFirst { it.key == queue.currentKey }
-        if (index > 0) list.scrollToItem(index)
-    }
     fun locate() {
         val index = queue.items.indexOfFirst { it.key == queue.currentKey }
         if (index < 0) return
-        scope.launch { if (animated) list.animateScrollToItem(index) else list.scrollToItem(index) }
+        val target = (index - 1).coerceAtLeast(0)
+        scope.launch { if (animated) list.animateScrollToItem(target) else list.scrollToItem(target) }
     }
     fun dragBy(delta: Float) {
         val key = draggedKey ?: return
@@ -112,6 +116,7 @@ internal fun MusicQueueSheet(music: MusicPlayback, onClear: () -> Unit, onDismis
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentWindowInsets = { WindowInsets.safeDrawing },
     ) {
@@ -137,7 +142,7 @@ internal fun MusicQueueSheet(music: MusicPlayback, onClear: () -> Unit, onDismis
                 IconButton(onClick = ::locate, enabled = currentIndex >= 0) {
                     Icon(XmIcons.Outlined.MyLocation, stringResource(R.string.player_queue_locate))
                 }
-                TextButton(onClick = onClear, enabled = queue.items.isNotEmpty()) {
+                TextButton(onClick = { confirmClear = true }, enabled = queue.items.isNotEmpty()) {
                     Text(stringResource(R.string.music_queue_clear))
                 }
             }
@@ -178,6 +183,14 @@ internal fun MusicQueueSheet(music: MusicPlayback, onClear: () -> Unit, onDismis
             }
         }
     }
+    if (confirmClear) AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text(stringResource(R.string.music_queue_clear_title)) },
+        confirmButton = {
+            TextButton(onClick = { confirmClear = false; onClear() }) { Text(stringResource(R.string.music_queue_clear)) }
+        },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable
@@ -201,6 +214,9 @@ private fun QueueRow(
                 .padding(start = XmLayout.PagePadding, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (current) {
+                Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.padding(end = 12.dp).size(20.dp), tint = scheme.primary)
+            }
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
                     song.title, style = MaterialTheme.typography.bodyLarge,

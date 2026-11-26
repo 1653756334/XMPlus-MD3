@@ -514,6 +514,10 @@
     <string name="music_queue_reorder">拖动排序</string>
     <string name="music_sleep_song_end">本首播完</string>
     <string name="music_sleep_status_song_end">本首播完后暂停播放</string>
-    <string name="music_cache_title">存储空间</string>
+    <string name="music_cache_title">缓存空间</string>
+    <string name="music_song_more">更多</string>
+    <string name="music_play_next">下一首播放</string>
+    <string name="music_play_next_added">已添加到下一首播放</string>
+    <string name="music_queue_clear_title">清空播放列表？</string>
     <string name="music_cache_usage">已用 %1$s，上限 %2$s</string>
 </resources>

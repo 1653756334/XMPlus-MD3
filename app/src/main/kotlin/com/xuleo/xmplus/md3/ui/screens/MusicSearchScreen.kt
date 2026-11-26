@@ -72,6 +72,7 @@ internal fun MusicSearchScreen(
     onBack: () -> Unit,
     onOpen: (PluginMedia) -> Unit,
     onPlay: (MusicItem) -> Unit,
+    onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String? = null,
     source: String? = null,
     onSource: (String) -> Unit = {},
@@ -125,7 +126,7 @@ internal fun MusicSearchScreen(
                     Column(Modifier.fillMaxSize()) {
                         val paged = state.results[current.platform to pageType] ?: Paged(loading = true)
                         SearchResults(paged, { viewModel.loadMore(current.platform, pageType) },
-                            { viewModel.retry(current.platform, pageType) }, onOpen, onPlay, playingKey)
+                            { viewModel.retry(current.platform, pageType) }, onOpen, onPlay, onPlayNext, playingKey)
                     }
                 }
             }
@@ -140,13 +141,14 @@ private fun androidx.compose.foundation.layout.ColumnScope.SearchResults(
     onRetry: () -> Unit,
     onOpen: (PluginMedia) -> Unit,
     onPlay: (MusicItem) -> Unit,
+    onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String?,
 ) {
     val list = rememberLazyListState()
     PagedList(paged, list, onLoadMore, onRetry) {
         itemsIndexed(paged.items, key = { index, item -> "$index:${item.id}" }) { _, item ->
             when (item) {
-                is MusicItem -> SongRow(item, playing = item.key == playingKey) { onPlay(item) }
+                is MusicItem -> SongRow(item, playing = item.key == playingKey, onPlayNext = { onPlayNext(item) }) { onPlay(item) }
                 is MusicAlbum -> MusicAlbumRow(item) { onOpen(item) }
                 is MusicArtist -> MusicArtistRow(item) { onOpen(item) }
                 is MusicSheet -> MusicSheetRow(item) { onOpen(item) }

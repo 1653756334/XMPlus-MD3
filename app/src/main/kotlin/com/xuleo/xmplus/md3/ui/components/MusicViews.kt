@@ -1,5 +1,7 @@
 package com.xuleo.xmplus.md3.ui.components
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +15,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
 import com.xuleo.xmplus.md3.R
 import androidx.compose.material3.MaterialTheme
@@ -62,13 +69,20 @@ fun SheetCard(sheet: MusicSheet, modifier: Modifier = Modifier, onClick: () -> U
 
 /**
  * A song: cover, title on one line and artist · album under it. The playing song shows the equalizer in place of
- * nothing, so the row keeps its width. Actions on songs arrive with the player (M3).
+ * nothing, so the row keeps its width. With [onPlayNext] the row ends in a menu holding 下一首播放.
  */
 @Composable
-fun SongRow(song: MusicItem, modifier: Modifier = Modifier, playing: Boolean = false, onClick: () -> Unit = {}) {
+fun SongRow(
+    song: MusicItem,
+    modifier: Modifier = Modifier,
+    playing: Boolean = false,
+    onPlayNext: (() -> Unit)? = null,
+    onClick: () -> Unit = {},
+) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp)
-            .padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+            .padding(start = XmLayout.PagePadding, end = if (onPlayNext != null) 4.dp else XmLayout.PagePadding)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
@@ -85,6 +99,29 @@ fun SongRow(song: MusicItem, modifier: Modifier = Modifier, playing: Boolean = f
             }
         }
         if (playing) Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        if (onPlayNext != null) SongMenu(playing, onPlayNext)
+    }
+}
+
+@Composable
+private fun SongMenu(playing: Boolean, onPlayNext: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val added = stringResource(R.string.music_play_next_added)
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.music_song_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        XmMenu(open, { open = false }) {
+            XmMenuItem(
+                stringResource(R.string.music_play_next), {
+                    open = false
+                    onPlayNext()
+                    Toast.makeText(context, added, Toast.LENGTH_SHORT).show()
+                }, 0, 1,
+                icon = XmIcons.Outlined.PlaylistAdd, enabled = !playing,
+            )
+        }
     }
 }
 

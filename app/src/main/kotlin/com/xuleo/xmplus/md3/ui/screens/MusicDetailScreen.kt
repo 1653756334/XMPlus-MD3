@@ -71,6 +71,7 @@ internal fun MusicDetailScreen(
     onBack: () -> Unit,
     onOpenAlbum: (MusicAlbum) -> Unit,
     onPlay: (List<MusicItem>, Int) -> Unit,
+    onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String? = null,
 ) {
     LaunchedEffect(viewModel) { viewModel.start() }
@@ -79,10 +80,10 @@ internal fun MusicDetailScreen(
     val title = item.title()
     DetailPage(onBack, title, header = { MusicHero(item) }) {
         if (viewModel.kind == MusicDetailKind.Artist) {
-            ArtistPages(viewModel, songs, onOpenAlbum, onPlay, playingKey)
+            ArtistPages(viewModel, songs, onOpenAlbum, onPlay, onPlayNext, playingKey)
         } else {
             val list = rememberLazyListState()
-            SongList(songs, list, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, playingKey, total = item.count())
+            SongList(songs, list, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = item.count())
         }
     }
 }
@@ -93,6 +94,7 @@ private fun ColumnScope.ArtistPages(
     songs: Paged<MusicItem>,
     onOpenAlbum: (MusicAlbum) -> Unit,
     onPlay: (List<MusicItem>, Int) -> Unit,
+    onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String?,
 ) {
     val pager = rememberPagerState { 2 }
@@ -104,7 +106,7 @@ private fun ColumnScope.ArtistPages(
     SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
         Column(Modifier.fillMaxWidth()) {
             if (page == 0) {
-                SongList(songs, songList, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, playingKey, total = null)
+                SongList(songs, songList, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = null)
             } else {
                 PagedList(albums, albumList, viewModel::loadMoreAlbums, viewModel::retryAlbums) {
                     itemsIndexed(albums.items, key = { index, album -> "$index:${album.id}" }) { _, album ->
@@ -123,13 +125,14 @@ private fun ColumnScope.SongList(
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
     onPlay: (List<MusicItem>, Int) -> Unit,
+    onPlayNext: (MusicItem) -> Unit = {},
     playingKey: String?,
     total: Int?,
 ) {
     PagedList(songs, list, onLoadMore, onRetry) {
         item(key = "play_all") { PlayAllRow(total ?: songs.items.size.takeIf { songs.isEnd }) { onPlay(songs.items, 0) } }
         itemsIndexed(songs.items, key = { index, song -> "$index:${song.id}" }) { index, song ->
-            SongRow(song, playing = song.key == playingKey) { onPlay(songs.items, index) }
+            SongRow(song, playing = song.key == playingKey, onPlayNext = { onPlayNext(song) }) { onPlay(songs.items, index) }
         }
     }
 }
