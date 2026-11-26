@@ -651,6 +651,11 @@ private fun List<LyricLine>.withInlineTranslation(): SongLyric {
         }
         lines += line
     }
+    // The last translation has no next line to lend it a time, so it follows the last original on a time of its own.
+    if (lines.size >= 2 && counts[lines.last().timeMs] == 1 && lines[lines.lastIndex - 1].timeMs !in translations) {
+        val translation = lines.removeAt(lines.lastIndex)
+        if (translation.text.isNotBlank()) translations[lines.last().timeMs] = translation.text
+    }
     return SongLyric(lines, translations)
 }
 
