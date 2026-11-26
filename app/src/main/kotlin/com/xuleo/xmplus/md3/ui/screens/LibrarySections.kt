@@ -304,7 +304,7 @@ private fun <T> ListingPage(
 /**
  * One row of a 听过 list: the cover, a title on one line, the quiet lines of [subtitle] and [meta], an optional trailing
  * action, and a tap that opens it. Episodes and songs have a 48dp cover; [large] gives albums and sheets 56dp.
- * [roomy] gives a 听书 row more air: a 56dp cover and [subtitle] and [meta] on lines of their own.
+ * [roomy] gives a 听书 row more air: a 64dp cover and [subtitle] and [meta] on lines of their own.
  * [music] gives the cover the music placeholder; [onLongClick] starts selection where a list has it.
  */
 @Composable
@@ -328,12 +328,12 @@ internal fun ListingRow(
     val click = if (onLongClick != null) Modifier.combinedClickable(onClick = onOpen, onLongClick = onLongClick) else Modifier.clickable(onClick = onOpen)
     val shape = if (large || roomy) MaterialTheme.shapes.medium else MaterialTheme.shapes.small
     Row(
-        modifier.fillMaxWidth().then(click).heightIn(min = if (roomy) 76.dp else 64.dp)
-            .padding(horizontal = XmLayout.PagePadding, vertical = if (roomy) 10.dp else 8.dp),
+        modifier.fillMaxWidth().then(click).heightIn(min = if (roomy) 88.dp else 64.dp)
+            .padding(horizontal = XmLayout.PagePadding, vertical = if (roomy) 12.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        Box(Modifier.size(if (large || roomy) 56.dp else 48.dp)) {
+        Box(Modifier.size(if (roomy) 64.dp else if (large) 56.dp else 48.dp)) {
             when {
                 circle -> Avatar(cover, Modifier.matchParentSize())
                 music -> MusicCover(cover, Modifier.matchParentSize(), shape)
