@@ -40,7 +40,7 @@ internal object SongTags {
         cover?.let { put(tag, it) }
         try {
             audio.commit()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             // Half-written tags are worse than none: the next attempt starts over.
         }
         if (cover != null) FlacCover.write(file, cover)
@@ -66,8 +66,9 @@ internal object SongTags {
             artwork.pictureType = FrontCover
             tag.deleteArtworkField()
             tag.addField(artwork)
-        } catch (_: Exception) {
-            // Covers are optional; some formats refuse them.
+        } catch (_: Throwable) {
+            // Covers are optional; some formats refuse them, and the tagger's own picture writer needs javax.imageio,
+            // which Android does not have. FLAC gets its cover from FlacCover instead.
         }
     }
 
