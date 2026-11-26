@@ -533,4 +533,6 @@
     <string name="music_queue_reorder">Reorder</string>
     <string name="music_sleep_song_end">Song end</string>
     <string name="music_sleep_status_song_end">Pauses when this song ends</string>
+    <string name="music_cache_title">Storage</string>
+    <string name="music_cache_usage">%1$s of %2$s used</string>
 </resources>

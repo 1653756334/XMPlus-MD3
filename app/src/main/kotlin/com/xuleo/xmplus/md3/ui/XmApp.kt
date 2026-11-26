@@ -391,7 +391,8 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
                 source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) }, browse = musicBrowse, onOpenSheet = onOpenSheet, onSearch = onMusicSearch)
             Destination.Library -> if (library != null) LibraryScreen(library, onAlbum, onAnchor, onPlay) else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
-            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins)
+            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins,
+                (LocalContext.current.applicationContext as? XmApplication)?.musicMediaCache)
         }
     }
 }

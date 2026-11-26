@@ -152,12 +152,17 @@ class XmApplication : Application(), PlaybackOwner {
         com.xuleo.xmplus.md3.core.media.MusicFavorites(this)
     }
 
+    /** Songs heard lately, kept on disk. One instance only: Media3 locks the folder. */
+    val musicMediaCache: com.xuleo.xmplus.md3.core.media.MusicMediaCache by lazy {
+        com.xuleo.xmplus.md3.core.media.MusicMediaCache(this)
+    }
+
     /** Songs share the player with 听书; starting one stops the other. */
     override val music: MusicPlayback by lazy {
         val resolver = SongSourceResolver { song, quality ->
             musicSources.mediaSource(song, quality.key)?.let { ResolvedSong(it.url, it.headers, it.localFile) }
         }
-        MusicPlayback(this, resolver).also { music ->
+        MusicPlayback(this, resolver, musicMediaCache).also { music ->
             music.onStart = { playback.stopForSong() }
             playback.onStart = { music.stopForEpisode() }
         }

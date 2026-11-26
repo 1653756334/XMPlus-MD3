@@ -10,7 +10,11 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.cache.CacheDataSink
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -27,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonNull
@@ -41,7 +46,7 @@ import okhttp3.OkHttpClient
  */
 @MainThread
 @androidx.annotation.OptIn(UnstableApi::class)
-class MusicPlayback(context: Context, private val resolver: SongSourceResolver) {
+class MusicPlayback(context: Context, private val resolver: SongSourceResolver, private val mediaCache: MusicMediaCache) {
     /** Called when a song is about to start, so that 听书 stops. */
     var onStart: () -> Unit = {}
 
@@ -62,6 +67,8 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
     /** [SleepTimerState.atEpisodeEnd] means at the end of the current song. */
     val sleepTimer = mutableSleep.asStateFlow()
     private var sleepJob: Job? = null
+    /** Downloads the playing song whole into the cache, so seeking within it needs no new request. */
+    private var preloading: Job? = null
 
     /** Plain client: plugin links go anywhere and redirect freely, with no Ximalaya headers or checks. */
     private val client by lazy {
@@ -405,14 +412,27 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
             .build()
         val uri = source.localFile?.let(Uri::fromFile) ?: Uri.parse(source.url)
         val mediaId = "song:${++media}"
+        // MusicFree marks `.m3u8` links as HLS.
+        val hls = uri.path.orEmpty().endsWith(".m3u8", ignoreCase = true)
+        // Cached by song and quality rather than link, since plugin links change while the sound does not.
+        val cacheKey = if (source.localFile != null || hls) null else "${song.key}#${quality.key}"
         val item = MediaItem.Builder().setMediaId(mediaId).setUri(uri).setMediaMetadata(metadata)
-            // MusicFree marks `.m3u8` links as HLS.
-            .apply { if (uri.path.orEmpty().endsWith(".m3u8", ignoreCase = true)) setMimeType(MimeTypes.APPLICATION_M3U8) }
+            .apply { if (hls) setMimeType(MimeTypes.APPLICATION_M3U8) }
+            .apply { cacheKey?.let(::setCustomCacheKey) }
             .build()
         val agent = source.headers.entries.firstOrNull { it.key.equals(UserAgent, true) }?.value
         val http = OkHttpDataSource.Factory(client).setUserAgent(agent)
             .setDefaultRequestProperties(source.headers.filterKeys { !it.equals(UserAgent, true) })
-        val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, http))
+        val upstream = DefaultDataSource.Factory(context, http)
+        val cached = cacheKey?.let {
+            CacheDataSource.Factory()
+                .setCache(mediaCache.cache)
+                .setUpstreamDataSourceFactory(upstream)
+                .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(mediaCache.cache).setFragmentSize(CacheFragmentBytes))
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        }
+        val factory = DefaultMediaSourceFactory(cached ?: upstream)
+        preload(cached, uri, cacheKey)
         opened = mediaId
         // Music asks other apps' sounds to duck rather than pause it; 听书 sets speech again when it opens.
         player.setAudioAttributes(MusicAttributes, true)
@@ -495,7 +515,28 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
         }
     }
 
+    /** Writes the whole song into the cache in the background; the player reads what is there and fetches the rest. */
+    private fun preload(factory: CacheDataSource.Factory?, uri: Uri, key: String?) {
+        preloading?.cancel()
+        preloading = null
+        if (factory == null || key == null) return
+        val writer = CacheWriter(
+            factory.createDataSourceForDownloading(), DataSpec.Builder().setUri(uri).setKey(key).build(), null, null,
+        )
+        preloading = scope.launch(Dispatchers.IO) {
+            try {
+                runInterruptible { writer.cache() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The player still streams what is missing.
+            }
+        }.also { job -> job.invokeOnCompletion { writer.cancel() } }
+    }
+
     private fun unload() {
+        preloading?.cancel()
+        preloading = null
         val player = engine.value
         val loaded = player != null && isCurrent(player)
         opened = null
@@ -562,6 +603,8 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver) 
         const val UserAgent = "user-agent"
         /** How close to the end of the queue the next page is read. */
         const val PagingDistance = 3
+        /** Cache files are split at this size so the oldest parts of a long song can go first. */
+        const val CacheFragmentBytes = 4L * 1024 * 1024
     }
 }
 
