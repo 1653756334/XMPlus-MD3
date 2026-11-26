@@ -6,8 +6,10 @@ import com.xuleo.xmplus.md3.core.download.DownloadManager
 import com.xuleo.xmplus.md3.core.download.DownloadRequest
 import com.xuleo.xmplus.md3.core.download.DownloadState
 import com.xuleo.xmplus.md3.core.download.DownloadTask
+import com.xuleo.xmplus.md3.core.media.MusicQuality
 import com.xuleo.xmplus.md3.core.model.Album
 import com.xuleo.xmplus.md3.core.model.AlbumDetail
+import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.core.protocol.AlbumEpisodePageSize
@@ -53,6 +55,21 @@ class DownloadActions(
     private val downloads: DownloadManager,
 ) {
     val tasks: StateFlow<List<DownloadTask>> get() = downloads.list
+
+    /** Songs only, in the order they were queued; 已下载 lists them newest first. */
+    val songs: StateFlow<List<DownloadTask>> get() = downloads.songs
+
+    /**
+     * Queues a song at [quality], or at the download quality setting when it is null, and returns whether it was added.
+     * A song already queued or downloaded is left alone. Nothing is charged for a song.
+     */
+    suspend fun downloadSong(song: MusicItem, quality: MusicQuality? = null): Boolean = downloads.enqueueSong(song, quality?.key)
+
+    /** A song's task, whatever its state; null when it was never queued. */
+    fun songTask(song: MusicItem): DownloadTask? = downloads.songTask(song)
+
+    /** The finished file of a downloaded song, for playing it offline. */
+    fun songFile(song: MusicItem): java.io.File? = downloads.completedSongFile(song)
 
     /**
      * Prices [tracks] for the preview. The list's paid badge only decides which episodes are looked up: one marked free

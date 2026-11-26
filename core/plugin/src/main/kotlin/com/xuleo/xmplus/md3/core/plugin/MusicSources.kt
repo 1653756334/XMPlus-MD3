@@ -34,7 +34,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 class MusicSources(
     context: Context,
     private val manager: PluginManager,
-    /** A finished download of the song. Downloads arrive with M5. */
+    /** A finished download of the song, which plays without asking a plugin (MP-01). */
     private val localFile: (MusicItem) -> File? = { null },
 ) {
     private val connectivity = context.applicationContext.getSystemService(ConnectivityManager::class.java)

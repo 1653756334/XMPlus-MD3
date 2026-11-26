@@ -54,6 +54,8 @@ class MusicPlayback(
     private val info: SongInfoResolver? = null,
     /** 最近播放. Songs are written there as episodes are; nothing here touches listening time. */
     private val history: ListenHistoryStore? = null,
+    /** The quality playback asks for first; [qualityOrder] falls back from it. */
+    private val qualities: MusicQualitySettings? = null,
 ) {
     /** Called when a song is about to start, so that 听书 stops. */
     var onStart: () -> Unit = {}
@@ -428,7 +430,7 @@ class MusicPlayback(
             if (request != revision) return@launch
             if (player == null) return@launch fail(request, PlayerUnavailable)
             var found: Pair<MusicQuality, ResolvedSong>? = takePrefetched(song)
-            if (found == null) for (candidate in qualityOrder(DefaultQuality)) {
+            if (found == null) for (candidate in qualityOrder(preferredQuality())) {
                 val source = resolve(song, candidate)
                 // Another song was chosen meanwhile: this one's link is dropped.
                 if (request != revision) return@launch
@@ -438,7 +440,7 @@ class MusicPlayback(
                 }
             }
             // MusicFree's last resort: the link the song itself carries.
-            if (found == null) found = song.ownUrl()?.let { DefaultQuality to ResolvedSong(it) }
+            if (found == null) found = song.ownUrl()?.let { MusicQuality.Standard to ResolvedSong(it) }
             if (found == null) return@launch fail(request, SongUnavailable)
             load(player, song, found.first, found.second, positionMs, play = true)
             remember()
@@ -635,7 +637,7 @@ class MusicPlayback(
         val request = revision
         prefetching?.cancel()
         prefetching = scope.launch {
-            val qualities = qualityOrder(DefaultQuality)
+            val qualities = qualityOrder(preferredQuality())
             if (withContext(Dispatchers.IO) { qualities.any { mediaCache.isCached(cacheKey(next, it)) } }) return@launch
             for (candidate in qualities) {
                 val source = resolve(next, candidate)
@@ -750,10 +752,12 @@ class MusicPlayback(
         }
     }
 
+    /** The quality the listener chose, 标准 when nothing was chosen or no settings were given. */
+    private fun preferredQuality(): MusicQuality = qualities?.play?.value ?: MusicQuality.Standard
+
     private fun isCurrent(player: Player) = player === engine.value && opened != null && player.currentMediaItem?.mediaId == opened
 
     private companion object {
-        val DefaultQuality = MusicQuality.Standard
         const val SongUnavailable = "song_unavailable"
         const val PlayerUnavailable = "playback_unavailable"
         const val UserAgent = "user-agent"

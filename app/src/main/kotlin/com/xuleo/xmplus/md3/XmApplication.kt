@@ -10,11 +10,13 @@ import com.xuleo.xmplus.md3.core.account.UsageLedger
 import com.xuleo.xmplus.md3.core.data.KeystoreAccountStore
 import com.xuleo.xmplus.md3.core.download.DownloadManager
 import com.xuleo.xmplus.md3.core.download.DownloadStore
+import com.xuleo.xmplus.md3.core.download.SongSource
 import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
 import com.xuleo.xmplus.md3.core.media.SleepTimerStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.media.MusicPlayback
+import com.xuleo.xmplus.md3.core.media.MusicQuality
 import com.xuleo.xmplus.md3.core.media.ResolvedSong
 import com.xuleo.xmplus.md3.core.media.SongSourceResolver
 import com.xuleo.xmplus.md3.core.media.ListenHistoryStore
@@ -109,7 +111,21 @@ class XmApplication : Application(), PlaybackOwner {
     /** Episodes kept for offline listening: the app's music folder on external storage, or the app's own files without it. */
     val downloads: DownloadManager by lazy {
         val folder = getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.let { File(it, "XMPlus") } ?: File(filesDir, "XMPlus-downloads")
-        DownloadManager(folder, DownloadStore(File(filesDir, "downloads/tasks.json")), accounts, playbackApi, usage, processScope)
+        DownloadManager(
+            folder, DownloadStore(File(filesDir, "downloads/tasks.json")), accounts, playbackApi, usage, processScope,
+            // Songs fall back exactly as playback does: the chosen quality, then higher ones, then lower ones.
+            songSource = { song, quality ->
+                val preferred = MusicQuality.fromKey(quality) ?: MusicQuality.Standard
+                for (candidate in musicQuality.order(preferred)) {
+                    val source = musicSources.mediaSource(song, candidate.key) ?: continue
+                    // Already on disk: nothing to download.
+                    if (source.localFile == null) return@DownloadManager SongSource(source.url, source.headers)
+                }
+                null
+            },
+            songLyric = { song -> musicLyrics.lyric(song)?.rawLrc },
+            songQuality = { musicQuality.download.value.key },
+        )
     }
 
     val downloadActions by lazy { DownloadActions(accounts, album, playbackApi, usage, downloads) }
@@ -140,7 +156,14 @@ class XmApplication : Application(), PlaybackOwner {
     val musicCatalog: MusicCatalog by lazy { MusicCatalog(plugins) }
 
     /** Where a song plays from: downloads, the media cache, the alternative plugin or the song's plugin. */
-    val musicSources: MusicSources by lazy { MusicSources(this, plugins) }
+    val musicSources: MusicSources by lazy {
+        MusicSources(this, plugins) { song -> downloads.completedSongFile(song) }
+    }
+
+    /** The quality songs play and download in: 默认播放音质 and 下载音质. */
+    val musicQuality: com.xuleo.xmplus.md3.core.media.MusicQualitySettings by lazy {
+        com.xuleo.xmplus.md3.core.media.MusicQualitySettings(this)
+    }
 
     /** Lyrics and comments of songs. */
     val musicLyrics: com.xuleo.xmplus.md3.core.plugin.MusicLyrics by lazy {
@@ -163,7 +186,7 @@ class XmApplication : Application(), PlaybackOwner {
             musicSources.mediaSource(song, quality.key)?.let { ResolvedSong(it.url, it.headers, it.localFile) }
         }
         val info = com.xuleo.xmplus.md3.core.media.SongInfoResolver { song -> musicCatalog.musicInfo(song) }
-        MusicPlayback(this, resolver, musicMediaCache, info, listens).also { music ->
+        MusicPlayback(this, resolver, musicMediaCache, info, listens, musicQuality).also { music ->
             music.onStart = { playback.stopForSong() }
             playback.onStart = { music.stopForEpisode() }
         }
