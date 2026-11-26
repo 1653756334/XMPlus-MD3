@@ -7,6 +7,7 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheEvictor
 import androidx.media3.datasource.cache.CacheSpan
+import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
 import java.util.TreeSet
@@ -37,6 +38,12 @@ class MusicMediaCache(context: Context) {
             val cache = cache
             synchronized(cache) { evictor.trim(cache) }
         }
+    }
+
+    /** True when the whole of [key] is on disk. Reads the disk on first use. */
+    internal fun isCached(key: String): Boolean {
+        val length = ContentMetadata.getContentLength(cache.getContentMetadata(key))
+        return length > 0 && cache.isCached(key, 0, length)
     }
 
     suspend fun usedBytes(): Long = withContext(Dispatchers.IO) { cache.cacheSpace }

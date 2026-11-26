@@ -69,6 +69,10 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
     private var sleepJob: Job? = null
     /** Downloads the playing song whole into the cache, so seeking within it needs no new request. */
     private var preloading: Job? = null
+    /** Caches the next song once the playing one is nearly over, so it starts without waiting. */
+    private var prefetching: Job? = null
+    /** The opening ([revision]) whose next song was already fetched, so each song asks once. */
+    private var prefetchedFor = -1L
 
     /** Plain client: plugin links go anywhere and redirect freely, with no Ximalaya headers or checks. */
     private val client by lazy {
@@ -116,6 +120,7 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
                 delay(250)
                 if (isCurrent(player)) {
                     publish(player)
+                    if (player.isPlaying) prefetchNext(player)
                     if (player.isPlaying && ++ticks % 20 == 0) remember()
                 }
             }
@@ -410,29 +415,19 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
             .setTitle(song.title).setArtist(song.artist).setAlbumTitle(song.album)
             .setArtworkUri(song.artwork?.let(Uri::parse))
             .build()
-        val uri = source.localFile?.let(Uri::fromFile) ?: Uri.parse(source.url)
+        val uri = source.uri()
         val mediaId = "song:${++media}"
-        // MusicFree marks `.m3u8` links as HLS.
-        val hls = uri.path.orEmpty().endsWith(".m3u8", ignoreCase = true)
-        // Cached by song and quality rather than link, since plugin links change while the sound does not.
-        val cacheKey = if (source.localFile != null || hls) null else "${song.key}#${quality.key}"
+        val hls = uri.isHls()
+        val cacheKey = cacheKey(song, quality, source)
         val item = MediaItem.Builder().setMediaId(mediaId).setUri(uri).setMediaMetadata(metadata)
             .apply { if (hls) setMimeType(MimeTypes.APPLICATION_M3U8) }
             .apply { cacheKey?.let(::setCustomCacheKey) }
             .build()
-        val agent = source.headers.entries.firstOrNull { it.key.equals(UserAgent, true) }?.value
-        val http = OkHttpDataSource.Factory(client).setUserAgent(agent)
-            .setDefaultRequestProperties(source.headers.filterKeys { !it.equals(UserAgent, true) })
-        val upstream = DefaultDataSource.Factory(context, http)
-        val cached = cacheKey?.let {
-            CacheDataSource.Factory()
-                .setCache(mediaCache.cache)
-                .setUpstreamDataSourceFactory(upstream)
-                .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(mediaCache.cache).setFragmentSize(CacheFragmentBytes))
-                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        }
+        val upstream = upstream(source)
+        val cached = cacheKey?.let { cached(upstream) }
         val factory = DefaultMediaSourceFactory(cached ?: upstream)
-        preload(cached, uri, cacheKey)
+        preloading?.cancel()
+        preloading = if (cached != null && cacheKey != null) scope.writeToCache(cached, uri, cacheKey) else null
         opened = mediaId
         // Music asks other apps' sounds to duck rather than pause it; 听书 sets speech again when it opens.
         player.setAudioAttributes(MusicAttributes, true)
@@ -515,15 +510,28 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         }
     }
 
-    /** Writes the whole song into the cache in the background; the player reads what is there and fetches the rest. */
-    private fun preload(factory: CacheDataSource.Factory?, uri: Uri, key: String?) {
-        preloading?.cancel()
-        preloading = null
-        if (factory == null || key == null) return
+    private fun upstream(source: ResolvedSong): DefaultDataSource.Factory {
+        val agent = source.headers.entries.firstOrNull { it.key.equals(UserAgent, true) }?.value
+        val http = OkHttpDataSource.Factory(client).setUserAgent(agent)
+            .setDefaultRequestProperties(source.headers.filterKeys { !it.equals(UserAgent, true) })
+        return DefaultDataSource.Factory(context, http)
+    }
+
+    private fun cached(upstream: DefaultDataSource.Factory): CacheDataSource.Factory = CacheDataSource.Factory()
+        .setCache(mediaCache.cache)
+        .setUpstreamDataSourceFactory(upstream)
+        .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(mediaCache.cache).setFragmentSize(CacheFragmentBytes))
+        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+    /**
+     * Writes the whole song into the cache; parts already there are skipped, so a song cached before costs nothing. The
+     * player reads what is there and fetches the rest.
+     */
+    private fun CoroutineScope.writeToCache(factory: CacheDataSource.Factory, uri: Uri, key: String): Job {
         val writer = CacheWriter(
             factory.createDataSourceForDownloading(), DataSpec.Builder().setUri(uri).setKey(key).build(), null, null,
         )
-        preloading = scope.launch(Dispatchers.IO) {
+        return launch(Dispatchers.IO) {
             try {
                 runInterruptible { writer.cache() }
             } catch (cancelled: CancellationException) {
@@ -534,9 +542,40 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         }.also { job -> job.invokeOnCompletion { writer.cancel() } }
     }
 
+    /**
+     * At 90 % of a song, the next one in the queue is cached. Skipped in 单曲循环, when the timer stops at this song's
+     * end, and when the next song is already cached whole in any quality.
+     */
+    private fun prefetchNext(player: Player) {
+        if (prefetchedFor == revision) return
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
+        if (player.currentPosition < duration * PrefetchAt) return
+        prefetchedFor = revision
+        if (mutableQueue.value.mode == MusicPlayMode.Single || mutableSleep.value.atEpisodeEnd) return
+        val current = list.current ?: return
+        val next = list.at(list.currentIndex + 1)?.takeIf { it.key != current.key } ?: return
+        val request = revision
+        prefetching?.cancel()
+        prefetching = scope.launch {
+            val qualities = qualityOrder(DefaultQuality)
+            if (withContext(Dispatchers.IO) { qualities.any { mediaCache.isCached(cacheKey(next, it)) } }) return@launch
+            for (candidate in qualities) {
+                val source = resolve(next, candidate)
+                if (request != revision) return@launch
+                if (source == null) continue
+                val key = cacheKey(next, candidate, source) ?: return@launch
+                writeToCache(cached(upstream(source)), source.uri(), key)
+                return@launch
+            }
+        }
+    }
+
     private fun unload() {
         preloading?.cancel()
         preloading = null
+        // A next song half fetched goes on from what is cached when it opens.
+        prefetching?.cancel()
+        prefetching = null
         val player = engine.value
         val loaded = player != null && isCurrent(player)
         opened = null
@@ -605,8 +644,22 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         const val PagingDistance = 3
         /** Cache files are split at this size so the oldest parts of a long song can go first. */
         const val CacheFragmentBytes = 4L * 1024 * 1024
+        /** How far into a song the next one is cached. */
+        const val PrefetchAt = 0.9
     }
 }
+
+private fun ResolvedSong.uri(): Uri = localFile?.let(Uri::fromFile) ?: Uri.parse(url)
+
+/** MusicFree marks `.m3u8` links as HLS. */
+private fun Uri.isHls() = path.orEmpty().endsWith(".m3u8", ignoreCase = true)
+
+/** Cached by song and quality rather than link, since plugin links change while the sound does not. */
+private fun cacheKey(song: MusicItem, quality: MusicQuality) = "${song.key}#${quality.key}"
+
+/** Null for local files and HLS, which are not cached. */
+private fun cacheKey(song: MusicItem, quality: MusicQuality, source: ResolvedSong): String? =
+    if (source.localFile != null || source.uri().isHls()) null else cacheKey(song, quality)
 
 private fun MusicItem.ownUrl(): String? =
     (raw["url"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.contentOrNull?.takeIf { it.isNotEmpty() }
