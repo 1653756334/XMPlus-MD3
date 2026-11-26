@@ -424,3 +424,57 @@ Player and system
 - MP-50 The player reads as `docs/MUSIC.md` · Player (music); 评论 shows only when the plugin has `getMusicComments`.
 - MP-51 Songs play as music: a notification sound lowers the volume instead of pausing. 听书 still plays as speech.
 - MP-52 Songs never touch the 听时 ledger. 听书 and songs share one player, mini player, notification and sleep timer; switching between them replaces the queue.
+
+## Phase M4 — Library
+
+Source: MusicFree `src/core/musicSheet/*`, `src/pages/musicListEditor`, `src/pages/pluginSheetDetail`, `src/pages/history`. Design: `docs/MUSIC.md` · 听过.
+
+### 最近播放 and 继续听
+
+- LM-01 A playing song is written to this device's history like an episode: one row per song, with its artist, cover, duration, where it stopped and when; a song played again moves to the top instead of repeating.
+- LM-02 A song row also records the list it was played from, so 继续听 can put that list back as the queue.
+- LM-03 继续听 shows the last 10 items of both kinds, newest first, with the episode's progress on its cover and the equalizer on the item playing now; the row is hidden when there is nothing yet.
+- LM-04 Tapping a song resumes that list as the queue and starts where it stopped; a song that had reached its end starts from the beginning.
+- LM-05 Tapping an episode starts it from its saved position, as 历史 did.
+- LM-06 最近播放 filters 全部 · 听书 · 音乐; long press starts selection, with 全选 and delete; delete shows 已从听过中移除 with 撤销, and undo keeps a row played again since.
+- LM-07 Rows written before music existed are 听书 and behave as before.
+
+### 我喜欢 and 自建歌单
+
+- LM-10 我喜欢 and each 自建歌单 keep the songs' full plugin objects; a song is in a sheet once (PL-21 round trips unchanged).
+- LM-11 我喜欢 is newest first; a song added to a sheet goes to the top, in the order given.
+- LM-12 The sheet page shows a mosaic of the first four distinct covers (or the sheet's own), the name and the count; 播放全部 plays the sheet from the top with the sheet as the queue.
+- LM-13 Selection: 添加到歌单 copies, 移动到 moves to another sheet, 删除 removes with 撤销; 全选 selects every row; back ends selection first.
+- LM-14 Drag handles reorder the songs; the order survives a restart.
+- LM-15 自建歌单 offers 重命名 and 删除歌单; 我喜欢 offers neither; a blank name is refused.
+- LM-16 An empty sheet says so; 新建歌单 from the overview creates a sheet and opens it.
+- LM-17 我喜欢 saved before this phase by the old file is imported once into the library store, and the old file is removed only after the new one is written.
+
+### 收藏歌单
+
+- LM-20 A plugin sheet page has a 收藏 toggle at the end of the top bar; the state comes from the starred list.
+- LM-21 收藏 lists the starred sheets; opening one shows the plugin's current contents, not a saved copy.
+- LM-22 Unstarring removes the row; 管理歌单 reorders and unstars in place.
+
+### 导入 and 搜索
+
+- LM-30 导入 shows a link field with 粘贴 and the enabled plugins that can import; the chosen plugin's hint is shown under the field.
+- LM-31 Importing a sheet creates a new 自建歌单 named after the result and opens it.
+- LM-32 单曲 imports one song and offers 播放 or 加入歌单.
+- LM-33 A plugin that returns nothing, or no capable plugin, shows one line and creates nothing.
+- LM-40 Library search reads this device only: episodes, albums, 我喜欢 and 自建 songs, and sheet names, grouped with counts; no match → 没有找到相关内容; tapping plays or opens the item.
+- LM-50 Every song ⋮ menu (lists, player, queue) can add to a sheet; the sheet lists 新建歌单, 我喜欢 and the 自建歌单s; a song already there is not added twice and says 已在歌单中.
+
+## Phase M5 — Music downloads
+
+Source: MusicFree `src/core/downloader.ts`, `src/pages/downloading`. Design: `docs/MUSIC.md` · 下载.
+
+- MD-01 A song downloads through the shared download manager: download quality first, then playback's fallback (higher, then lower). No 听时 is read or spent and no account is needed.
+- MD-02 The file is `音乐/<artist> - <title> [<id>].<ext>` with illegal characters replaced and the length capped as for episodes; the extension follows the link, then the response type.
+- MD-03 Title, artist, album, cover and the song's lyrics are written into MP3, FLAC and M4A files; a tag that cannot be written leaves the file playable and does not fail the download.
+- MD-04 A downloaded song plays from its file with no call to the plugin, so it plays offline.
+- MD-05 下载中 lists songs and episodes together, with pause, resume and cancel.
+- MD-06 已下载 shows 听书 · 音乐 filters when both kinds exist; 音乐 lists songs newest first with 播放全部 (queue source 已下载).
+- MD-07 Deleting a downloaded song asks first and shows its file size; the space is freed at once.
+- MD-08 A song's ⋮ menu shows 下载 with the quality sheet, or 下载中 / 已下载 instead when it is already queued or done.
+- MD-09 The player's action row shows 下载 and 定时关闭 moved into 更多; 我的 has 默认播放音质 and 下载音质, and the choice survives a restart.

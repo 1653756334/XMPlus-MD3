@@ -28,25 +28,25 @@ Add a music platform to XMPlus-MD3 next to 听书:
 
 ### 插件 Plugins
 
-- [ ] Runtime: the injected environment and bundled packages exactly as MusicFree (see 2)
-- [ ] Install from local files (several at once) or a link, as MusicFree does
-- [ ] Subscriptions: a list of `.js` / `.json` links, updated on demand
-- [ ] Update one plugin from its `srcUrl`, or all; same-name plugins replace older versions only
-- [ ] Enable / disable, drag to reorder, user variables, alternative plugin (替代插件), description, uninstall
-- [ ] Incompatible or unreadable plugins are listed with the reason and never called
+- [x] Runtime: the injected environment and bundled packages exactly as MusicFree (see 2)
+- [x] Install from local files (several at once) or a link, as MusicFree does
+- [x] Subscriptions: a list of `.js` / `.json` links, updated on demand
+- [x] Update one plugin from its `srcUrl`, or all; same-name plugins replace older versions only
+- [x] Enable / disable, drag to reorder, user variables, alternative plugin (替代插件), description, uninstall
+- [x] Incompatible or unreadable plugins are listed with the reason and never called
 
 ### 音乐 Music tab
 
-- [ ] 推荐: sheet square (歌单广场) per plugin, with pinned and grouped tags
-- [ ] 榜单: ranking groups per plugin
-- [ ] Search: per plugin, by type (单曲 / 专辑 / 歌手 / 歌单 / 歌词 where supported), paged, with history
-- [ ] Empty state when no plugin is installed, with one 导入插件 action
+- [x] 推荐: sheet square (歌单广场) per plugin, with pinned and grouped tags
+- [x] 榜单: ranking groups per plugin
+- [x] Search: per plugin, by type (单曲 / 专辑 / 歌手 / 歌单 / 歌词 where supported), paged, with history
+- [x] Empty state when no plugin is installed, with one 导入插件 action
 
 ### 详情 Detail pages
 
-- [ ] 歌单 / 榜单 / 专辑: header, 播放全部, paged songs, multi-select
-- [ ] 歌手: profile, 单曲 and 专辑 tabs
-- [ ] Star a plugin sheet into 收藏歌单
+- [x] 歌单 / 榜单 / 专辑: header, 播放全部, paged songs, multi-select
+- [x] 歌手: profile, 单曲 and 专辑 tabs
+- [x] Star a plugin sheet into 收藏歌单
 
 ### 播放 Player
 
@@ -55,25 +55,25 @@ Add a music platform to XMPlus-MD3 next to 听书:
 - [x] Play modes: 列表循环 / 单曲循环 / 随机
 - [x] Lyrics: synced, translation, tap a line to seek, lyric search when a song has none
 - [x] Comments when the plugin supports them
-- [ ] Editable queue: reorder, remove, clear, play next
-- [ ] Shared with 听书: mini player, sleep timer, notification, lock screen, Bluetooth, last session
+- [x] Editable queue: reorder, remove, clear, play next
+- [x] Shared with 听书: mini player, sleep timer, notification, lock screen, Bluetooth, last session
 
 ### 听过 Library (both kinds of content)
 
-- [ ] One overview page instead of seven swipe tabs (see 5 · 听过)
-- [ ] 最近播放: 听书 episodes and songs in one list, filter 全部 / 听书 / 音乐, resume from where each stopped
-- [ ] 我喜欢, a built-in sheet
-- [ ] 自建歌单: create, rename, delete, reorder songs, move and copy between sheets
-- [ ] 收藏歌单
-- [ ] Import a sheet or a song from a link through a plugin (`importMusicSheet`, `importMusicItem`)
-- [ ] 听书 sections (云历史, 听更新, 订阅, 收藏, 书签, 关注的主播) as pages opened from the overview, content unchanged
-- [ ] Search across the library
+- [x] One overview page instead of seven swipe tabs (see 5 · 听过)
+- [x] 最近播放: 听书 episodes and songs in one list, filter 全部 / 听书 / 音乐, resume from where each stopped
+- [x] 我喜欢, a built-in sheet
+- [x] 自建歌单: create, rename, delete, reorder songs, move and copy between sheets
+- [x] 收藏歌单
+- [x] Import a sheet or a song from a link through a plugin (`importMusicSheet`, `importMusicItem`)
+- [x] 听书 sections (云历史, 听更新, 订阅, 收藏, 书签, 关注的主播) as pages opened from the overview, content unchanged
+- [x] Search across the library
 
 ### 下载 Downloads
 
-- [ ] Songs in the shared download manager, with quality choice
-- [ ] Tags, cover and lyrics written to the file (shared FFmpeg pipeline)
-- [ ] Downloaded songs play offline
+- [x] Songs in the shared download manager, with quality choice
+- [x] Tags, cover and lyrics written to the file (jaudiotagger until the shared FFmpeg pipeline arrives)
+- [x] Downloaded songs play offline
 
 ### 迁移 Migration (last)
 
