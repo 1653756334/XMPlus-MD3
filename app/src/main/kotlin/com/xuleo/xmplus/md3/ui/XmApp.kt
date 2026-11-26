@@ -141,7 +141,7 @@ internal fun XmAppContent(
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
                 is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, AppRoute.MusicSearch,
-                AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet -> Unit
+                AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet, AppRoute.LibrarySearch -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -231,7 +231,7 @@ internal fun XmAppContent(
         onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
         // Hooks for the next steps: library search and 导入.
         onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
-        onSearch = null,
+        onSearch = { navigator.push(AppRoute.LibrarySearch) },
         onImportSheet = { importing = true },
     )
     val libraryTab: @Composable () -> Unit = {
@@ -362,6 +362,22 @@ internal fun XmAppContent(
                                     onPlay = { songs, index, source -> music.playback.playList(songs, index, source = source) },
                                     onPlayNext = { music.playback.addNext(it) },
                                     playingKey = playingSong?.key,
+                                )
+                            }
+                        }
+                    }
+                    entry<AppRoute.LibrarySearch> {
+                        Surface(Modifier.fillMaxSize()) {
+                            val music = musicPlayer
+                            if (library != null && music != null) {
+                                LibrarySearchScreen(
+                                    library, music.library, nowPlaying, { navigator.pop() }, ::openAlbum,
+                                    onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
+                                    onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
+                                    onPlayEpisode = ::playSaved,
+                                    onPlaySong = ::playSong,
+                                    onPlay = { music.playback.playNow(it, MusicPlaySource(MusicPlaySource.Type.Single)) },
+                                    onPlayNext = { music.playback.addNext(it) },
                                 )
                             }
                         }

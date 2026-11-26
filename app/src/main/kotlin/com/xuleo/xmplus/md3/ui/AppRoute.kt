@@ -26,6 +26,8 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data object Recent : AppRoute
     /** 我喜欢 (`MusicLibrary.LikesId`) or one of the user's sheets. */
     @Serializable data class LocalSheet(val id: String) : AppRoute
+    /** 资料库搜索: episodes, albums, songs and sheets of everything 听过 holds. */
+    @Serializable data object LibrarySearch : AppRoute
     /** One 听书 collection of 听过; [section] is a `LibrarySection` name. */
     @Serializable data class LibraryPage(val section: String) : AppRoute
     @Serializable data object Player : AppRoute
