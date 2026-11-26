@@ -757,11 +757,12 @@ private fun LyricLines(
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // The lyric starts at the top and the line being sung settles a third of the way down.
+        // The lyric starts at the top and ends at the bottom; in between, the line being sung settles a third of the
+        // way down.
         LazyColumn(
             Modifier.fillMaxSize().lyricFade(),
             state = list,
-            contentPadding = PaddingValues(top = maxHeight * LyricFadeEdge, bottom = maxHeight * (1f - LyricAnchor)),
+            contentPadding = PaddingValues(vertical = maxHeight * LyricFadeEdge),
         ) {
             itemsIndexed(lyric.lines) { index, line ->
                 LyricRow(
