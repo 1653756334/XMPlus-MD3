@@ -4,6 +4,9 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,19 +72,27 @@ fun SheetCard(sheet: MusicSheet, modifier: Modifier = Modifier, onClick: () -> U
 
 /**
  * A song: cover, title on one line and artist · album under it. The playing song shows the equalizer in place of
- * nothing, so the row keeps its width. With [onPlayNext] the row ends in a menu holding 下一首播放.
+ * nothing, so the row keeps its width. With [onPlayNext] the row ends in the song menu (下一首播放, 加入歌单, then
+ * [extraItems]); [trailing] replaces that menu, as check boxes do while selecting. [onLongClick] starts selection.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
     song: MusicItem,
     modifier: Modifier = Modifier,
     playing: Boolean = false,
     onPlayNext: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    extraItems: List<SongMenuItem> = emptyList(),
+    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit = {},
 ) {
+    val click = if (onLongClick != null) Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    else Modifier.clickable(onClick = onClick)
+    val ends = trailing != null || onPlayNext != null
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp)
-            .padding(start = XmLayout.PagePadding, end = if (onPlayNext != null) 4.dp else XmLayout.PagePadding)
+        modifier.fillMaxWidth().then(click).heightIn(min = 64.dp)
+            .padding(start = XmLayout.PagePadding, end = if (ends) 4.dp else XmLayout.PagePadding)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
@@ -99,30 +110,61 @@ fun SongRow(
             }
         }
         if (playing) Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-        if (onPlayNext != null) SongMenu(playing, onPlayNext)
+        when {
+            trailing != null -> trailing()
+            onPlayNext != null -> SongMenu(song, playing, onPlayNext, extraItems)
+        }
     }
 }
 
+/** An action a list adds to the song menu after the shared ones, such as 从歌单移除. */
+class SongMenuItem(val text: String, val icon: ImageVector, val onClick: () -> Unit)
+
+/**
+ * The song menu, shared by every song list: 下一首播放 and 加入歌单 (with [LocalMusicLibrary]), then [extraItems].
+ * [onPlayNext] null leaves 下一首播放 out.
+ */
 @Composable
-private fun SongMenu(playing: Boolean, onPlayNext: () -> Unit) {
+fun SongMenu(
+    song: MusicItem,
+    playing: Boolean,
+    onPlayNext: (() -> Unit)?,
+    extraItems: List<SongMenuItem> = emptyList(),
+) {
     var open by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val added = stringResource(R.string.music_play_next_added)
+    val library = LocalMusicLibrary.current
     Box {
         IconButton(onClick = { open = true }) {
             Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.music_song_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         XmMenu(open, { open = false }) {
-            XmMenuItem(
-                stringResource(R.string.music_play_next), {
-                    open = false
-                    onPlayNext()
-                    Toast.makeText(context, added, Toast.LENGTH_SHORT).show()
-                }, 0, 1,
-                icon = XmIcons.Outlined.PlaylistAdd, enabled = !playing,
-            )
+            val count = (if (onPlayNext != null) 1 else 0) + (if (library != null) 1 else 0) + extraItems.size
+            var index = 0
+            if (onPlayNext != null) {
+                XmMenuItem(
+                    stringResource(R.string.music_play_next), {
+                        open = false
+                        onPlayNext()
+                        Toast.makeText(context, added, Toast.LENGTH_SHORT).show()
+                    }, index++, count,
+                    icon = XmIcons.Outlined.QueueMusic, enabled = !playing,
+                )
+            }
+            if (library != null) {
+                XmMenuItem(
+                    stringResource(R.string.music_add_to_sheet), { open = false; adding = true }, index++, count,
+                    icon = XmIcons.Outlined.PlaylistAdd,
+                )
+            }
+            extraItems.forEach { item ->
+                XmMenuItem(item.text, { open = false; item.onClick() }, index++, count, icon = item.icon)
+            }
         }
     }
+    if (adding) AddToSheetSheet(listOf(song), onDismiss = { adding = false })
 }
 
 /** An album in a list: cover, title, and the date and song count when the plugin gives them. */

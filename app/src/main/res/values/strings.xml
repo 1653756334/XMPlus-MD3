@@ -551,4 +551,16 @@
     <string name="library_sheet_import">Import</string>
     <string name="library_sheet_name">Name</string>
     <string name="library_sheet_create">Create</string>
+    <string name="music_sheet_added">Added to %1$s</string>
+    <string name="music_sheet_moved">Moved to %1$s</string>
+    <string name="music_sheet_present">Already in this playlist</string>
+    <string name="music_move_to">Move to</string>
+    <string name="music_sheet_removed">Removed from playlist</string>
+    <string name="music_sheet_rename">Rename</string>
+    <string name="music_sheet_delete">Delete playlist</string>
+    <string name="music_sheet_delete_title">Delete “%1$s”?</string>
+    <string name="music_sheets_delete_title">Delete the selected playlists?</string>
+    <string name="music_star">Save</string>
+    <string name="music_unstar">Unsave</string>
+    <string name="music_starred">Saved to your playlists</string>
 </resources>

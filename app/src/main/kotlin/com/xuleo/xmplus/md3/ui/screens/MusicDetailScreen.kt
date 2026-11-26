@@ -163,7 +163,7 @@ internal fun <T> ColumnScope.PagedList(
 
 /** The page's main action, as QQ 音乐 places it: under the head, with the count beside it. */
 @Composable
-private fun PlayAllRow(count: Int?, onClick: () -> Unit) {
+internal fun PlayAllRow(count: Int?, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = XmLayout.PagePadding),
         verticalAlignment = Alignment.CenterVertically,

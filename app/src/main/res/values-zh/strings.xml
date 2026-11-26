@@ -532,4 +532,16 @@
     <string name="library_sheet_import">导入</string>
     <string name="library_sheet_name">名称</string>
     <string name="library_sheet_create">创建</string>
+    <string name="music_sheet_added">已添加到「%1$s」</string>
+    <string name="music_sheet_moved">已移动到「%1$s」</string>
+    <string name="music_sheet_present">已在歌单中</string>
+    <string name="music_move_to">移动到</string>
+    <string name="music_sheet_removed">已从歌单移除</string>
+    <string name="music_sheet_rename">重命名</string>
+    <string name="music_sheet_delete">删除歌单</string>
+    <string name="music_sheet_delete_title">删除「%1$s」？</string>
+    <string name="music_sheets_delete_title">删除所选歌单？</string>
+    <string name="music_star">收藏</string>
+    <string name="music_unstar">取消收藏</string>
+    <string name="music_starred">已收藏到歌单</string>
 </resources>

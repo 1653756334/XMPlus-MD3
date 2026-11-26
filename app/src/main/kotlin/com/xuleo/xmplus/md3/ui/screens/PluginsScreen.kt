@@ -395,7 +395,7 @@ private fun SelectionToolbar(
 }
 
 @Composable
-private fun ToolbarAction(@StringRes label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
+internal fun ToolbarAction(@StringRes label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
     Column(
         Modifier.widthIn(min = 64.dp).clip(MaterialTheme.shapes.large)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)

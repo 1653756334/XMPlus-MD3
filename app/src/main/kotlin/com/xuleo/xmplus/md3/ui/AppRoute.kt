@@ -24,6 +24,8 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data object MusicSearch : AppRoute
     /** 最近播放, opened from 继续听 in 听过. */
     @Serializable data object Recent : AppRoute
+    /** 我喜欢 (`MusicLibrary.LikesId`) or one of the user's sheets. */
+    @Serializable data class LocalSheet(val id: String) : AppRoute
     /** One 听书 collection of 听过; [section] is a `LibrarySection` name. */
     @Serializable data class LibraryPage(val section: String) : AppRoute
     @Serializable data object Player : AppRoute

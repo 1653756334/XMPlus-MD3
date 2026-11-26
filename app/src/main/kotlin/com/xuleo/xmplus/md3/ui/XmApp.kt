@@ -94,7 +94,7 @@ fun XmApp() {
         if (kind == null || item == null) null
         else viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = MusicDetailViewModel.factory(application.musicCatalog, kind, item))
     }
-    XmAppContent(
+    CompositionLocalProvider(com.xuleo.xmplus.md3.ui.components.LocalMusicLibrary provides application.musicLibrary) { XmAppContent(
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
@@ -102,7 +102,7 @@ fun XmApp() {
         musicPlayer = remember(application) {
             MusicPlayerDeps(application.music, application.musicLyrics, application.musicCatalog, application.musicLibrary)
         },
-    )
+    ) }
 }
 
 @Composable
@@ -140,7 +140,7 @@ internal fun XmAppContent(
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
                 is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, AppRoute.MusicSearch,
-                AppRoute.Recent, is AppRoute.LibraryPage -> Unit
+                AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -226,7 +226,7 @@ internal fun XmAppContent(
         onOpenDownloads = { onSelect(Destination.Downloads) },
         onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
         // Hooks for the next steps: the sheet page (我喜欢 and 自建), library search, 管理歌单 and 导入.
-        onOpenSheet = null,
+        onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
         onSearch = null,
         onManageSheets = null,
         onImportSheet = null,
@@ -345,6 +345,19 @@ internal fun XmAppContent(
                                     onOpenAlbum = { openMusic(MusicDetailKind.Album, it) },
                                     onPlay = { songs, index -> musicPlayer?.playback?.playList(songs, index, vm.queuePages(), vm.playSource()) },
                                     onPlayNext = { musicPlayer?.playback?.addNext(it) },
+                                    playingKey = playingSong?.key,
+                                )
+                            }
+                        }
+                    }
+                    entry<AppRoute.LocalSheet> { route ->
+                        Surface(Modifier.fillMaxSize()) {
+                            val music = musicPlayer
+                            if (music != null) {
+                                LocalSheetScreen(
+                                    music.library, route.id, { navigator.pop() },
+                                    onPlay = { songs, index, source -> music.playback.playList(songs, index, source = source) },
+                                    onPlayNext = { music.playback.addNext(it) },
                                     playingKey = playingSong?.key,
                                 )
                             }
