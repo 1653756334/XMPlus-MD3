@@ -94,6 +94,7 @@
     <string name="action_back">Back</string>
     <string name="action_retry">Retry</string>
     <string name="settings_general">General</string>
+    <string name="settings_music">Music</string>
     <string name="player_transcript_empty">No transcript for this episode</string>
     <string name="library_action_failed">Couldn’t update. Try again.</string>
     <string name="album_subscribe">Subscribe</string>

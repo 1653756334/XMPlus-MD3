@@ -90,6 +90,7 @@
     <string name="action_back">返回</string>
     <string name="action_retry">重试</string>
     <string name="settings_general">通用</string>
+    <string name="settings_music">音乐</string>
     <string name="player_transcript_empty">这一集没有文稿</string>
     <string name="library_action_failed">操作失败，请重试</string>
     <string name="album_subscribe">订阅</string>
