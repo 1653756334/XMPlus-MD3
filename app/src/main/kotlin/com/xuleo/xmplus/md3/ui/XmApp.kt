@@ -466,6 +466,12 @@ internal fun XmAppContent(
                 com.xuleo.xmplus.md3.ui.screens.MusicQueueSheet(
                     queueMusic, onClear = { miniQueue = false; queueMusic.clear() }, onDismiss = { miniQueue = false },
                 )
+            } else if (miniQueue && playback != null && playingTrack != null) {
+                val episodeQueue by playback.queue.collectAsStateWithLifecycle()
+                PlayerQueueSheet(
+                    episodeQueue, onSelect = playback::playQueued, onCheckNew = playback::checkNewEpisodes,
+                    onLoadMore = playback::loadMoreQueue, onDismiss = { miniQueue = false },
+                )
             }
         }
     }

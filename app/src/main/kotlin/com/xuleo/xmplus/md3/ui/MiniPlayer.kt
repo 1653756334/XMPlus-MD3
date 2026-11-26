@@ -123,8 +123,8 @@ fun MiniPlayer(
                     )
                 }
             }
-            // Songs have a queue to open from here, as in QQ音乐; 听书 opens its list from the player.
-            if (song != null) IconButton(onClick = onQueue) {
+            // The queue opens from here for both kinds, as in QQ音乐 and 喜马拉雅.
+            if (active) IconButton(onClick = onQueue) {
                 Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
             }
         }
