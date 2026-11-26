@@ -46,6 +46,13 @@ data class SheetGroup(val title: String, val sheets: List<MusicSheet>)
 /** A sheet, ranking or album page: the item itself (completed by the plugin on page 1) and its songs. */
 data class SongListPage<out T : PluginMedia>(val item: T, val songs: PluginPage<MusicItem>)
 
+/** What 从链接导入 found: the songs, and the sheet's own title when the plugin gave one. */
+data class ImportedSheet(val songs: List<MusicItem>, val title: String?) {
+    companion object {
+        val Empty = ImportedSheet(emptyList(), null)
+    }
+}
+
 /** Where a song plays from: a link with the headers it needs, or a downloaded [localFile]. */
 data class MediaSource(val url: String, val headers: Map<String, String>, val quality: String?, val localFile: java.io.File? = null)
 
@@ -124,6 +131,28 @@ class MusicCatalog(private val manager: PluginManager) {
             }
         }
         return PluginPage(items, root.isEnd())
+    }
+
+    /**
+     * MusicFree's `importMusicSheet`: the plugin reads a share link or text and returns the songs it holds. Most
+     * return a bare list; one that returns an object may carry them under `musicList`/`data` and name the sheet it
+     * came from as `targetSheetItem`/`sheetItem`. Nothing found is an empty result; a plugin that throws fails the call.
+     */
+    suspend fun importSheet(platform: String, url: String): ImportedSheet {
+        val reply = call(platform, "importMusicSheet", JsonPrimitive(url)) ?: return ImportedSheet.Empty
+        val list = when (reply) {
+            is JsonArray -> reply
+            is JsonObject -> (reply["musicList"] ?: reply["data"]) as? JsonArray ?: JsonArray(emptyList())
+            else -> JsonArray(emptyList())
+        }
+        val named = ((reply as? JsonObject)?.let { it["targetSheetItem"] ?: it["sheetItem"] }) as? JsonObject
+        return ImportedSheet(list.songs(platform), named?.text("title")?.takeIf { it.isNotBlank() })
+    }
+
+    /** MusicFree's `importMusicItem`: one song from a link. Null when the plugin returns nothing. */
+    suspend fun importItem(platform: String, url: String): MusicItem? {
+        val reply = call(platform, "importMusicItem", JsonPrimitive(url)) as? JsonObject ?: return null
+        return MusicItem.from(reply, platform)
     }
 
     private suspend fun <T> artistWorks(artist: MusicArtist, page: Int, type: SearchType, item: (JsonObject) -> T?): PluginPage<T> {

@@ -60,6 +60,7 @@ import com.xuleo.xmplus.md3.music.musicDetailItem
 import com.xuleo.xmplus.md3.music.routeRaw
 import com.xuleo.xmplus.md3.core.model.PluginMedia
 import com.xuleo.xmplus.md3.music.PluginsViewModel
+import com.xuleo.xmplus.md3.ui.components.ImportSheetSheet
 import com.xuleo.xmplus.md3.ui.screens.*
 
 @Composable
@@ -159,6 +160,7 @@ internal fun XmAppContent(
     val playingTrack = playback?.state?.collectAsStateWithLifecycle()?.value?.selection?.track?.id
     val nowPlaying = if (playingSong != null) NowPlaying(songKey = playingSong.key) else NowPlaying(trackId = playingTrack)
     val downloadCount = downloads?.tasks?.collectAsStateWithLifecycle()?.value?.count { it.state == DownloadState.Completed }
+    val installedPlugins = plugins?.plugins?.collectAsStateWithLifecycle()?.value.orEmpty()
 
     BackHandler(enabled = !isPlayer && isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
     LaunchedEffect(isHome) { if (isHome) suite.show() else suite.hide() }
@@ -217,6 +219,8 @@ internal fun XmAppContent(
     fun playSong(resume: SongResume) {
         musicPlayer?.playback?.playList(resume.songs, resume.index, source = resume.source, positionMs = resume.positionMs)
     }
+    // 从链接导入 opens over the 听过 page; the sheet it creates opens on top of it.
+    var importing by remember { mutableStateOf(false) }
     val libraryLinks = LibraryLinks(
         onOpenAlbum = ::openAlbum,
         onPlay = ::playSaved,
@@ -228,7 +232,7 @@ internal fun XmAppContent(
         // Hooks for the next steps: library search and 导入.
         onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
         onSearch = null,
-        onImportSheet = null,
+        onImportSheet = { importing = true },
     )
     val libraryTab: @Composable () -> Unit = {
         if (library != null) {
@@ -410,6 +414,16 @@ internal fun XmAppContent(
             )
             var miniQueue by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
             MiniPlayer(playback, onOpen = ::openPlayer, music = musicPlayer?.playback, onQueue = { miniQueue = true })
+            if (importing && musicPlayer != null) {
+                ImportSheetSheet(
+                    plugins = installedPlugins, library = musicPlayer.library,
+                    onImportSheet = musicPlayer.catalog::importSheet, onImportItem = musicPlayer.catalog::importItem,
+                    onDismiss = { importing = false },
+                    onCreated = { importing = false; navigator.push(AppRoute.LocalSheet(it)) },
+                    onPlay = { musicPlayer.playback.playNow(it, MusicPlaySource(MusicPlaySource.Type.Single)) },
+                    onPlugins = { importing = false; navigator.push(AppRoute.Plugins) },
+                )
+            }
             val queueMusic = musicPlayer?.playback
             if (miniQueue && queueMusic != null && playingSong != null) {
                 com.xuleo.xmplus.md3.ui.screens.MusicQueueSheet(

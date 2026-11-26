@@ -546,4 +546,9 @@
     <string name="music_star">收藏</string>
     <string name="music_unstar">取消收藏</string>
     <string name="music_starred">已收藏到歌单</string>
+    <string name="music_import_link">链接</string>
+    <string name="music_import_paste">粘贴</string>
+    <string name="music_import_failed">导入失败</string>
+    <string name="music_import_none">没有能导入链接的插件</string>
+    <string name="music_importing">正在导入…</string>
 </resources>

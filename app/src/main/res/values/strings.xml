@@ -565,4 +565,9 @@
     <string name="music_star">Save</string>
     <string name="music_unstar">Unsave</string>
     <string name="music_starred">Saved to your playlists</string>
+    <string name="music_import_link">Link</string>
+    <string name="music_import_paste">Paste</string>
+    <string name="music_import_failed">Import failed</string>
+    <string name="music_import_none">No plugin can import from a link</string>
+    <string name="music_importing">Importing…</string>
 </resources>
