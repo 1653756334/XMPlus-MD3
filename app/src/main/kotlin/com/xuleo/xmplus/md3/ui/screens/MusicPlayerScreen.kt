@@ -625,8 +625,33 @@ private fun LyricSource.parsed(): SongLyric? {
     val translation = parseLrc(translation)
     if (main.isEmpty() && translation.isEmpty()) return null
     if (main.isEmpty()) return SongLyric(translation, emptyMap())
+    if (translation.isEmpty()) return main.withInlineTranslation()
     return SongLyric(main, translation.filter { it.text.isNotBlank() }.associate { it.timeMs to it.text })
 }
+
+/**
+ * Some plugins put the translation in the lyric itself, each translated line right under its original with the same
+ * time. When most times hold such a pair, the second line of each becomes the first one's translation.
+ */
+private fun List<LyricLine>.withInlineTranslation(): SongLyric {
+    val groups = groupBy { it.timeMs }.values.toList()
+    val pairs = groups.count { group -> group.size == 2 && group.all { it.text.isNotBlank() } }
+    if (pairs < InlineTranslationMinPairs || pairs * 2 < groups.size) return SongLyric(this, emptyMap())
+    val lines = mutableListOf<LyricLine>()
+    val translations = mutableMapOf<Long, String>()
+    for (group in groups) {
+        if (group.size == 2 && group.all { it.text.isNotBlank() }) {
+            lines += group[0]
+            translations[group[0].timeMs] = group[1].text
+        } else {
+            lines += group
+        }
+    }
+    return SongLyric(lines, translations)
+}
+
+/** Fewer pairs than this are lines that happen to share a time, such as 词 and 曲 at the start. */
+private const val InlineTranslationMinPairs = 3
 
 /** 歌词: the lyric over a compact transport, or 暂无歌词 with 搜索歌词. */
 @Composable
