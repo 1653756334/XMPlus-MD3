@@ -496,6 +496,10 @@
     <string name="music_quality_high">高品质</string>
     <string name="music_quality_super">超高品质</string>
     <string name="music_quality_failed">暂无该音质</string>
+    <string name="music_play_quality">默认播放音质</string>
+    <string name="music_download_quality">下载音质</string>
+    <string name="downloads_queued">已加入下载</string>
+    <string name="downloads_downloading_percent">下载中 %1$d%%</string>
     <string name="music_source_value">来源：%1$s</string>
     <string name="music_mode_queue">列表循环</string>
     <string name="music_mode_single">单曲循环</string>

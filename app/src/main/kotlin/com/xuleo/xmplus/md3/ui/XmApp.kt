@@ -95,7 +95,17 @@ fun XmApp() {
         if (kind == null || item == null) null
         else viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = MusicDetailViewModel.factory(application.musicCatalog, kind, item))
     }
-    CompositionLocalProvider(com.xuleo.xmplus.md3.ui.components.LocalMusicLibrary provides application.musicLibrary) { XmAppContent(
+    // 下载 in every song menu and on the player reads the same tasks and the same download quality setting.
+    val songDownloads = remember(application) {
+        com.xuleo.xmplus.md3.ui.components.SongDownloads(
+            application.downloadActions.tasks, application.musicQuality.download,
+            application.downloadActions::downloadSong, application.downloadActions::pause, application.downloadActions::resume,
+        )
+    }
+    CompositionLocalProvider(
+        com.xuleo.xmplus.md3.ui.components.LocalMusicLibrary provides application.musicLibrary,
+        com.xuleo.xmplus.md3.ui.components.LocalSongDownloads provides songDownloads,
+    ) { XmAppContent(
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
@@ -490,7 +500,8 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
             Destination.Library -> if (library != null && libraryTab != null) libraryTab() else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins,
-                (LocalContext.current.applicationContext as? XmApplication)?.musicMediaCache)
+                (LocalContext.current.applicationContext as? XmApplication)?.musicMediaCache,
+                (LocalContext.current.applicationContext as? XmApplication)?.musicQuality)
         }
     }
 }

@@ -26,6 +26,7 @@ import com.xuleo.xmplus.md3.core.account.*
 import com.xuleo.xmplus.md3.core.designsystem.*
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
 import com.xuleo.xmplus.md3.core.media.MusicMediaCache
+import com.xuleo.xmplus.md3.core.media.MusicQualitySettings
 import com.xuleo.xmplus.md3.settings.AppLanguage
 import com.xuleo.xmplus.md3.settings.setAppLanguage
 import com.xuleo.xmplus.md3.ui.Destination
@@ -33,7 +34,8 @@ import coil3.compose.AsyncImage
 
 @Composable
 fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
-    pluginCount: Int? = null, onPlugins: () -> Unit = {}, musicCache: MusicMediaCache? = null) {
+    pluginCount: Int? = null, onPlugins: () -> Unit = {}, musicCache: MusicMediaCache? = null,
+    musicQuality: MusicQualitySettings? = null) {
     val configuration = LocalConfiguration.current
     val language = remember(configuration) { AppLanguage.current() }
     val state = viewModel?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
@@ -43,6 +45,7 @@ fun MeScreen(viewModel: AccountViewModel?, onManage: () -> Unit, onLogin: () -> 
         avatars = viewModel?.avatars.orEmpty(),
         generalExtras = {
             if (historyUpload != null) HistoryUploadSettings(historyUpload)
+            if (musicQuality != null) MusicPlaybackSettings(musicQuality)
             if (musicCache != null) MusicCacheSettings(musicCache)
         },
         pluginCount = pluginCount, onPlugins = onPlugins)

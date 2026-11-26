@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
 import com.xuleo.xmplus.md3.R
@@ -35,6 +36,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.core.download.DownloadState
+import com.xuleo.xmplus.md3.core.download.DownloadTask
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.core.model.MusicAlbum
 import com.xuleo.xmplus.md3.core.model.MusicArtist
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.model.MusicSheet
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
+import kotlinx.coroutines.launch
 
 /** A music cover; without an image it is a tinted surface with a note, never a grey box. */
 @Composable
@@ -121,8 +126,8 @@ fun SongRow(
 class SongMenuItem(val text: String, val icon: ImageVector, val onClick: () -> Unit)
 
 /**
- * The song menu, shared by every song list: 下一首播放 and 加入歌单 (with [LocalMusicLibrary]), then [extraItems].
- * [onPlayNext] null leaves 下一首播放 out.
+ * The song menu, shared by every song list: 下一首播放 and 加入歌单 (with [LocalMusicLibrary]), 下载 (with
+ * [LocalSongDownloads], showing what the download is doing), then [extraItems]. [onPlayNext] null leaves 下一首播放 out.
  */
 @Composable
 fun SongMenu(
@@ -133,15 +138,20 @@ fun SongMenu(
 ) {
     var open by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val added = stringResource(R.string.music_play_next_added)
     val library = LocalMusicLibrary.current
+    val downloads = LocalSongDownloads.current
+    val task = downloads?.tasks?.collectAsStateWithLifecycle()?.value?.songDownload(song)
     Box {
         IconButton(onClick = { open = true }) {
             Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.music_song_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         XmMenu(open, { open = false }) {
-            val count = (if (onPlayNext != null) 1 else 0) + (if (library != null) 1 else 0) + extraItems.size
+            val count = (if (onPlayNext != null) 1 else 0) + (if (library != null) 1 else 0) +
+                (if (downloads != null) 1 else 0) + extraItems.size
             var index = 0
             if (onPlayNext != null) {
                 XmMenuItem(
@@ -159,12 +169,48 @@ fun SongMenu(
                     icon = XmIcons.Outlined.PlaylistAdd,
                 )
             }
+            if (downloads != null) {
+                val state = task?.state
+                val label = when (state) {
+                    null -> stringResource(R.string.player_download)
+                    DownloadState.Queued -> stringResource(R.string.downloads_waiting)
+                    DownloadState.Running -> downloadProgress(task) ?: stringResource(R.string.downloads_running)
+                    DownloadState.Paused -> stringResource(R.string.downloads_paused)
+                    DownloadState.Completed -> stringResource(R.string.downloads_done)
+                    DownloadState.Failed -> stringResource(R.string.downloads_retry)
+                }
+                val icon = when (state) {
+                    null -> XmIcons.Outlined.Download
+                    DownloadState.Queued, DownloadState.Running, DownloadState.Paused -> XmIcons.Outlined.Downloading
+                    DownloadState.Completed -> XmIcons.Outlined.DownloadDone
+                    DownloadState.Failed -> XmIcons.Outlined.Refresh
+                }
+                XmMenuItem(
+                    label, {
+                        open = false
+                        when (state) {
+                            null -> downloading = true
+                            DownloadState.Failed -> scope.launch { downloads.download(song, null) }
+                            else -> Unit
+                        }
+                    }, index++, count,
+                    icon = icon, enabled = state == null || state == DownloadState.Failed,
+                )
+            }
             extraItems.forEach { item ->
                 XmMenuItem(item.text, { open = false; item.onClick() }, index++, count, icon = item.icon)
             }
         }
     }
     if (adding) AddToSheetSheet(listOf(song), onDismiss = { adding = false })
+    if (downloading) SongDownloadSheet(song, onDismiss = { downloading = false })
+}
+
+/** 下载中 42% while a song's size is known, as the menu says what the download is doing. */
+@Composable
+private fun downloadProgress(task: DownloadTask): String? {
+    val total = task.totalBytes?.takeIf { it > 0 } ?: return null
+    return stringResource(R.string.downloads_downloading_percent, (task.bytes * 100 / total).toInt().coerceIn(0, 100))
 }
 
 /** An album in a list: cover, title, and the date and song count when the plugin gives them. */

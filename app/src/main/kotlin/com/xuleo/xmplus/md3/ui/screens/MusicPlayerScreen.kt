@@ -119,18 +119,22 @@ import com.xuleo.xmplus.md3.music.MusicDetailKind
 import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
 import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
+import com.xuleo.xmplus.md3.ui.components.DownloadButton
 import com.xuleo.xmplus.md3.ui.components.InlineError
 import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
+import com.xuleo.xmplus.md3.ui.components.LocalSongDownloads
 import com.xuleo.xmplus.md3.ui.components.PagingFooter
 import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.SheetHeader
 import com.xuleo.xmplus.md3.ui.components.SongRow
+import com.xuleo.xmplus.md3.ui.components.SongDownloadSheet
 import com.xuleo.xmplus.md3.ui.components.XmMenu
 import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import com.xuleo.xmplus.md3.ui.components.XmSwap
 import com.xuleo.xmplus.md3.ui.components.formatCount
 import com.xuleo.xmplus.md3.ui.components.formatDate
 import com.xuleo.xmplus.md3.ui.components.formatDuration
+import com.xuleo.xmplus.md3.ui.components.songDownload
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import java.util.Locale
 import kotlin.math.abs
@@ -430,7 +434,7 @@ private fun MusicControls(
     }
 }
 
-/** 喜欢, 加入歌单 and 更多; the last two open menus under their buttons. */
+/** 喜欢, 加入歌单, 下载 and 更多; 定时关闭 sits in 更多, the last two opening menus under their buttons. */
 @Composable
 private fun SongActions(
     song: MusicItem,
@@ -449,6 +453,10 @@ private fun SongActions(
     val scheme = MaterialTheme.colorScheme
     var adding by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val downloads = LocalSongDownloads.current
+    val task = downloads?.tasks?.collectAsStateWithLifecycle()?.value?.songDownload(song)
     Row(modifier.fillMaxWidth()) {
         ActionSlot {
             IconButton(
@@ -472,12 +480,12 @@ private fun SongActions(
             }
         }
         ActionSlot {
-            IconButton(
-                onClick = onOpenSleep,
-                colors = IconButtonDefaults.iconButtonColors(contentColor = if (sleepActive) scheme.primary else scheme.onSurfaceVariant),
-            ) {
-                Icon(if (sleepActive) XmIcons.Filled.Timer else XmIcons.Outlined.Timer, stringResource(R.string.player_sleep))
-            }
+            DownloadButton(
+                task,
+                onDownload = { downloading = true },
+                onPause = { downloads?.let { scope.launch { it.pause(song.key) } } },
+                onResume = { downloads?.let { scope.launch { it.resume(song.key) } } },
+            )
         }
         if (onOpenComments != null) {
             ActionSlot {
@@ -498,7 +506,7 @@ private fun SongActions(
                         more = false
                         action()
                     }
-                    val count = 5
+                    val count = 6
                     XmMenuItem(
                         stringResource(R.string.music_view_artist), pick { onOpenArtist?.invoke() }, 0, count,
                         icon = XmIcons.Outlined.Person, enabled = onOpenArtist != null,
@@ -508,13 +516,18 @@ private fun SongActions(
                         icon = XmIcons.Outlined.Album, enabled = onOpenAlbum != null,
                     )
                     XmMenuItem(stringResource(R.string.music_quality), pick(onOpenQuality), 2, count, icon = XmIcons.Outlined.Tune)
-                    XmMenuItem(stringResource(R.string.player_speed), pick(onOpenSpeed), 3, count, icon = XmIcons.Outlined.Speed)
-                    XmMenuItem(stringResource(R.string.music_source_value, platform), pick {}, 4, count, icon = XmIcons.Outlined.Link)
+                    XmMenuItem(
+                        stringResource(R.string.player_sleep), pick(onOpenSleep), 3, count,
+                        icon = if (sleepActive) XmIcons.Filled.Timer else XmIcons.Outlined.Timer,
+                    )
+                    XmMenuItem(stringResource(R.string.player_speed), pick(onOpenSpeed), 4, count, icon = XmIcons.Outlined.Speed)
+                    XmMenuItem(stringResource(R.string.music_source_value, platform), pick {}, 5, count, icon = XmIcons.Outlined.Link)
                 }
             }
         }
     }
     if (adding) AddToSheetSheet(listOf(song), onDismiss = { adding = false })
+    if (downloading) SongDownloadSheet(song, onDismiss = { downloading = false })
 }
 
 @Composable
@@ -1132,7 +1145,7 @@ internal val MusicPlayMode.label: Int
     }
 
 @get:StringRes
-private val MusicQuality.label: Int
+internal val MusicQuality.label: Int
     get() = when (this) {
         MusicQuality.Low -> R.string.music_quality_low
         MusicQuality.Standard -> R.string.music_quality_standard
