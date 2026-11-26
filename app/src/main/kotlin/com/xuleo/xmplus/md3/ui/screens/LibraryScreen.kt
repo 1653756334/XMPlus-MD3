@@ -88,7 +88,7 @@ import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** How many items 继续听 shows. */
 private const val ContinueCount = 10
-private const val GridColumns = 3
+private const val GridColumns = 2
 
 /** What is playing now, so 继续听 can mark it: a song's key or an episode's track id. */
 data class NowPlaying(val songKey: String? = null, val trackId: String? = null) {
@@ -396,7 +396,7 @@ private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> 
         }
         Text(
             if (song) record.trackTitle else record.trackTitle.ifEmpty { record.albumTitle },
-            style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -406,6 +406,10 @@ private val BadgeInset = 6.dp
 
 /** Space each side of the 听书 grid inside its card; with the columns' own margins the icons line up with the heading. */
 private val TileGridInset = 4.dp
+
+/** The round mark of a shortcut, and the least height of its row. */
+private val TileIconSize = 40.dp
+private val TileMinHeight = 56.dp
 
 /** The kind on a cover's corner: a white mark on a soft dark disc, readable on any picture. */
 @Composable
@@ -441,17 +445,23 @@ internal fun KindBadge(kind: ContentKind, modifier: Modifier = Modifier, size: D
 @Composable
 private fun SignedOutBooks(bookmarks: Tile, onLogin: (() -> Unit)?) {
     Row(
-        Modifier.fillMaxWidth().padding(start = TileGridInset, end = XmLayout.PagePadding),
+        Modifier.fillMaxWidth().padding(horizontal = TileGridInset),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
         // As wide as one column of the signed-in grid, so 书签 sits where it would there.
         ShortcutTile(bookmarks, Modifier.weight(1f))
-        Text(
-            stringResource(R.string.library_sign_in_hint), Modifier.weight(1.4f),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        onLogin?.let { FilledTonalButton(onClick = it) { Text(stringResource(R.string.library_sign_in)) } }
+        Row(
+            Modifier.weight(1f).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        ) {
+            Text(
+                stringResource(R.string.library_sign_in_hint), Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+            onLogin?.let { FilledTonalButton(onClick = it, contentPadding = PaddingValues(horizontal = 16.dp)) { Text(stringResource(R.string.library_sign_in)) } }
+        }
     }
 }
 
@@ -499,7 +509,7 @@ private fun QuietLine(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Shortcuts in rows of three; tiles that are left out close up rather than leave a gap. */
+/** Shortcuts in rows of two, each a mark and its name; tiles that are left out close up rather than leave a gap. */
 @Composable
 private fun TileGrid(tiles: List<Tile>) {
     Column(Modifier.padding(horizontal = TileGridInset)) {
@@ -514,21 +524,28 @@ private fun TileGrid(tiles: List<Tile>) {
 
 @Composable
 private fun ShortcutTile(tile: Tile, modifier: Modifier = Modifier) {
-    Column(
-        modifier.pressable(tile.onClick).heightIn(min = 72.dp).padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+    Row(
+        modifier.pressable(tile.onClick).heightIn(min = TileMinHeight).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
         Box(
-            Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+            Modifier.size(TileIconSize).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(tile.icon, contentDescription = null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Icon(tile.icon, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(stringResource(tile.label), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(
+            Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                stringResource(tile.label), style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
             tile.count?.takeIf { it > 0 }?.let {
-                Text("$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text("$it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
     }
