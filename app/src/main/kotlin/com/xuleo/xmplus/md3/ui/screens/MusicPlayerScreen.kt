@@ -630,22 +630,23 @@ private fun LyricSource.parsed(): SongLyric? {
 }
 
 /**
- * Some plugins put the translation in the lyric itself, each translated line right under its original with the same
- * time. When most times hold such a pair, the second line of each becomes the first one's translation.
+ * Some plugins (酷我's lyrics) put the translation in the lyric itself: each translated line follows its original but
+ * carries the next line's time, so that time appears twice. As LX Music reads them, the line before a repeated time is
+ * the translation of the line before it. Applied only when most times repeat, so ordinary lyrics stay as they are.
  */
 private fun List<LyricLine>.withInlineTranslation(): SongLyric {
-    val groups = groupBy { it.timeMs }.values.toList()
-    val pairs = groups.count { group -> group.size == 2 && group.all { it.text.isNotBlank() } }
-    if (pairs < InlineTranslationMinPairs || pairs * 2 < groups.size) return SongLyric(this, emptyMap())
+    val counts = groupingBy { it.timeMs }.eachCount()
+    val shared = counts.count { it.value == 2 }
+    if (shared < InlineTranslationMinPairs || shared * 2 < counts.size) return SongLyric(this, emptyMap())
+    val seen = HashSet<Long>()
     val lines = mutableListOf<LyricLine>()
     val translations = mutableMapOf<Long, String>()
-    for (group in groups) {
-        if (group.size == 2 && group.all { it.text.isNotBlank() }) {
-            lines += group[0]
-            translations[group[0].timeMs] = group[1].text
-        } else {
-            lines += group
+    for (line in this) {
+        if (!seen.add(line.timeMs) && lines.size >= 2) {
+            val translation = lines.removeAt(lines.lastIndex)
+            if (translation.text.isNotBlank()) translations[lines.last().timeMs] = translation.text
         }
+        lines += line
     }
     return SongLyric(lines, translations)
 }
