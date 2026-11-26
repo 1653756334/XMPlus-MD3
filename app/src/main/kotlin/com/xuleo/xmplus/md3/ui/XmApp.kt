@@ -350,7 +350,14 @@ internal fun XmAppContent(
                     }
                 },
             )
-            MiniPlayer(playback, onOpen = ::openPlayer, music = musicPlayer?.playback)
+            var miniQueue by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+            MiniPlayer(playback, onOpen = ::openPlayer, music = musicPlayer?.playback, onQueue = { miniQueue = true })
+            val queueMusic = musicPlayer?.playback
+            if (miniQueue && queueMusic != null && playingSong != null) {
+                com.xuleo.xmplus.md3.ui.screens.MusicQueueSheet(
+                    queueMusic, onClear = { miniQueue = false; queueMusic.clear() }, onDismiss = { miniQueue = false },
+                )
+            }
         }
     }
     val songActive = playingSong != null

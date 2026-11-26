@@ -73,6 +73,10 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
     private var prefetching: Job? = null
     /** The opening ([revision]) whose next song was already fetched, so each song asks once. */
     private var prefetchedFor = -1L
+    /** The next song's link found while caching it, used when that song opens so it starts without asking again. */
+    private var prefetched: Prefetched? = null
+    /** The cache key [prefetching] writes, so the song opening with it takes that download over. */
+    private var prefetchKey: String? = null
 
     /** Plain client: plugin links go anywhere and redirect freely, with no Ximalaya headers or checks. */
     private val client by lazy {
@@ -261,6 +265,10 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         paging?.cancel()
         loadMore = null
         unload()
+        prefetching?.cancel()
+        prefetching = null
+        prefetchKey = null
+        prefetched = null
         list.clear()
         mutableState.value = MusicPlaybackState()
         publishQueue()
@@ -384,8 +392,8 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
             val player = withTimeoutOrNull(5_000) { engine.filterNotNull().first() }
             if (request != revision) return@launch
             if (player == null) return@launch fail(request, PlayerUnavailable)
-            var found: Pair<MusicQuality, ResolvedSong>? = null
-            for (candidate in qualityOrder(DefaultQuality)) {
+            var found: Pair<MusicQuality, ResolvedSong>? = takePrefetched(song)
+            if (found == null) for (candidate in qualityOrder(DefaultQuality)) {
                 val source = resolve(song, candidate)
                 // Another song was chosen meanwhile: this one's link is dropped.
                 if (request != revision) return@launch
@@ -427,7 +435,12 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         val cached = cacheKey?.let { cached(upstream) }
         val factory = DefaultMediaSourceFactory(cached ?: upstream)
         preloading?.cancel()
-        preloading = if (cached != null && cacheKey != null) scope.writeToCache(cached, uri, cacheKey) else null
+        // The next song cached ahead keeps its download; one for a song not opened stops.
+        val ahead = prefetching?.takeIf { it.isActive && cacheKey != null && prefetchKey == cacheKey }
+        if (ahead == null) prefetching?.cancel()
+        prefetching = null
+        prefetchKey = null
+        preloading = ahead ?: if (cached != null && cacheKey != null) scope.writeToCache(cached, uri, cacheKey) else null
         opened = mediaId
         // Music asks other apps' sounds to duck rather than pause it; 听书 sets speech again when it opens.
         player.setAudioAttributes(MusicAttributes, true)
@@ -563,19 +576,31 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
                 val source = resolve(next, candidate)
                 if (request != revision) return@launch
                 if (source == null) continue
+                prefetched = Prefetched(next.key, candidate, source, SystemClock.elapsedRealtime())
                 val key = cacheKey(next, candidate, source) ?: return@launch
+                prefetchKey = key
                 writeToCache(cached(upstream(source)), source.uri(), key)
                 return@launch
             }
         }
     }
 
+    /**
+     * The link found for [song] while it was cached as the next song: kept while the whole song is on disk, since then
+     * the link is not read, or for [PrefetchLinkMs] otherwise, as plugin links expire.
+     */
+    private fun takePrefetched(song: MusicItem): Pair<MusicQuality, ResolvedSong>? {
+        val saved = prefetched?.takeIf { it.songKey == song.key } ?: return null
+        prefetched = null
+        val fresh = SystemClock.elapsedRealtime() - saved.foundAt < PrefetchLinkMs ||
+            cacheKey(song, saved.quality, saved.source)?.let(mediaCache::isCached) == true
+        return if (fresh) saved.quality to saved.source else null
+    }
+
     private fun unload() {
         preloading?.cancel()
         preloading = null
-        // A next song half fetched goes on from what is cached when it opens.
-        prefetching?.cancel()
-        prefetching = null
+        // The next song keeps caching while it plays: the player reads what is written and fetches the rest.
         val player = engine.value
         val loaded = player != null && isCurrent(player)
         opened = null
@@ -646,8 +671,12 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
         const val CacheFragmentBytes = 4L * 1024 * 1024
         /** How far into a song the next one is cached. */
         const val PrefetchAt = 0.9
+        /** How long a link found ahead is trusted. */
+        const val PrefetchLinkMs = 10 * 60_000L
     }
 }
+
+private class Prefetched(val songKey: String, val quality: MusicQuality, val source: ResolvedSong, val foundAt: Long)
 
 private fun ResolvedSong.uri(): Uri = localFile?.let(Uri::fromFile) ?: Uri.parse(url)
 

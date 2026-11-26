@@ -46,6 +46,7 @@ fun MiniPlayer(
     onOpen: () -> Unit = {},
     modifier: Modifier = Modifier,
     music: com.xuleo.xmplus.md3.core.media.MusicPlayback? = null,
+    onQueue: () -> Unit = {},
 ) {
     val episodeState = playback?.state?.collectAsStateWithLifecycle()?.value ?: PlaybackState()
     val episodeQueue = playback?.queue?.collectAsStateWithLifecycle()?.value
@@ -121,6 +122,10 @@ fun MiniPlayer(
                         contentDescription = stringResource(if (retry) R.string.action_retry else if (wantsToPlay) R.string.action_pause else R.string.action_play),
                     )
                 }
+            }
+            // Songs have a queue to open from here, as in QQ音乐; 听书 opens its list from the player.
+            if (song != null) IconButton(onClick = onQueue) {
+                Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
             }
         }
     }
