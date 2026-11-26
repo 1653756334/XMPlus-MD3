@@ -66,7 +66,7 @@ fun PlayCountBadge(playCount: Long, modifier: Modifier = Modifier) {
 /** A cover with its title and anchor beneath, sized for a horizontal shelf. */
 @Composable
 fun AlbumCard(album: Album, stats: AlbumStats?, modifier: Modifier = Modifier.width(128.dp), onClick: () -> Unit = {}) {
-    Column(modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.pressable(onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
             Cover(album.coverUrl, Modifier.matchParentSize())
             stats?.playCount?.let { PlayCountBadge(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }

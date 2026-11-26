@@ -68,6 +68,7 @@ import com.xuleo.xmplus.md3.core.model.MusicSheet
 import com.xuleo.xmplus.md3.library.LibraryViewModel
 import com.xuleo.xmplus.md3.ui.Destination
 import com.xuleo.xmplus.md3.ui.components.Cover
+import com.xuleo.xmplus.md3.ui.components.pressable
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
@@ -298,7 +299,7 @@ private fun OverflowMenu(onManageSheets: () -> Unit) {
 private fun ContinueRow(records: List<ListenRecord>, nowPlaying: NowPlaying, onOpenRecent: () -> Unit, onResume: (ListenRecord) -> Unit) {
     Column {
         Row(
-            Modifier.clickable(onClick = onOpenRecent).heightIn(min = 48.dp)
+            Modifier.pressable(onOpenRecent).heightIn(min = 48.dp)
                 .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding / 2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -319,7 +320,7 @@ private fun ContinueRow(records: List<ListenRecord>, nowPlaying: NowPlaying, onO
 @Composable
 private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> Unit) {
     val song = record.kind == ContentKind.Song
-    Column(Modifier.width(112.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.width(112.dp).pressable(onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(MaterialTheme.shapes.medium)) {
             if (song) MusicCover(record.coverUrl, Modifier.matchParentSize()) else Cover(record.coverUrl, Modifier.matchParentSize())
             if (!song && record.durationMs > 0) {
@@ -367,7 +368,7 @@ private fun TileGrid(tiles: List<Tile>) {
 @Composable
 private fun ShortcutTile(tile: Tile, modifier: Modifier = Modifier) {
     Column(
-        modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = tile.onClick).padding(vertical = 10.dp),
+        modifier.pressable(tile.onClick).padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

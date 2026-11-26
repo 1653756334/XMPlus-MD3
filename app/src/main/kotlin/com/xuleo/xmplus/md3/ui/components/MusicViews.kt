@@ -66,7 +66,7 @@ fun MusicCover(url: String?, modifier: Modifier = Modifier, shape: Shape = Mater
 /** A sheet in a grid: cover with its play count when the plugin gives one, and the title on two lines. */
 @Composable
 fun SheetCard(sheet: MusicSheet, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
-    Column(modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.pressable(onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(MaterialTheme.shapes.medium)) {
             MusicCover(sheet.coverUrl, Modifier.matchParentSize())
             sheet.playCount?.takeIf { it > 0 }?.let { PlayCountBadge(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }

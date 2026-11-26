@@ -3,7 +3,6 @@ package com.xuleo.xmplus.md3.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -256,7 +255,7 @@ private fun FeaturedCarousel(section: AlbumSection, onAlbum: (String) -> Unit) {
         modifier = Modifier.fillMaxWidth().height(200.dp),
     ) { index ->
         val album = albums[index]
-        Box(Modifier.fillMaxSize().maskClip(MaterialTheme.shapes.extraLarge).clickable { onAlbum(album.id) }) {
+        Box(Modifier.fillMaxSize().pressable({ onAlbum(album.id) }).maskClip(MaterialTheme.shapes.extraLarge)) {
             Cover(album.coverUrl, Modifier.fillMaxSize(), RectangleShape)
             Column(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth()
