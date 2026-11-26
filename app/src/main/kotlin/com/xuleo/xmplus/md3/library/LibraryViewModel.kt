@@ -10,6 +10,7 @@ import com.xuleo.xmplus.md3.core.media.BookmarkEntry
 import com.xuleo.xmplus.md3.core.media.ListenHistoryStore
 import com.xuleo.xmplus.md3.core.media.ListenRecord
 import com.xuleo.xmplus.md3.core.media.PlaybackBookmarkStore
+import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.core.model.Credentials
 import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
@@ -20,6 +21,7 @@ import com.xuleo.xmplus.md3.core.protocol.XmlyLibrary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -39,6 +41,8 @@ class LibraryViewModel(
 ) : ViewModel() {
     /** Local history: one row per album, the episode last played from it. Null until the store has been read. */
     val listenHistory: StateFlow<List<ListenRecord>?> = listens.records()
+        // Songs join this list with the new 听过 overview; until then it stays 听书 only.
+        .map { records -> records.filter { it.kind == ContentKind.Episode } }
         .stateIn<List<ListenRecord>?>(viewModelScope, SharingStarted.WhileSubscribed(StopTimeoutMs), null)
 
     private val bookmarkState = MutableStateFlow<List<BookmarkEntry>?>(null)

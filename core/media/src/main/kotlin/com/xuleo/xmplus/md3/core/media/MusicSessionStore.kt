@@ -28,6 +28,8 @@ internal data class MusicSession(
     val currentKey: String?,
     val positionMs: Long,
     val quality: MusicQuality?,
+    /** The list the queue was played from, as kept with 最近播放. */
+    val playedToken: String? = null,
 )
 
 /** Brings the music queue back paused after the app is swiped away, killed or the phone restarts. */
@@ -59,6 +61,7 @@ internal class MusicSessionStore(context: Context) {
                     currentKey = (root["current"] as? JsonPrimitive)?.contentOrNull,
                     positionMs = (root["position"] as? JsonPrimitive)?.longOrNull?.coerceAtLeast(0) ?: 0L,
                     quality = MusicQuality.fromKey((root["quality"] as? JsonPrimitive)?.contentOrNull),
+                    playedToken = (root["played"] as? JsonPrimitive)?.contentOrNull,
                 )
             } catch (_: Exception) {
                 // A damaged file only means there is nothing to bring back.
@@ -82,6 +85,7 @@ internal class MusicSessionStore(context: Context) {
                 session.currentKey?.let { put("current", it) }
                 put("position", session.positionMs)
                 session.quality?.let { put("quality", it.key) }
+                session.playedToken?.let { put("played", it) }
             }.toString()
             val stream = try {
                 file.startWrite()

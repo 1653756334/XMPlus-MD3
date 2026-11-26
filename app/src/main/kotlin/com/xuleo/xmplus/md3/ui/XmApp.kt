@@ -1,5 +1,6 @@
 package com.xuleo.xmplus.md3.ui
 
+import com.xuleo.xmplus.md3.core.media.MusicPlaySource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -298,7 +299,7 @@ internal fun XmAppContent(
                         Surface(Modifier.fillMaxSize()) {
                             if (musicSearch != null) {
                                 MusicSearchScreen(musicSearch, plugins?.plugins?.collectAsStateWithLifecycle()?.value.orEmpty(), { navigator.pop() },
-                                    onOpen = ::openMusic, onPlay = { musicPlayer?.playback?.playNow(it) },
+                                    onOpen = ::openMusic, onPlay = { musicPlayer?.playback?.playNow(it, MusicPlaySource(MusicPlaySource.Type.Search)) },
                                     onPlayNext = { musicPlayer?.playback?.addNext(it) }, playingKey = playingSong?.key,
                                     source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) })
                             }
@@ -310,7 +311,7 @@ internal fun XmAppContent(
                                 MusicDetailScreen(
                                     vm, { navigator.pop() },
                                     onOpenAlbum = { openMusic(MusicDetailKind.Album, it) },
-                                    onPlay = { songs, index -> musicPlayer?.playback?.playList(songs, index, vm.queuePages()) },
+                                    onPlay = { songs, index -> musicPlayer?.playback?.playList(songs, index, vm.queuePages(), vm.playSource()) },
                                     onPlayNext = { musicPlayer?.playback?.addNext(it) },
                                     playingKey = playingSong?.key,
                                 )

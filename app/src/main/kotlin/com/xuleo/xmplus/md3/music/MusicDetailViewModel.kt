@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xuleo.xmplus.md3.core.media.MusicPlaySource
 import com.xuleo.xmplus.md3.core.model.MusicAlbum
 import com.xuleo.xmplus.md3.core.model.MusicArtist
 import com.xuleo.xmplus.md3.core.model.MusicItem
@@ -76,6 +77,17 @@ class MusicDetailViewModel(private val catalog: MusicCatalog, val kind: MusicDet
             }
         }
     }
+
+    /** The list as 最近播放 keeps it, so a song played from here can bring the list back. */
+    fun playSource(): MusicPlaySource = MusicPlaySource.of(
+        when (kind) {
+            MusicDetailKind.Sheet -> MusicPlaySource.Type.PluginSheet
+            MusicDetailKind.TopList -> MusicPlaySource.Type.TopList
+            MusicDetailKind.Album -> MusicPlaySource.Type.Album
+            MusicDetailKind.Artist -> MusicPlaySource.Type.Artist
+        },
+        initial,
+    )
 
     fun startAlbums() = startList(mutableAlbums, ::albumPage)
     fun loadMoreAlbums() = loadMore(mutableAlbums, ::albumPage)

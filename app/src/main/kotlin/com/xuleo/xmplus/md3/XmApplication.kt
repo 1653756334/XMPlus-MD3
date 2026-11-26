@@ -163,7 +163,7 @@ class XmApplication : Application(), PlaybackOwner {
             musicSources.mediaSource(song, quality.key)?.let { ResolvedSong(it.url, it.headers, it.localFile) }
         }
         val info = com.xuleo.xmplus.md3.core.media.SongInfoResolver { song -> musicCatalog.musicInfo(song) }
-        MusicPlayback(this, resolver, musicMediaCache, info).also { music ->
+        MusicPlayback(this, resolver, musicMediaCache, info, listens).also { music ->
             music.onStart = { playback.stopForSong() }
             playback.onStart = { music.stopForEpisode() }
         }

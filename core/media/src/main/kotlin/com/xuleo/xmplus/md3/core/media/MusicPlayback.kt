@@ -19,6 +19,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.xuleo.xmplus.md3.core.model.MusicItem
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,8 @@ class MusicPlayback(
     private val resolver: SongSourceResolver,
     private val mediaCache: MusicMediaCache,
     private val info: SongInfoResolver? = null,
+    /** 最近播放. Songs are written there as episodes are; nothing here touches listening time. */
+    private val history: ListenHistoryStore? = null,
 ) {
     /** Called when a song is about to start, so that 听书 stops. */
     var onStart: () -> Unit = {}
@@ -99,6 +102,12 @@ class MusicPlayback(
     private var loadMore: (suspend () -> List<MusicItem>?)? = null
     private var paging: Job? = null
     private var pagesEnded = false
+    /** The list last played with [playList], as kept with 最近播放, and the keys of its songs. */
+    private var played: SongQueue? = null
+    private var playedKeys: Set<String> = emptySet()
+    private var playedGeneration = 0L
+    /** Where songs queued one by one ([playNow], [addNext]) came from. */
+    private val singleSources = HashMap<String, MusicPlaySource>()
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -130,6 +139,7 @@ class MusicPlayback(
                 if (isCurrent(player)) {
                     publish(player)
                     if (player.isPlaying) prefetchNext(player)
+                    if (player.isPlaying) observeHistory(player)
                     if (player.isPlaying && ++ticks % 20 == 0) remember()
                 }
             }
@@ -138,6 +148,7 @@ class MusicPlayback(
 
     internal fun detach(player: ExoPlayer) {
         if (engine.value !== player) return
+        history?.flush()
         val loaded = isCurrent(player)
         val position = if (loaded) player.currentPosition.coerceAtLeast(0) else mutableState.value.positionMs
         revision++
@@ -153,26 +164,38 @@ class MusicPlayback(
         remember()
     }
 
-    /** Replaces the queue with [songs] and plays the one at [index]. [loadMore] reads the list's next page. */
-    fun playList(songs: List<MusicItem>, index: Int, loadMore: (suspend () -> List<MusicItem>?)? = null) {
+    /**
+     * Replaces the queue with [songs] and plays the one at [index]. [loadMore] reads the list's next page. [source] is
+     * the list they come from; the list is kept with 最近播放 so the song can bring it back.
+     */
+    fun playList(
+        songs: List<MusicItem>,
+        index: Int,
+        loadMore: (suspend () -> List<MusicItem>?)? = null,
+        source: MusicPlaySource? = null,
+    ) {
         val target = songs.getOrNull(index) ?: return
         failures = 0
         paging?.cancel()
         this.loadMore = loadMore
         pagesEnded = false
         list.replace(songs, shuffle = mutableQueue.value.mode == MusicPlayMode.Shuffle)
+        singleSources.clear()
+        setPlayed(SongQueue(UUID.randomUUID().toString(), source, SongQueue.window(songs, index)), save = true)
         open(target)
     }
 
     /** Plays [song] now, right after the current song; the rest of the queue is kept. */
-    fun playNow(song: MusicItem) {
+    fun playNow(song: MusicItem, source: MusicPlaySource? = null) {
         failures = 0
+        source?.let { singleSources[song.key] = it }
         list.insertAfterCurrent(song)
         open(song)
     }
 
     /** Queues [song] after the current one, and plays it when nothing is queued. */
-    fun addNext(song: MusicItem) {
+    fun addNext(song: MusicItem, source: MusicPlaySource? = null) {
+        source?.let { singleSources[song.key] = it }
         val start = list.current == null
         list.insertAfterCurrent(song)
         if (start) {
@@ -264,6 +287,9 @@ class MusicPlayback(
 
     /** Empties the queue and stops. */
     fun clear() {
+        history?.flush()
+        setPlayed(null)
+        singleSources.clear()
         cancelSleepTimer()
         revision++
         loading?.cancel()
@@ -298,6 +324,7 @@ class MusicPlayback(
     }
 
     fun pause() {
+        history?.flush()
         val current = mutableState.value
         if (current.song == null) return
         val player = engine.value
@@ -380,6 +407,7 @@ class MusicPlayback(
     }
 
     private fun open(song: MusicItem, positionMs: Long = 0) {
+        history?.flush()
         val request = ++revision
         loading?.cancel()
         onStart()
@@ -552,6 +580,7 @@ class MusicPlayback(
             if (loadMore !== read) return@launch
             val fresh = if (mutableQueue.value.mode == MusicPlayMode.Shuffle) songs.shuffled() else songs
             if (list.append(fresh) == 0) pagesEnded = true
+            played?.let { queue -> queue.plus(songs).takeIf { it !== queue }?.let { setPlayed(it, save = true) } }
             publishQueue()
             remember()
         }
@@ -666,12 +695,31 @@ class MusicPlayback(
     }
 
     /** Saves the queue, the song and where it is; called on changes, on pause and every 5 s while playing. */
+    /** The list played with [playList]; [save] keeps it with 最近播放. */
+    private fun setPlayed(queue: SongQueue?, save: Boolean = false) {
+        playedGeneration++
+        played = queue
+        playedKeys = queue?.songs?.mapTo(HashSet()) { it.key }.orEmpty()
+        if (save && queue != null) history?.saveQueue(queue)
+    }
+
+    /** Reports the playing song to 最近播放, with the list it plays from when it came from one. */
+    private fun observeHistory(player: Player) {
+        val store = history ?: return
+        if (player.playbackState != Player.STATE_READY) return
+        val song = mutableState.value.song ?: return
+        val queue = played?.takeIf { song.key in playedKeys }
+        val source = if (queue != null) queue.source else singleSources[song.key] ?: MusicPlaySource(MusicPlaySource.Type.Single)
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: mutableState.value.durationMs
+        store.observeSong(song, queue, source, player.currentPosition.coerceAtLeast(0), duration)
+    }
+
     private fun remember() {
         val version = ++sessionVersion
         val player = engine.value
         val position = if (player != null && isCurrent(player)) player.currentPosition.coerceAtLeast(0) else mutableState.value.positionMs
         val session = if (list.items.isEmpty()) null
-        else MusicSession(list.items, list.stamps(), list.currentKey, position, mutableState.value.quality)
+        else MusicSession(list.items, list.stamps(), list.currentKey, position, mutableState.value.quality, played?.token)
         scope.launch { sessions.save(version, session) }
     }
 
@@ -684,6 +732,14 @@ class MusicPlayback(
             if (version != sessionVersion || request != revision || list.items.isNotEmpty()) return@launch
             list.restore(saved.songs, saved.order, saved.currentKey)
             publishQueue()
+            // The list the queue was played from comes back too, so 最近播放 keeps pointing at it.
+            saved.playedToken?.let { token ->
+                val generation = playedGeneration
+                scope.launch {
+                    val queue = history?.queue(token) ?: return@launch
+                    if (generation == playedGeneration) setPlayed(queue)
+                }
+            }
             val song = list.current ?: return@launch
             mutableState.value = MusicPlaybackState(
                 song, PlaybackPhase.Paused, positionMs = saved.positionMs,
