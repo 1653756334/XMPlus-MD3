@@ -112,20 +112,23 @@ fun MiniPlayer(
                     )
                 }
             }
-            IconButton(onClick = toggle, enabled = active) {
-                val retry = phase == PlaybackPhase.Failed
-                if (loadingQueue && !wantsToPlay) {
-                    CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelLabel }, strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        imageVector = if (retry) XmIcons.Filled.Refresh else if (wantsToPlay) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow,
-                        contentDescription = stringResource(if (retry) R.string.action_retry else if (wantsToPlay) R.string.action_pause else R.string.action_play),
-                    )
+            // The two buttons sit together at the end: the queue keeps the edge, play moves over to it.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = toggle, enabled = active) {
+                    val retry = phase == PlaybackPhase.Failed
+                    if (loadingQueue && !wantsToPlay) {
+                        CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelLabel }, strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = if (retry) XmIcons.Filled.Refresh else if (wantsToPlay) XmIcons.Filled.Pause else XmIcons.Filled.PlayArrow,
+                            contentDescription = stringResource(if (retry) R.string.action_retry else if (wantsToPlay) R.string.action_pause else R.string.action_play),
+                        )
+                    }
                 }
-            }
-            // The queue opens from here for both kinds, as in QQ音乐 and 喜马拉雅.
-            if (active) IconButton(onClick = onQueue) {
-                Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
+                // The queue opens from here for both kinds, as in QQ音乐 and 喜马拉雅.
+                if (active) IconButton(onClick = onQueue) {
+                    Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
+                }
             }
         }
     }
