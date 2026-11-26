@@ -70,6 +70,8 @@ class DownloadStore(private val file: File) {
         put("coverUrl", coverUrl)
         put("confirmedSeconds", confirmedSeconds)
         put("kind", kind.key)
+        put("quality", quality)
+        put("item", item)
     }
 
     private fun JsonObject.toTask(): DownloadTask {
@@ -95,6 +97,8 @@ class DownloadStore(private val file: File) {
             coverUrl = text("coverUrl"),
             confirmedSeconds = text("confirmedSeconds")?.toIntOrNull(),
             kind = ContentKind.fromKey(text("kind")),
+            quality = text("quality"),
+            item = text("item"),
         )
     }
 }

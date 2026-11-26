@@ -401,6 +401,7 @@
     <string name="download_error_range_missing">部分集数不在本专辑中</string>
     <string name="download_error_range_ambiguous">有两集使用了同一个集数</string>
     <string name="download_error_file_missing">文件已不存在，请重新下载</string>
+    <string name="download_error_source">无法获取这首歌的下载链接</string>
     <string name="album_order_to_newest">改为从新到旧</string>
     <string name="album_order_to_oldest">改为从旧到新</string>
     <string name="album_select_download">选择要下载的节目</string>

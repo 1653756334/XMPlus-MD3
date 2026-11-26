@@ -417,6 +417,7 @@
     <string name="download_error_range_missing">Some of these numbers aren\'t in this album</string>
     <string name="download_error_range_ambiguous">Two episodes share one of these numbers</string>
     <string name="download_error_file_missing">The file is gone. Download it again.</string>
+    <string name="download_error_source">No download link for this song</string>
     <string name="album_order_to_newest">Show newest first</string>
     <string name="album_order_to_oldest">Show oldest first</string>
     <string name="album_select_download">Select episodes to download</string>

@@ -24,6 +24,20 @@ internal object DownloadNames {
         return cut(clean(title).ifEmpty { "album" }, MaxFolderBytes - bytes(tail)) + tail
     }
 
+    /**
+     * `{artist} - {title} [{songId}]` with an extension, the file of one song. The id keeps two songs of the same name
+     * apart, also across plugins, the way an episode's own id does.
+     */
+    fun song(artist: String, title: String, songId: String, extension: String): String {
+        val tail = " [${clean(songId)}].$extension"
+        val head = clean(artist).ifEmpty { "song" } + " - "
+        val room = MaxNameBytes - bytes(head) - bytes(tail)
+        return head + cut(clean(title).ifEmpty { songId }, room) + tail
+    }
+
+    /** The folder songs go to, next to the albums. */
+    const val SongsFolder = "音乐"
+
     private fun clean(text: String): String {
         val safe = text.replace(Illegal, "_").trim().trimEnd('.', ' ')
         return if (Reserved.matches(safe)) "_$safe" else safe

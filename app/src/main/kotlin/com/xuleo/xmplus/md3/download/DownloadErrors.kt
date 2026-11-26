@@ -16,6 +16,7 @@ fun downloadErrorMessage(code: String?): Int = when (code) {
     "range_missing" -> R.string.download_error_range_missing
     "range_ambiguous" -> R.string.download_error_range_ambiguous
     "file_missing" -> R.string.download_error_file_missing
+    "no_source", "invalid_item" -> R.string.download_error_source
     "rate_limited" -> R.string.error_rate_limited
     "network", "http_error" -> R.string.error_network
     else -> R.string.error_generic

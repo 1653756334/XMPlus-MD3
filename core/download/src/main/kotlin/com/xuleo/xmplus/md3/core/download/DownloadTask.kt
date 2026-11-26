@@ -1,7 +1,12 @@
 package com.xuleo.xmplus.md3.core.download
 
 import com.xuleo.xmplus.md3.core.model.ContentKind
+import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.model.Track
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /** Where one episode is in its download. */
 enum class DownloadState(val key: String) {
@@ -47,7 +52,27 @@ data class DownloadTask(
     val confirmedSeconds: Int? = null,
     /** Songs (from M5) never use listening time: [accountIdentity], [receiptId] and [confirmedSeconds] stay null. */
     val kind: ContentKind = ContentKind.Episode,
+    /** A song's quality, by MusicFree's quality keys; null for episodes. */
+    val quality: String? = null,
+    /** A song's object exactly as its plugin returned it; null for episodes. */
+    val item: String? = null,
 )
+
+/** The song a song task was queued from. Null when its object is missing or unreadable. */
+internal fun DownloadTask.song(): MusicItem? {
+    val raw = item?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return null
+    val platform = (raw["platform"] as? JsonPrimitive)?.contentOrNull ?: albumId
+    return MusicItem.from(raw, platform)
+}
 
 /** One episode to queue, with the listening time agreed for it; null when it was shown as free. */
 data class DownloadRequest(val track: Track, val confirmedSeconds: Int?)
+
+/** Where a song's bytes come from: the link and the headers it needs. */
+data class SongSource(val url: String, val headers: Map<String, String> = emptyMap())
+
+/** Finds a song's link in one quality. Implemented by the app with the plugins, so downloads do not know them. */
+fun interface SongResolver {
+    /** Null when the song has no source in [quality]. */
+    suspend fun resolve(song: MusicItem, quality: String): SongSource?
+}
