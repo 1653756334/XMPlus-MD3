@@ -97,6 +97,8 @@ class MusicPlayback(
     private var media = 0L
     private var loading: Job? = null
     private var opened: String? = null
+    /** The quality the playing song came from disk in, so a failure may just mean its link went stale. */
+    private var fromCache: MusicQuality? = null
     private var clock: Job? = null
     private var sessionVersion = 0L
     /** Songs that failed one after another; the auto skip stops once every song in the queue failed. */
@@ -118,7 +120,10 @@ class MusicPlayback(
             val error = player.playerError
             when {
                 error != null -> scope.launch(Dispatchers.Main) {
-                    if (request == revision && isCurrent(player) && player.playerError === error) fail(request, SongUnavailable)
+                    if (request != revision || !isCurrent(player) || player.playerError !== error) return@launch
+                    // The copy on disk stopped reading: the stored link likely expired, so ask the plugin once.
+                    if (retryCached()) return@launch
+                    fail(request, SongUnavailable)
                 }
                 player.playbackState == Player.STATE_ENDED -> scope.launch(Dispatchers.Main) {
                     if (request == revision && isCurrent(player) && player.playbackState == Player.STATE_ENDED) engine.value?.let(::finishSong)
@@ -385,7 +390,7 @@ class MusicPlayback(
         if (quality == current.quality) return@withContext true
         val player = engine.value?.takeIf(::isCurrent) ?: return@withContext false
         val request = revision
-        val source = resolve(song, quality) ?: return@withContext false
+        val source = cachedCopy(song, quality)?.second ?: resolve(song, quality) ?: return@withContext false
         if (request != revision || !isCurrent(player)) return@withContext false
         load(player, song, quality, source, player.currentPosition.coerceAtLeast(0), play = player.playWhenReady)
         remember()
@@ -416,6 +421,7 @@ class MusicPlayback(
         loading?.cancel()
         onStart()
         unload()
+        fromCache = null
         list.currentKey = song.key
         val quality = mutableState.value.quality
         mutableState.value = MusicPlaybackState(
@@ -429,7 +435,7 @@ class MusicPlayback(
             val player = withTimeoutOrNull(5_000) { engine.filterNotNull().first() }
             if (request != revision) return@launch
             if (player == null) return@launch fail(request, PlayerUnavailable)
-            var found: Pair<MusicQuality, ResolvedSong>? = takePrefetched(song)
+            var found: Pair<MusicQuality, ResolvedSong>? = cachedCopy(song) ?: takePrefetched(song)
             if (found == null) for (candidate in qualityOrder(preferredQuality())) {
                 val source = resolve(song, candidate)
                 // Another song was chosen meanwhile: this one's link is dropped.
@@ -487,6 +493,24 @@ class MusicPlayback(
         null
     }
 
+    /**
+     * The song already on disk, played from there: no plugin asked, so it starts at once and plays with no network.
+     * The quality is the first in the listener's order that has the whole song, which keeps a replay from downloading
+     * the same song again in another quality.
+     */
+    private suspend fun cachedCopy(song: MusicItem, only: MusicQuality? = null): Pair<MusicQuality, ResolvedSong>? {
+        // Reading the disk, which on first use opens the cache and scans it.
+        return withContext(Dispatchers.IO) {
+            for (candidate in if (only != null) listOf(only) else qualityOrder(preferredQuality())) {
+                val key = cacheKey(song, candidate)
+                if (!mediaCache.isCached(key)) continue
+                val url = mediaCache.sourceOf(key) ?: continue
+                return@withContext candidate to ResolvedSong(url, cached = true)
+            }
+            null
+        }
+    }
+
     private fun load(player: ExoPlayer, song: MusicItem, quality: MusicQuality, source: ResolvedSong, positionMs: Long, play: Boolean) {
         val metadata = metadata(song)
         val uri = source.uri()
@@ -506,7 +530,10 @@ class MusicPlayback(
         if (ahead == null) prefetching?.cancel()
         prefetching = null
         prefetchKey = null
-        preloading = ahead ?: if (cached != null && cacheKey != null) scope.writeToCache(cached, uri, cacheKey) else null
+        preloading = ahead ?: if (cached != null && cacheKey != null && !source.cached) scope.writeToCache(cached, uri, cacheKey) else null
+        fromCache = if (source.cached) quality else null
+        // Written down so the same song opens from disk next time, without asking the plugin.
+        if (cacheKey != null && !source.cached) mediaCache.rememberSource(cacheKey, source.url)
         opened = mediaId
         // Music asks other apps' sounds to duck rather than pause it; 听书 sets speech again when it opens.
         player.setAudioAttributes(MusicAttributes, true)
@@ -521,8 +548,7 @@ class MusicPlayback(
         publish(player)
     }
 
-    private fun finishSong(player: ExoPlayer) {
-        failures = 0
+    private fun finishSong(player: ExoPlayer) {        failures = 0
         if (mutableSleep.value.atEpisodeEnd) {
             cancelSleepTimer()
             player.pause()
@@ -538,6 +564,20 @@ class MusicPlayback(
         } else {
             skip(1, automatic = true)
         }
+    }
+
+    /**
+     * Re-opens the playing song through the plugin after its copy on disk failed, once: an expired link is the likely
+     * cause, and the parts already on disk are still read from there. False when the song did not come from disk.
+     */
+    private fun retryCached(): Boolean {
+        val song = mutableState.value.song ?: return false
+        val quality = fromCache ?: return false
+        fromCache = null
+        mediaCache.forgetSource(cacheKey(song, quality))
+        val position = engine.value?.takeIf(::isCurrent)?.currentPosition ?: mutableState.value.positionMs
+        open(song, position.coerceAtLeast(0))
+        return true
     }
 
     /** MusicFree's `handlePlayFail`: show the error, then try the next song after 500 ms. */
@@ -559,6 +599,7 @@ class MusicPlayback(
         revision++
         loading?.cancel()
         unload()
+        fromCache = null
         list.currentKey = song.key
         mutableState.value = MusicPlaybackState(
             song, PlaybackPhase.Paused, durationMs = (song.durationSeconds * 1_000).toLong().coerceAtLeast(0),
@@ -645,6 +686,7 @@ class MusicPlayback(
                 if (source == null) continue
                 prefetched = Prefetched(next.key, candidate, source, SystemClock.elapsedRealtime())
                 val key = cacheKey(next, candidate, source) ?: return@launch
+                mediaCache.rememberSource(key, source.url)
                 prefetchKey = key
                 writeToCache(cached(upstream(source)), source.uri(), key)
                 return@launch
@@ -763,8 +805,9 @@ class MusicPlayback(
         const val UserAgent = "user-agent"
         /** How close to the end of the queue the next page is read. */
         const val PagingDistance = 3
-        /** Cache files are split at this size so the oldest parts of a long song can go first. */
-        const val CacheFragmentBytes = 4L * 1024 * 1024
+        /** Cache files are split at this size so the oldest parts of a long song can go first, and so a seek never lands
+         * in a part still being written. */
+        const val CacheFragmentBytes = 1L * 1024 * 1024
         /** How far into a song the next one is cached. */
         const val PrefetchAt = 0.9
         /** How long a link found ahead is trusted. */

@@ -36,7 +36,9 @@ enum class MusicPlayMode(val key: String) {
 }
 
 /** Where a song plays from: a link with the headers it needs (user agent included), or a downloaded file. */
-data class ResolvedSong(val url: String, val headers: Map<String, String> = emptyMap(), val localFile: File? = null)
+data class ResolvedSong(val url: String, val headers: Map<String, String> = emptyMap(), val localFile: File? = null,
+    /** The whole song is on disk already: it plays from there and needs no link. */
+    val cached: Boolean = false)
 
 /** Finds a song's source in one quality. Implemented by the app with the plugins, so playback does not know them. */
 fun interface SongSourceResolver {
