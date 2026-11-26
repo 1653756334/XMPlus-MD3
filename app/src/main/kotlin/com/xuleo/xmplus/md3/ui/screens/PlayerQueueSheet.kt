@@ -43,6 +43,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xuleo.xmplus.md3.ui.components.PlayingBars
+import com.xuleo.xmplus.md3.ui.components.PlayingMarkSize
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
@@ -119,7 +121,7 @@ internal fun PlayerQueueSheet(
                         onClick = { onSelect(track.id) },
                         modifier = Modifier.fillMaxWidth().semantics { if (isCurrent) stateDescription = label },
                         leadingContent = {
-                            if (isCurrent) Icon(XmIcons.Filled.Equalizer, null, tint = MaterialTheme.colorScheme.primary)
+                            if (isCurrent) PlayingBars(Modifier.size(PlayingMarkSize))
                             else Text(track.officialPosition?.toString().orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
                         trailingContent = if (track.durationSeconds > 0) ({

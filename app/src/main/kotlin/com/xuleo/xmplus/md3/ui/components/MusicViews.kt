@@ -112,7 +112,7 @@ fun SongRow(
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (playing) Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        if (playing) PlayingBars(Modifier.padding(end = 12.dp).size(PlayingMarkSize))
         when {
             trailing != null -> trailing()
             onPlayNext != null -> SongMenu(song, playing, onPlayNext, extraItems)

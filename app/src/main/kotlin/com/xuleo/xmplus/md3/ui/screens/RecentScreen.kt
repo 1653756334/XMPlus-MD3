@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +50,8 @@ import com.xuleo.xmplus.md3.core.media.ListenRecord
 import com.xuleo.xmplus.md3.core.media.SongResume
 import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.library.LibraryViewModel
+import com.xuleo.xmplus.md3.ui.components.PlayingBars
+import com.xuleo.xmplus.md3.ui.components.PlayingMarkSize
 import com.xuleo.xmplus.md3.ui.components.SelectionToolbar
 import com.xuleo.xmplus.md3.ui.components.SelectionToolbarSpace
 import com.xuleo.xmplus.md3.ui.components.ToolbarAction
@@ -221,7 +224,7 @@ private fun RecentRow(
             XmSwap(selecting) { active ->
                 when {
                     active -> Checkbox(checked = checked, onCheckedChange = null)
-                    playing -> Icon(XmIcons.Filled.Equalizer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    playing -> PlayingBars(Modifier.size(PlayingMarkSize))
                 }
             }
         },

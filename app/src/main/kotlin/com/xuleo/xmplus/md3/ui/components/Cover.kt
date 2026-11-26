@@ -19,7 +19,17 @@ import coil3.request.crossfade
 
 /** A cover or avatar over a quiet placeholder; the image fades in unless the system has animations turned off. */
 @Composable
-fun Cover(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.medium) {
+fun Cover(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.medium) = CoverImage(coverUrl(url), modifier, shape)
+
+/** Plugins often give a picture as `//host/path`; it needs its scheme before it can be loaded. */
+private fun coverUrl(url: String?): String? = when {
+    url == null -> null
+    url.startsWith("//") -> "https:$url"
+    else -> url
+}
+
+@Composable
+private fun CoverImage(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.medium) {
     val context = LocalContext.current
     val animated = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f

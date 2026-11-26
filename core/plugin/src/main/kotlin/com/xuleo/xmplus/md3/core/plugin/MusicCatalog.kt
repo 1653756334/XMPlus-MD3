@@ -117,6 +117,17 @@ class MusicCatalog(private val manager: PluginManager) {
     suspend fun artistAlbums(artist: MusicArtist, page: Int): PluginPage<MusicAlbum> =
         artistWorks(artist, page, SearchType.Album) { MusicAlbum.from(it, artist.platform) }
 
+    /**
+     * The artist as the plugin's search knows them: opened from a song, an artist carries only a name, so this fills in
+     * the avatar and the numbers. The artist of the same id wins; otherwise the one of the same name. Null when the
+     * plugin lists neither.
+     */
+    suspend fun artistInfo(artist: MusicArtist): MusicArtist? {
+        val found = search(artist.platform, artist.name, 1, SearchType.Artist).items.filterIsInstance<MusicArtist>()
+        return found.firstOrNull { it.id == artist.id }
+            ?: found.firstOrNull { it.name.equals(artist.name, ignoreCase = true) }
+    }
+
     /** Songs for [SearchType.Music] and [SearchType.Lyric], otherwise albums, artists or sheets. */
     suspend fun search(platform: String, query: String, page: Int, type: SearchType): PluginPage<PluginMedia> {
         val reply = call(platform, "search", JsonPrimitive(query), JsonPrimitive(page), JsonPrimitive(type.key))

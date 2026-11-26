@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,6 +55,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -84,6 +86,7 @@ import com.xuleo.xmplus.md3.ui.components.formatCount
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 private val HeroCover = 120.dp
+private val ArtistAvatar = 96.dp
 
 /**
  * 歌单, 榜单, 专辑 and 歌手 from a plugin. The first three share the album page's head and a song list with 播放全部 on
@@ -320,11 +323,51 @@ internal fun PlayAllRow(count: Int?, onClick: () -> Unit) {
     }
 }
 
+/**
+ * The head of an artist page: the avatar centred over its own blurred picture, then the name, the numbers and the
+ * introduction the plugin gives. It reads differently from a sheet or an album, whose cover sits beside the title.
+ */
+@Composable
+private fun ArtistHero(artist: MusicArtist) {
+    DetailHero(artist.avatar) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding).padding(bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            MusicCover(
+                artist.avatar, Modifier.size(ArtistAvatar).shadow(elevation = 8.dp, shape = CircleShape), CircleShape,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                artist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+            )
+            heroNumbers(artist)?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                )
+            }
+            artist.description.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
 /** The head: blurred cover behind, the cover (round for an artist), the title, who made it and one line of numbers. */
 @Composable
 private fun MusicHero(item: PluginMedia) {
-    val artist = item is MusicArtist
-    val shape = if (artist) CircleShape else MaterialTheme.shapes.large
+    if (item is MusicArtist) {
+        ArtistHero(item)
+        return
+    }
+    val shape = MaterialTheme.shapes.large
     DetailHero(item.cover()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding).padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             MusicCover(item.cover(), Modifier.size(HeroCover).shadow(elevation = 10.dp, shape = shape), shape)

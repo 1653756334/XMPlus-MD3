@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.xuleo.xmplus.md3.ui.components.PlayingBars
 import com.xuleo.xmplus.md3.ui.components.ReorderHandle
 import com.xuleo.xmplus.md3.ui.components.ReorderState
 import com.xuleo.xmplus.md3.ui.components.rememberReorderState
@@ -390,7 +391,7 @@ private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> 
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    PlayingBars(Modifier.size(12.dp), MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }

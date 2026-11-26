@@ -54,6 +54,8 @@ import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.MusicPlayback
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
+import com.xuleo.xmplus.md3.ui.components.PlayingBars
+import com.xuleo.xmplus.md3.ui.components.PlayingMarkSize
 import com.xuleo.xmplus.md3.ui.components.XmMenu
 import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import com.xuleo.xmplus.md3.ui.components.XmSwap
@@ -222,7 +224,7 @@ private fun QueueRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (current) {
-                Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.padding(end = 12.dp).size(20.dp), tint = scheme.primary)
+                PlayingBars(Modifier.padding(end = 12.dp).size(PlayingMarkSize), scheme.primary)
             }
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(

@@ -97,7 +97,29 @@ class MusicDetailViewModel(private val catalog: MusicCatalog, val kind: MusicDet
         MusicDetailKind.Sheet -> catalog.sheetDetail(initial as MusicSheet, page).also { if (page <= 1) mutableItem.value = it.item }.songs
         MusicDetailKind.TopList -> catalog.topListDetail(initial as MusicSheet, page).also { if (page <= 1) mutableItem.value = it.item }.songs
         MusicDetailKind.Album -> catalog.albumDetail(initial as MusicAlbum, page).also { if (page <= 1) mutableItem.value = it.item }.songs
-        MusicDetailKind.Artist -> catalog.artistSongs(initial as MusicArtist, page)
+        MusicDetailKind.Artist -> catalog.artistSongs(initial as MusicArtist, page).also { if (page <= 1) fillArtist() }
+    }
+
+    /**
+     * An artist opened from a song brings only a name, so the page looks them up once to show the avatar and numbers.
+     * What the plugin gives never replaces the id the page is already reading.
+     */
+    private suspend fun fillArtist() {
+        val artist = mutableItem.value as? MusicArtist ?: return
+        if (artist.avatar != null) return
+        val found = try {
+            catalog.artistInfo(artist)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            null
+        } ?: return
+        mutableItem.value = artist.copy(
+            avatar = found.avatar ?: artist.avatar,
+            fans = found.fans ?: artist.fans,
+            description = found.description.ifBlank { artist.description },
+            worksNum = found.worksNum ?: artist.worksNum,
+        )
     }
 
     private suspend fun albumPage(page: Int): PluginPage<MusicAlbum> =
