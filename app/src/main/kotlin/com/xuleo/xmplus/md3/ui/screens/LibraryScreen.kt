@@ -50,7 +50,6 @@ import com.xuleo.xmplus.md3.ui.components.sectionCardPart
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,7 +134,6 @@ fun LibraryScreen(
     links: LibraryLinks,
 ) {
     val history by viewModel.listenHistory.collectAsStateWithLifecycle()
-    val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
     val liked = music?.liked?.collectAsStateWithLifecycle()?.value.orEmpty()
     val sheets = music?.sheets?.collectAsStateWithLifecycle()?.value.orEmpty()
     val starred = music?.starred?.collectAsStateWithLifecycle()?.value.orEmpty()
@@ -164,9 +162,8 @@ fun LibraryScreen(
         selected = setOf(key)
     }
     BackHandler(enabled = managing, onBack = ::endManage)
-    LaunchedEffect(Unit) { viewModel.loadBookmarks() }
     val recent = history.orEmpty().take(ContinueCount)
-    val bookmarksTile = Tile(R.string.listen_tab_bookmarks, XmIcons.Outlined.BookmarkBorder, bookmarks?.size) {
+    val bookmarksTile = Tile(R.string.listen_tab_bookmarks, XmIcons.Outlined.BookmarkBorder, null) {
         links.onOpenSection(LibrarySection.Bookmarks)
     }
     val tiles = listOf(
