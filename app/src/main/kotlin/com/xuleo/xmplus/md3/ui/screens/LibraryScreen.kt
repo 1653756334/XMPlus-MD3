@@ -21,7 +21,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import com.xuleo.xmplus.md3.core.model.MusicItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -76,7 +82,7 @@ import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** How many items 继续听 shows. */
 private const val ContinueCount = 10
-private const val GridColumns = 4
+private const val GridColumns = 3
 
 /** What is playing now, so 继续听 can mark it: a song's key or an episode's track id. */
 data class NowPlaying(val songKey: String? = null, val trackId: String? = null) {
@@ -93,12 +99,15 @@ class LibraryLinks(
     val onPlaySong: (SongResume) -> Unit,
     val onOpenRecent: () -> Unit,
     val onOpenSection: (LibrarySection) -> Unit,
-    val onOpenDownloads: () -> Unit,
     val onOpenStarred: (MusicSheet) -> Unit,
     /** 我喜欢 ([MusicLibrary.LikesId]) and 自建 sheets. */
     val onOpenSheet: ((String) -> Unit)? = null,
+    /** Plays 我喜欢 from the top. */
+    val onPlayLikes: ((List<MusicItem>) -> Unit)? = null,
     val onSearch: (() -> Unit)? = null,
     val onImportSheet: (() -> Unit)? = null,
+    /** Opens account sign-in, as 我的 does. */
+    val onLogin: (() -> Unit)? = null,
 )
 
 private enum class SheetGroup { Mine, Starred }
@@ -106,15 +115,15 @@ private enum class SheetGroup { Mine, Starred }
 private class Tile(@StringRes val label: Int, val icon: ImageVector, val count: Int?, val onClick: () -> Unit)
 
 /**
- * 听过, after QQ 音乐's 我的: 继续听 with the latest of both kinds, a grid of shortcuts to each collection, and the
- * user's own and starred sheets. Account collections are left out when no account is signed in.
+ * 听过, after QQ 音乐's 我的 and 喜马拉雅's 我听: 继续听 with the latest of both kinds, then a 听书 section (the account
+ * collections, or 书签 and a sign-in line when signed out) and a 音乐 section (我喜欢, then the user's own and starred
+ * sheets).
  */
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     music: MusicLibrary?,
     signedIn: Boolean,
-    downloadCount: Int?,
     nowPlaying: NowPlaying,
     links: LibraryLinks,
 ) {
@@ -150,21 +159,17 @@ fun LibraryScreen(
     BackHandler(enabled = managing, onBack = ::endManage)
     LaunchedEffect(Unit) { viewModel.loadBookmarks() }
     val recent = history.orEmpty().take(ContinueCount)
-    val tiles = buildList {
-        val openSheet = links.onOpenSheet
-        if (music != null && openSheet != null) add(Tile(R.string.music_favorites, XmIcons.Outlined.FavoriteBorder, liked.size) { openSheet(MusicLibrary.LikesId) })
-        if (signedIn) {
-            add(Tile(R.string.listen_tab_updates, XmIcons.Outlined.AutoAwesome, null) { links.onOpenSection(LibrarySection.Updates) })
-            add(Tile(R.string.listen_tab_subscriptions, XmIcons.Outlined.LibraryAdd, null) { links.onOpenSection(LibrarySection.Subscriptions) })
-        }
-        add(Tile(R.string.listen_tab_bookmarks, XmIcons.Outlined.BookmarkBorder, bookmarks?.size) { links.onOpenSection(LibrarySection.Bookmarks) })
-        if (signedIn) {
-            add(Tile(R.string.library_favorites, XmIcons.Outlined.Star, null) { links.onOpenSection(LibrarySection.Favorites) })
-            add(Tile(R.string.library_following, XmIcons.Outlined.Person, null) { links.onOpenSection(LibrarySection.Anchors) })
-            add(Tile(R.string.listen_tab_cloud, XmIcons.Outlined.Sync, null) { links.onOpenSection(LibrarySection.Cloud) })
-        }
-        add(Tile(R.string.tab_downloads, XmIcons.Outlined.Download, downloadCount, links.onOpenDownloads))
+    val bookmarksTile = Tile(R.string.listen_tab_bookmarks, XmIcons.Outlined.BookmarkBorder, bookmarks?.size) {
+        links.onOpenSection(LibrarySection.Bookmarks)
     }
+    val tiles = listOf(
+        Tile(R.string.listen_tab_subscriptions, XmIcons.Outlined.LibraryAdd, null) { links.onOpenSection(LibrarySection.Subscriptions) },
+        Tile(R.string.library_favorites, XmIcons.Outlined.Star, null) { links.onOpenSection(LibrarySection.Favorites) },
+        Tile(R.string.listen_tab_updates, XmIcons.Outlined.AutoAwesome, null) { links.onOpenSection(LibrarySection.Updates) },
+        bookmarksTile,
+        Tile(R.string.library_following, XmIcons.Outlined.Person, null) { links.onOpenSection(LibrarySection.Anchors) },
+        Tile(R.string.listen_tab_cloud, XmIcons.Outlined.Sync, null) { links.onOpenSection(LibrarySection.Cloud) },
+    )
     TabScaffold(
         Destination.Library.label,
         headline = if (managing) stringResource(R.string.history_selected, selected.size) else null,
@@ -199,8 +204,21 @@ fun LibraryScreen(
                     }
                 }
             }
-            if (!managing) item(key = "tiles") { TileGrid(tiles) }
+            if (!managing) {
+                item(key = "booksHeading") { SectionHeading(stringResource(R.string.tab_discover)) }
+                item(key = "books") { if (signedIn) TileGrid(tiles) else SignedOutBooks(bookmarksTile, links.onLogin) }
+            }
             if (music != null) {
+                if (!managing) {
+                    item(key = "musicHeading") { SectionHeading(stringResource(R.string.tab_music)) }
+                    item(key = "likes") {
+                        LikesRow(
+                            liked,
+                            onClick = links.onOpenSheet?.let { open -> { open(MusicLibrary.LikesId) } },
+                            onPlay = links.onPlayLikes?.takeIf { liked.isNotEmpty() }?.let { play -> { play(liked) } },
+                        )
+                    }
+                }
                 item(key = "sheetsHeader") {
                     SheetsHeader(
                         group, sheets.size, starred.size, { group = it; selected = emptySet() },
@@ -224,7 +242,7 @@ fun LibraryScreen(
                         }
                     }
                     SheetGroup.Starred -> if (starred.isEmpty()) {
-                        item(key = "starredEmpty") { Note(stringResource(R.string.library_starred_empty)) }
+                        item(key = "starredEmpty") { QuietLine(stringResource(R.string.library_starred_empty)) }
                     } else {
                         items(if (managing) starredOrder.items(starred) else starred, key = ::starredKey) { sheet ->
                             val key = starredKey(sheet)
@@ -303,7 +321,7 @@ private fun ContinueRow(records: List<ListenRecord>, nowPlaying: NowPlaying, onO
                 .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding / 2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.library_continue), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.library_continue), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Icon(XmIcons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         LazyRow(
@@ -325,15 +343,19 @@ private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> 
             if (song) MusicCover(record.coverUrl, Modifier.matchParentSize()) else Cover(record.coverUrl, Modifier.matchParentSize())
             if (!song && record.durationMs > 0) {
                 val progress = (record.positionMs.toFloat() / record.durationMs).coerceIn(0f, 1f)
+                // Beside the kind badge, on its centre line, so the two never overlap.
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp).heightIn(max = 3.dp),
+                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .padding(start = BadgeInset + BadgeSize + 6.dp, end = 8.dp, bottom = BadgeInset + BadgeSize / 2 - 1.5.dp)
+                        .height(3.dp),
                     strokeCap = StrokeCap.Round,
                     gapSize = 0.dp,
                     drawStopIndicator = {},
                     trackColor = Color.White.copy(alpha = 0.4f),
                 )
             }
+            KindBadge(record.kind, Modifier.align(Alignment.BottomStart).padding(BadgeInset))
             if (playing) {
                 Box(
                     Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(CircleShape)
@@ -352,7 +374,106 @@ private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> 
     }
 }
 
-/** Shortcuts in rows of four; tiles that are left out close up rather than leave a gap. */
+/** A section title on the overview: 听书, 音乐. */
+@Composable
+private fun SectionHeading(text: String) {
+    Box(
+        Modifier.fillMaxWidth().padding(top = XmLayout.SectionGap / 2).heightIn(min = 48.dp)
+            .padding(horizontal = XmLayout.PagePadding).semantics { heading() },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private val BadgeSize = 18.dp
+private val BadgeInset = 6.dp
+
+/** A small round mark on a cover that tells 听书 from 音乐. */
+@Composable
+internal fun KindBadge(kind: ContentKind, modifier: Modifier = Modifier, size: Dp = BadgeSize) {
+    val song = kind == ContentKind.Song
+    Box(
+        modifier.size(size).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (song) XmIcons.Filled.MusicNote else XmIcons.Filled.Headphones,
+            contentDescription = stringResource(if (song) R.string.tab_music else R.string.tab_discover),
+            Modifier.size(size * 0.65f),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Signed out, 听书 keeps 书签 and one line that leads to sign-in, so the section never shows gaps. */
+@Composable
+private fun SignedOutBooks(bookmarks: Tile, onLogin: (() -> Unit)?) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = XmLayout.PagePadding / 2, end = XmLayout.PagePadding, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ShortcutTile(bookmarks, Modifier.weight(1f))
+        Row(
+            Modifier.weight(2f).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .heightIn(min = 56.dp).padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.library_sign_in_hint), Modifier.weight(1f).padding(vertical = 8.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            onLogin?.let { TextButton(onClick = it) { Text(stringResource(R.string.library_sign_in)) } }
+        }
+    }
+}
+
+/** 我喜欢 as a row of its own, as QQ 音乐 has it: mosaic, name and count, and a play button for the whole list. */
+@Composable
+private fun LikesRow(songs: List<MusicItem>, onClick: (() -> Unit)?, onPlay: (() -> Unit)?) {
+    Row(
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).heightIn(min = 64.dp)
+            .padding(start = XmLayout.PagePadding, end = if (onPlay != null) 4.dp else XmLayout.PagePadding)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    ) {
+        if (songs.isEmpty()) {
+            Box(
+                Modifier.size(56.dp).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(XmIcons.Filled.Favorite, contentDescription = null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        } else {
+            SheetMosaic(songs, Modifier.size(56.dp), MaterialTheme.shapes.medium)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.music_favorites), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                pluralStringResource(R.plurals.music_song_count, songs.size, songs.size),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            )
+        }
+        onPlay?.let {
+            IconButton(onClick = it) {
+                Icon(XmIcons.Filled.PlayArrow, stringResource(R.string.music_play_all), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+/** One quiet line where a list is empty. */
+@Composable
+private fun QuietLine(text: String) {
+    Text(
+        text, Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 12.dp),
+        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Shortcuts in rows of three; tiles that are left out close up rather than leave a gap. */
 @Composable
 private fun TileGrid(tiles: List<Tile>) {
     Column(Modifier.padding(horizontal = XmLayout.PagePadding / 2, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -399,19 +520,22 @@ private fun SheetsHeader(
             onSelect = onGroup, modifier = Modifier.weight(1f), textStyle = MaterialTheme.typography.titleMedium,
         )
         IconButton(onClick = onCreate) { Icon(XmIcons.Outlined.Add, stringResource(R.string.library_sheet_new)) }
-        onImport?.let { IconButton(onClick = it) { Icon(XmIcons.Outlined.Link, stringResource(R.string.library_sheet_import)) } }
+        onImport?.let { IconButton(onClick = it) { Icon(XmIcons.Outlined.Input, stringResource(R.string.library_sheet_import)) } }
     }
 }
 
 @Composable
 private fun EmptySheets(onCreate: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().padding(XmLayout.PagePadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        Text(stringResource(R.string.library_sheets_empty), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onCreate) { Text(stringResource(R.string.library_sheet_new)) }
+        Text(
+            stringResource(R.string.library_sheets_empty), Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FilledTonalButton(onClick = onCreate) { Text(stringResource(R.string.library_sheet_new)) }
     }
 }
 

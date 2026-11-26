@@ -309,6 +309,8 @@ internal fun ListingRow(
     circle: Boolean = false,
     music: Boolean = false,
     highlighted: Boolean = false,
+    /** Marks the cover as 听书 or 音乐 where both kinds share a list. */
+    kind: ContentKind? = null,
     onLongClick: (() -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
 ) {
@@ -318,10 +320,13 @@ internal fun ListingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        when {
-            circle -> Avatar(cover, Modifier.size(56.dp))
-            music -> MusicCover(cover, Modifier.size(56.dp))
-            else -> Cover(cover, Modifier.size(56.dp))
+        Box(Modifier.size(56.dp)) {
+            when {
+                circle -> Avatar(cover, Modifier.matchParentSize())
+                music -> MusicCover(cover, Modifier.matchParentSize())
+                else -> Cover(cover, Modifier.matchParentSize())
+            }
+            if (kind != null) KindBadge(kind, Modifier.align(Alignment.BottomStart).padding(3.dp), size = 16.dp)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(

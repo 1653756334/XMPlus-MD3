@@ -377,7 +377,7 @@
         <item quantity="one">%1$d episode · %2$s</item>
         <item quantity="other">%1$d episodes · %2$s</item>
     </plurals>
-    <string name="downloads_empty_done">Downloaded episodes appear here</string>
+    <string name="downloads_empty_done">Downloads appear here</string>
     <string name="downloads_empty_active">Nothing is downloading</string>
     <string name="downloads_cancel_all">Cancel all</string>
     <string name="downloads_cancel_all_title">Cancel all downloads?</string>
@@ -553,6 +553,9 @@
     <string name="library_sheets_mine">Mine %1$d</string>
     <string name="library_sheets_starred">Saved %1$d</string>
     <string name="library_sheets_empty">No playlists yet</string>
+    <string name="library_sign_in_hint">Sign in to see subscriptions, saved albums and cloud history</string>
+    <string name="library_sign_in">Sign in</string>
+    <string name="music_likes_empty">No liked songs yet</string>
     <string name="library_starred_empty">No saved playlists yet</string>
     <string name="library_sheet_new">New playlist</string>
     <string name="library_sheet_import">Import</string>

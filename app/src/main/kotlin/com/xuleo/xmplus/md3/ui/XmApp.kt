@@ -3,7 +3,6 @@ package com.xuleo.xmplus.md3.ui
 import com.xuleo.xmplus.md3.core.media.MusicPlaySource
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.media.SongResume
-import com.xuleo.xmplus.md3.core.download.DownloadState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -170,7 +169,6 @@ internal fun XmAppContent(
     val playingSong = musicPlayer?.playback?.state?.collectAsStateWithLifecycle()?.value?.song
     val playingTrack = playback?.state?.collectAsStateWithLifecycle()?.value?.selection?.track?.id
     val nowPlaying = if (playingSong != null) NowPlaying(songKey = playingSong.key) else NowPlaying(trackId = playingTrack)
-    val downloadCount = downloads?.tasks?.collectAsStateWithLifecycle()?.value?.count { it.state == DownloadState.Completed }
     val installedPlugins = plugins?.plugins?.collectAsStateWithLifecycle()?.value.orEmpty()
 
     BackHandler(enabled = !isPlayer && isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
@@ -238,16 +236,17 @@ internal fun XmAppContent(
         onPlaySong = ::playSong,
         onOpenRecent = { navigator.push(AppRoute.Recent) },
         onOpenSection = { navigator.push(AppRoute.LibraryPage(it.name)) },
-        onOpenDownloads = { onSelect(Destination.Downloads) },
         onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
         // Hooks for the next steps: library search and 导入.
         onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
         onSearch = { navigator.push(AppRoute.LibrarySearch) },
         onImportSheet = { importing = true },
+        onPlayLikes = { songs -> musicPlayer?.playback?.playList(songs, 0, source = MusicPlaySource.Likes) },
+        onLogin = ::openPhone,
     )
     val libraryTab: @Composable () -> Unit = {
         if (library != null) {
-            LibraryScreen(library, musicPlayer?.library, accountState.hasAccounts, downloadCount, nowPlaying, libraryLinks)
+            LibraryScreen(library, musicPlayer?.library, accountState.hasAccounts, nowPlaying, libraryLinks)
         }
     }
     fun openImport(identity: String? = null) {

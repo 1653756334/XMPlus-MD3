@@ -365,7 +365,7 @@
     <plurals name="downloads_album_meta">
         <item quantity="other">%1$d 集 · %2$s</item>
     </plurals>
-    <string name="downloads_empty_done">下载的节目会出现在这里</string>
+    <string name="downloads_empty_done">下载的内容会出现在这里</string>
     <string name="downloads_empty_active">没有正在下载的内容</string>
     <string name="downloads_cancel_all">全部取消</string>
     <string name="downloads_cancel_all_title">取消全部下载？</string>
@@ -534,6 +534,9 @@
     <string name="library_sheets_mine">自建 %1$d</string>
     <string name="library_sheets_starred">收藏 %1$d</string>
     <string name="library_sheets_empty">还没有歌单</string>
+    <string name="library_sign_in_hint">登录后查看订阅、收藏和云历史</string>
+    <string name="library_sign_in">登录</string>
+    <string name="music_likes_empty">还没有喜欢的歌曲</string>
     <string name="library_starred_empty">还没有收藏歌单</string>
     <string name="library_sheet_new">新建歌单</string>
     <string name="library_sheet_import">导入</string>

@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
@@ -208,7 +209,7 @@ internal fun LocalSheetScreen(
             ) {
                 item(key = "header") { SheetHeader(name, songs) }
                 if (songs.isEmpty()) {
-                    item(key = "empty") { Note(stringResource(R.string.music_nothing)) }
+                    item(key = "empty") { Note(stringResource(if (likes) R.string.music_likes_empty else R.string.music_nothing)) }
                 } else {
                     item(key = "play_all") { PlayAllRow(songs.size) { if (mode == SheetMode.Normal) onPlay(songs, 0, source) } }
                 }
@@ -330,9 +331,8 @@ private fun SheetHeader(name: String, songs: List<MusicItem>) {
 
 /** Four different song covers in a square, as QQ 音乐 shows a sheet; with fewer, the first cover or the placeholder. */
 @Composable
-internal fun SheetMosaic(songs: List<MusicItem>, modifier: Modifier = Modifier) {
+internal fun SheetMosaic(songs: List<MusicItem>, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.large) {
     val covers = remember(songs) { songs.mapNotNull { it.artwork }.distinct().take(4) }
-    val shape = MaterialTheme.shapes.large
     if (covers.size < 4) {
         MusicCover(covers.firstOrNull(), modifier, shape)
         return

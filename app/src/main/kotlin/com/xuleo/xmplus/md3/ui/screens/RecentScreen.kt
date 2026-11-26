@@ -155,6 +155,7 @@ fun RecentScreen(
                         RecentRow(
                             record,
                             playing = nowPlaying.matches(record),
+                            showKind = filter == RecentFilter.All,
                             selecting = selecting,
                             checked = record.albumId in selected,
                             onClick = {
@@ -187,6 +188,7 @@ private val RecentFilter.label: Int
 private fun RecentRow(
     record: ListenRecord,
     playing: Boolean,
+    showKind: Boolean,
     selecting: Boolean,
     checked: Boolean,
     onClick: () -> Unit,
@@ -204,6 +206,7 @@ private fun RecentRow(
         modifier = Modifier.background(MaterialTheme.colorScheme.surface),
         music = song,
         highlighted = playing,
+        kind = record.kind.takeIf { showKind },
         onLongClick = onLongClick,
         trailing = {
             XmSwap(selecting) { active ->
