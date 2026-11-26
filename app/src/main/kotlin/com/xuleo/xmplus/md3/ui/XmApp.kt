@@ -1,6 +1,7 @@
 package com.xuleo.xmplus.md3.ui
 
 import com.xuleo.xmplus.md3.core.media.MusicPlaySource
+import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.core.media.SongResume
 import com.xuleo.xmplus.md3.core.download.DownloadState
 import androidx.activity.compose.BackHandler
@@ -302,7 +303,8 @@ internal fun XmAppContent(
                             Crossfade(selected, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "tab") { tab ->
                                 TabContent(tab, stateHolder, accounts, discover, categories, rankings, hotWords, links,
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload, library, downloads, ::openAlbum, ::openAnchor, { albumId, trackId, positionMs -> playback?.playSaved(albumId, trackId, positionMs) },
-                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) }, plugins, { navigator.push(AppRoute.Plugins) }, musicBrowse,
+                                    { albumId, trackId -> playback?.playEpisode(albumId, trackId) },
+                                    { songs -> musicPlayer?.playback?.playList(songs, 0, source = MusicPlaySource(MusicPlaySource.Type.Download)) }, plugins, { navigator.push(AppRoute.Plugins) }, musicBrowse,
                                     { sheet, ranking -> openMusic(if (ranking) MusicDetailKind.TopList else MusicDetailKind.Sheet, sheet) },
                                     { navigator.push(AppRoute.MusicSearch) }, libraryTab = libraryTab)
                             }
@@ -488,7 +490,7 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
     categories: CategoriesViewModel?, rankings: RankingsViewModel?, hotWords: List<HotWord>, links: DiscoverLinks,
     onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
     library: LibraryViewModel?, downloads: DownloadsViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit,
-    onPlayEpisode: (String, String) -> Unit, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {},
+    onPlayEpisode: (String, String) -> Unit, onPlaySongs: (List<MusicItem>) -> Unit = {}, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {},
     musicBrowse: MusicBrowseViewModel? = null, onOpenSheet: (MusicSheet, Boolean) -> Unit = { _, _ -> }, onMusicSearch: () -> Unit = {},
     libraryTab: (@Composable () -> Unit)? = null) {
     val installed = plugins?.plugins?.collectAsStateWithLifecycle()?.value
@@ -498,7 +500,7 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
             Destination.Music -> MusicScreen(if (plugins == null) emptyList() else installed, onPlugins,
                 source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) }, browse = musicBrowse, onOpenSheet = onOpenSheet, onSearch = onMusicSearch)
             Destination.Library -> if (library != null && libraryTab != null) libraryTab() else EmptyTab(destination.label, destination.icon)
-            Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
+            Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode, onPlaySongs) else EmptyTab(destination.label, destination.icon)
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins,
                 (LocalContext.current.applicationContext as? XmApplication)?.musicMediaCache,
                 (LocalContext.current.applicationContext as? XmApplication)?.musicQuality)

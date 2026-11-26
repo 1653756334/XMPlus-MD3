@@ -22,7 +22,7 @@ data class MusicPlaySource(
 ) {
     enum class Type(val key: String) {
         Likes("likes"), Sheet("sheet"), PluginSheet("pluginSheet"), TopList("topList"), Album("album"),
-        Artist("artist"), Search("search"), Single("single");
+        Artist("artist"), Search("search"), Single("single"), Download("download");
 
         companion object {
             fun fromKey(key: String?): Type? = entries.firstOrNull { it.key == key }

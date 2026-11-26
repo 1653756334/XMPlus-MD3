@@ -383,6 +383,8 @@
     <string name="downloads_cancel_all_title">Cancel all downloads?</string>
     <string name="downloads_cancel_all_body">Episodes that haven\'t finished are removed with their partial files. Listening time already charged is not refunded.</string>
     <string name="downloads_delete_title">Delete this episode?</string>
+    <string name="downloads_delete_song_title">Delete “%1$s”?</string>
+    <string name="downloads_deleted">Deleted</string>
     <string name="downloads_delete_album_title">Delete this album\'s downloads?</string>
     <string name="downloads_delete_body">%1$s of audio will be deleted from this device.</string>
     <string name="downloads_open_album">Open album</string>

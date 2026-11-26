@@ -59,7 +59,7 @@ data class DownloadTask(
 )
 
 /** The song a song task was queued from. Null when its object is missing or unreadable. */
-internal fun DownloadTask.song(): MusicItem? {
+fun DownloadTask.song(): MusicItem? {
     val raw = item?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return null
     val platform = (raw["platform"] as? JsonPrimitive)?.contentOrNull ?: albumId
     return MusicItem.from(raw, platform)

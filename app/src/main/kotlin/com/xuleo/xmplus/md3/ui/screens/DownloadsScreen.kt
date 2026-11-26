@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,12 +21,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import com.xuleo.xmplus.md3.ui.components.XmMenu
 import com.xuleo.xmplus.md3.ui.components.XmMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,9 +38,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,14 +60,19 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.download.DownloadState
 import com.xuleo.xmplus.md3.core.download.DownloadTask
+import com.xuleo.xmplus.md3.core.download.song
+import com.xuleo.xmplus.md3.core.model.ContentKind
+import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.download.DownloadsViewModel
 import com.xuleo.xmplus.md3.download.downloadErrorMessage
 import com.xuleo.xmplus.md3.ui.Destination
 import com.xuleo.xmplus.md3.ui.components.Cover
+import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.PagerTabs
 import com.xuleo.xmplus.md3.ui.components.SettlingPager
 import com.xuleo.xmplus.md3.ui.components.formatDuration
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** The downloaded episodes of one album, newest album first. */
 private class DownloadedAlbum(val id: String, val episodes: List<DownloadTask>) {
@@ -69,10 +81,17 @@ private class DownloadedAlbum(val id: String, val episodes: List<DownloadTask>) 
     val bytes: Long get() = episodes.sumOf { it.bytes }
 }
 
+/** What 已下载 shows: the episodes by album, or the songs. */
+private enum class DoneFilter(@StringRes val label: Int) {
+    Books(R.string.tab_discover),
+    Music(R.string.tab_music),
+}
+
 /** A removal waiting for the listener to agree, with the audio it frees. */
 private sealed interface PendingRemoval {
     data class Episode(val task: DownloadTask) : PendingRemoval
     data class Album(val album: DownloadedAlbum) : PendingRemoval
+    data class Song(val task: DownloadTask) : PendingRemoval
     /** An unfinished episode that was already charged: cancelling it gives up that listening time. */
     data class Charged(val task: DownloadTask) : PendingRemoval
     data object Unfinished : PendingRemoval
@@ -80,23 +99,38 @@ private sealed interface PendingRemoval {
 
 /**
  * 下载: how much the downloads take and what is left, then 已下载 and 下载中, which swipe. 已下载 lists albums that open
- * into their episodes; 下载中 shows each episode's progress and speed. The top bar's icons act on everything in 下载中.
+ * into their episodes, or the downloaded songs; 下载中 shows each download's progress and speed, episodes and songs
+ * alike. The top bar's icons act on everything in 下载中.
  */
 @Composable
-fun DownloadsScreen(viewModel: DownloadsViewModel, onOpenAlbum: (String) -> Unit, onPlay: (albumId: String, trackId: String) -> Unit) {
+fun DownloadsScreen(
+    viewModel: DownloadsViewModel,
+    onOpenAlbum: (String) -> Unit,
+    onPlay: (albumId: String, trackId: String) -> Unit,
+    onPlaySongs: (List<MusicItem>) -> Unit = {},
+) {
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val free by viewModel.freeBytes.collectAsStateWithLifecycle()
     val active = remember(tasks) { tasks.filter { it.state != DownloadState.Completed } }
-    val albums = remember(tasks) {
-        tasks.filter { it.state == DownloadState.Completed }.groupBy { it.albumId }
+    val done = remember(tasks) { tasks.filter { it.state == DownloadState.Completed } }
+    val albums = remember(done) {
+        done.filter { it.kind == ContentKind.Episode }.groupBy { it.albumId }
             .map { (id, episodes) -> DownloadedAlbum(id, episodes.sortedBy { it.index ?: Int.MAX_VALUE }) }
             .sortedByDescending { album -> album.episodes.maxOf { it.createdAt } }
     }
-    val pager = rememberPagerState(initialPage = if (albums.isEmpty() && active.isNotEmpty()) ActiveTab else DoneTab) { 2 }
+    val songs = remember(done) { done.filter { it.kind == ContentKind.Song }.sortedByDescending { it.createdAt } }
+    // 听书 and 音乐 split the songs from the albums, and are worth showing only when both are there.
+    val bothKinds = albums.isNotEmpty() && songs.isNotEmpty()
+    val pager = rememberPagerState(initialPage = if (albums.isEmpty() && songs.isEmpty() && active.isNotEmpty()) ActiveTab else DoneTab) { 2 }
+    var filter by rememberSaveable { mutableStateOf(DoneFilter.Books) }
     var removal by remember { mutableStateOf<PendingRemoval?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deleted = stringResource(R.string.downloads_deleted)
     val running = active.any { it.state == DownloadState.Queued || it.state == DownloadState.Running }
     TabScaffold(
         Destination.Downloads.label,
+        snackbarHost = { SnackbarHost(snackbar) },
         actions = {
             if (pager.currentPage == ActiveTab && active.isNotEmpty()) {
                 if (running) {
@@ -111,20 +145,26 @@ fun DownloadsScreen(viewModel: DownloadsViewModel, onOpenAlbum: (String) -> Unit
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            StorageBar(used = albums.sumOf { it.bytes } + active.sumOf { it.bytes }, free = free)
+            StorageBar(used = done.sumOf { it.bytes } + active.sumOf { it.bytes }, free = free)
             PagerTabs(
                 pager,
                 listOf(
-                    tabLabel(R.string.downloads_tab_done, albums.sumOf { it.episodes.size }),
+                    tabLabel(R.string.downloads_tab_done, albums.sumOf { it.episodes.size } + songs.size),
                     tabLabel(R.string.downloads_tab_active, active.size),
                 ),
             )
             SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                 if (page == DoneTab) {
                     DonePage(
-                        albums, onPlay = { onPlay(it.albumId, it.trackId) }, onOpenAlbum = onOpenAlbum,
+                        albums = albums, songs = songs,
+                        filter = if (bothKinds) filter else null,
+                        onFilter = { filter = it },
+                        onPlay = { onPlay(it.albumId, it.trackId) },
+                        onPlayAllSongs = { onPlaySongs(songs.mapNotNull { it.song() }) },
+                        onOpenAlbum = onOpenAlbum,
                         onDeleteEpisode = { removal = PendingRemoval.Episode(it) },
                         onDeleteAlbum = { removal = PendingRemoval.Album(it) },
+                        onDeleteSong = { removal = PendingRemoval.Song(it) },
                     )
                 } else {
                     ActivePage(active, viewModel, onCancel = { task ->
@@ -142,6 +182,10 @@ fun DownloadsScreen(viewModel: DownloadsViewModel, onOpenAlbum: (String) -> Unit
                 when (pending) {
                     is PendingRemoval.Episode -> viewModel.delete(pending.task.trackId)
                     is PendingRemoval.Album -> viewModel.deleteAlbum(pending.album.id)
+                    is PendingRemoval.Song -> {
+                        viewModel.delete(pending.task.trackId)
+                        scope.launch { snackbar.showSnackbar(deleted, duration = SnackbarDuration.Short) }
+                    }
                     is PendingRemoval.Charged -> viewModel.cancel(pending.task.trackId)
                     PendingRemoval.Unfinished -> viewModel.cancelAll()
                 }
@@ -181,19 +225,52 @@ private fun StorageBar(used: Long, free: Long?) {
     }
 }
 
-/** Albums, each opening in place into its episodes. Tapping an episode plays it from the downloaded file. */
+/** Albums, each opening in place into its episodes, or the downloaded songs. The chips split the two kinds. */
 @Composable
 private fun DonePage(
+    albums: List<DownloadedAlbum>,
+    songs: List<DownloadTask>,
+    filter: DoneFilter?,
+    onFilter: (DoneFilter) -> Unit,
+    onPlay: (DownloadTask) -> Unit,
+    onPlayAllSongs: () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onDeleteEpisode: (DownloadTask) -> Unit,
+    onDeleteAlbum: (DownloadedAlbum) -> Unit,
+    onDeleteSong: (DownloadTask) -> Unit,
+) {
+    if (albums.isEmpty() && songs.isEmpty()) {
+        EmptyPage(XmIcons.Outlined.DownloadDone, R.string.downloads_empty_done)
+        return
+    }
+    val shown = filter ?: if (songs.isEmpty()) DoneFilter.Books else DoneFilter.Music
+    Column(Modifier.fillMaxSize()) {
+        if (filter != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DoneFilter.entries.forEach { option ->
+                    FilterChip(selected = option == shown, onClick = { onFilter(option) }, label = { Text(stringResource(option.label)) })
+                }
+            }
+        }
+        when (shown) {
+            DoneFilter.Books -> AlbumList(albums, onPlay, onOpenAlbum, onDeleteEpisode, onDeleteAlbum)
+            DoneFilter.Music -> SongList(songs, onPlayAll = onPlayAllSongs, onPlay = onPlay, onDelete = onDeleteSong)
+        }
+    }
+}
+
+/** Albums, each opening in place into its episodes. Tapping an episode plays it from the downloaded file. */
+@Composable
+private fun AlbumList(
     albums: List<DownloadedAlbum>,
     onPlay: (DownloadTask) -> Unit,
     onOpenAlbum: (String) -> Unit,
     onDeleteEpisode: (DownloadTask) -> Unit,
     onDeleteAlbum: (DownloadedAlbum) -> Unit,
 ) {
-    if (albums.isEmpty()) {
-        EmptyPage(XmIcons.Outlined.DownloadDone, R.string.downloads_empty_done)
-        return
-    }
     var expanded by rememberSaveable { mutableStateOf(listOf<String>()) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
         for (album in albums) {
@@ -210,6 +287,66 @@ private fun DonePage(
                 items(album.episodes, key = { "episode-${it.trackId}" }) { task ->
                     DoneEpisodeRow(task, onPlay = { onPlay(task) }, onDelete = { onDeleteEpisode(task) })
                 }
+            }
+        }
+    }
+}
+
+/** The downloaded songs, newest first, behind 播放全部. */
+@Composable
+private fun SongList(songs: List<DownloadTask>, onPlayAll: () -> Unit, onPlay: (DownloadTask) -> Unit, onDelete: (DownloadTask) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
+        item(key = "play-all") { PlayAllRow(songs.size, onPlayAll) }
+        items(songs, key = { "song-${it.trackId}" }) { task ->
+            DoneSongRow(task, onPlay = { onPlay(task) }, onDelete = { onDelete(task) })
+        }
+    }
+}
+
+@Composable
+private fun PlayAllRow(count: Int, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 56.dp).padding(horizontal = XmLayout.PagePadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(XmIcons.Filled.PlayArrow, contentDescription = null, tint = scheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(R.string.music_play_all), style = MaterialTheme.typography.titleSmall, color = scheme.primary)
+        Text(
+            pluralStringResource(R.plurals.music_song_count, count, count), Modifier.padding(start = 8.dp),
+            style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A downloaded song: cover, title and artist, its size as quiet meta, and 删除 behind the menu. */
+@Composable
+private fun DoneSongRow(task: DownloadTask, onPlay: () -> Unit, onDelete: () -> Unit) {
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_play), onClick = onPlay)
+            .padding(start = XmLayout.PagePadding, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MusicCover(task.coverUrl, Modifier.size(CoverSize), MaterialTheme.shapes.small)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(task.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(
+                    task.albumTitle.takeIf { it.isNotBlank() },
+                    Formatter.formatShortFileSize(context, task.bytes),
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.player_more), tint = scheme.onSurfaceVariant) }
+            XmMenu(menu, onDismissRequest = { menu = false }) {
+                XmMenuItem(stringResource(R.string.downloads_delete), { menu = false; onDelete() }, 0, 1, XmIcons.Outlined.DeleteOutline)
             }
         }
     }
@@ -306,7 +443,8 @@ private fun ActiveRow(task: DownloadTask, onPause: () -> Unit, onResume: () -> U
         Modifier.fillMaxWidth().padding(start = XmLayout.PagePadding, end = 4.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Cover(task.coverUrl, Modifier.size(CoverSize), MaterialTheme.shapes.small)
+        if (task.kind == ContentKind.Song) MusicCover(task.coverUrl, Modifier.size(CoverSize), MaterialTheme.shapes.small)
+        else Cover(task.coverUrl, Modifier.size(CoverSize), MaterialTheme.shapes.small)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(task.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -405,6 +543,11 @@ private fun RemovalDialog(removal: PendingRemoval, onConfirm: () -> Unit, onDism
         is PendingRemoval.Album -> Triple(
             stringResource(R.string.downloads_delete_album_title),
             stringResource(R.string.downloads_delete_body, Formatter.formatShortFileSize(context, removal.album.bytes)),
+            stringResource(R.string.downloads_delete),
+        )
+        is PendingRemoval.Song -> Triple(
+            stringResource(R.string.downloads_delete_song_title, removal.task.title),
+            stringResource(R.string.downloads_delete_body, Formatter.formatShortFileSize(context, removal.task.bytes)),
             stringResource(R.string.downloads_delete),
         )
         is PendingRemoval.Charged -> Triple(
