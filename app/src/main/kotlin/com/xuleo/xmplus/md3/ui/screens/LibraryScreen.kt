@@ -41,6 +41,7 @@ import com.xuleo.xmplus.md3.ui.components.ReorderState
 import com.xuleo.xmplus.md3.ui.components.rememberReorderState
 import com.xuleo.xmplus.md3.ui.components.reorderItem
 import com.xuleo.xmplus.md3.ui.components.CardHeading
+import com.xuleo.xmplus.md3.ui.components.CardTopPadding
 import com.xuleo.xmplus.md3.ui.components.CardPartPadding
 import com.xuleo.xmplus.md3.ui.components.SectionCard
 import com.xuleo.xmplus.md3.ui.components.SectionHeader
@@ -214,7 +215,7 @@ fun LibraryScreen(
             if (!managing) {
                 item(key = "books") {
                     // The heading sits as far from the top as 全站热播榜 does on 听书 home.
-                    SectionCard(contentPadding = PaddingValues(top = XmLayout.PagePadding, bottom = 10.dp)) {
+                    SectionCard(contentPadding = PaddingValues(top = CardTopPadding, bottom = 10.dp)) {
                         CardHeading(stringResource(R.string.tab_discover))
                         if (signedIn) TileGrid(tiles) else SignedOutBooks(bookmarksTile, links.onLogin)
                     }
@@ -225,7 +226,7 @@ fun LibraryScreen(
                 if (!managing) {
                     item(key = "musicGap") { Spacer(Modifier.height(XmLayout.ItemGap)) }
                     item(key = "musicHeading") {
-                        CardHeading(stringResource(R.string.tab_music), Modifier.sectionCardPart(first = true, last = false, padding = XmLayout.PagePadding))
+                        CardHeading(stringResource(R.string.tab_music), Modifier.sectionCardPart(first = true, last = false, padding = CardTopPadding))
                     }
                     item(key = "likes") {
                         LikesRow(
@@ -514,7 +515,7 @@ private fun TileGrid(tiles: List<Tile>) {
 @Composable
 private fun ShortcutTile(tile: Tile, modifier: Modifier = Modifier) {
     Column(
-        modifier.pressable(tile.onClick).heightIn(min = 76.dp).padding(vertical = 6.dp),
+        modifier.pressable(tile.onClick).heightIn(min = 72.dp).padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
     ) {

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.material3.MaterialTheme
@@ -29,11 +28,14 @@ import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 /** Space above and below the content of a card whose heading is a full 48dp row. */
 val CardPartPadding = 8.dp
 
+/** Space between a card's top edge and its heading. */
+val CardTopPadding = 10.dp
+
 /** A tonal rounded group on a page, as 全站热播榜 sits on 听书 home. */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(vertical = XmLayout.PagePadding),
+    contentPadding: PaddingValues = PaddingValues(vertical = CardTopPadding),
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -69,8 +71,9 @@ fun Modifier.sectionCardPart(first: Boolean, last: Boolean, padding: Dp = CardPa
 @Composable
 fun CardHeading(title: String, modifier: Modifier = Modifier, trailing: (@Composable RowScope.() -> Unit)? = null) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = 48.dp)
-            .padding(start = XmLayout.PagePadding, end = if (trailing != null) 4.dp else XmLayout.PagePadding),
+        modifier.fillMaxWidth()
+            .padding(start = XmLayout.PagePadding, end = if (trailing != null) 4.dp else XmLayout.PagePadding)
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
