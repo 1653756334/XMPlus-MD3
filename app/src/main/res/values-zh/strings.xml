@@ -540,6 +540,8 @@
     <string name="music_sheet_rename">重命名</string>
     <string name="music_sheet_delete">删除歌单</string>
     <string name="music_sheet_delete_title">删除「%1$s」？</string>
+    <string name="library_star">收藏歌单</string>
+    <string name="library_unstar">取消收藏</string>
     <string name="music_sheets_delete_title">删除所选歌单？</string>
     <string name="music_star">收藏</string>
     <string name="music_unstar">取消收藏</string>

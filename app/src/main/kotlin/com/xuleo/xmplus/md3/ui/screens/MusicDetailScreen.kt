@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.core.media.MusicLibrary
 import com.xuleo.xmplus.md3.core.model.MusicAlbum
 import com.xuleo.xmplus.md3.core.model.MusicArtist
 import com.xuleo.xmplus.md3.core.model.MusicItem
@@ -49,6 +52,7 @@ import com.xuleo.xmplus.md3.ui.components.DetailHero
 import com.xuleo.xmplus.md3.ui.components.DetailPage
 import com.xuleo.xmplus.md3.ui.components.ErrorState
 import com.xuleo.xmplus.md3.ui.components.ListSkeleton
+import com.xuleo.xmplus.md3.ui.components.LocalMusicLibrary
 import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
 import com.xuleo.xmplus.md3.ui.components.MusicAlbumRow
 import com.xuleo.xmplus.md3.ui.components.MusicCover
@@ -78,13 +82,34 @@ internal fun MusicDetailScreen(
     val item by viewModel.item.collectAsStateWithLifecycle()
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val title = item.title()
-    DetailPage(onBack, title, header = { MusicHero(item) }) {
+    DetailPage(
+        onBack, title, header = { MusicHero(item) },
+        actions = {
+            // MusicFree lets a plugin sheet be starred; the other kinds have nothing to keep.
+            val sheet = item as? MusicSheet
+            val library = LocalMusicLibrary.current
+            if (sheet != null && library != null) StarAction(library, sheet)
+        },
+    ) {
         if (viewModel.kind == MusicDetailKind.Artist) {
             ArtistPages(viewModel, songs, onOpenAlbum, onPlay, onPlayNext, playingKey)
         } else {
             val list = rememberLazyListState()
             SongList(songs, list, viewModel::loadMoreSongs, viewModel::retrySongs, onPlay, onPlayNext, playingKey, total = item.count())
         }
+    }
+}
+
+@Composable
+private fun StarAction(library: MusicLibrary, sheet: MusicSheet) {
+    val starred by library.starred.collectAsStateWithLifecycle()
+    val on = starred.any { it.platform == sheet.platform && it.id == sheet.id }
+    IconButton(onClick = { if (on) library.unstar(sheet) else library.star(sheet) }) {
+        Icon(
+            XmIcons.Outlined.Star,
+            stringResource(if (on) R.string.library_unstar else R.string.library_star),
+            tint = if (on) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
     }
 }
 
