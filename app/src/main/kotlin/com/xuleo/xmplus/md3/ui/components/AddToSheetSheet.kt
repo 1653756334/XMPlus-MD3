@@ -2,7 +2,6 @@
 
 package com.xuleo.xmplus.md3.ui.components
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -72,7 +70,7 @@ fun AddToSheetSheet(
     val library = LocalMusicLibrary.current ?: return
     val liked by library.liked.collectAsStateWithLifecycle()
     val sheets by library.sheets.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val resources = LocalResources.current
     var creating by rememberSaveable { mutableStateOf(false) }
     fun put(id: String, name: String) {
@@ -84,7 +82,7 @@ fun AddToSheetSheet(
         } else {
             resources.getString(R.string.music_sheet_present)
         }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        showMessage(message)
         onDismiss()
         onDone()
     }

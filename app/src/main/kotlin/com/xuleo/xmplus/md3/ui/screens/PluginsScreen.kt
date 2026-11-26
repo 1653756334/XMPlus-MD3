@@ -67,6 +67,7 @@ import com.xuleo.xmplus.md3.music.failureText
 import com.xuleo.xmplus.md3.music.installSummary
 import com.xuleo.xmplus.md3.music.PluginsViewModel
 import com.xuleo.xmplus.md3.music.installMessage
+import com.xuleo.xmplus.md3.ui.components.ToolbarAction
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 private val PluginRowHeight = 64.dp
@@ -391,21 +392,6 @@ private fun SelectionToolbar(
         ToolbarAction(R.string.plugin_disable, XmIcons.Outlined.ToggleOff, canDisable, onDisable)
         ToolbarAction(R.string.plugin_update, XmIcons.Outlined.Refresh, canUpdate, onUpdate)
         ToolbarAction(R.string.plugin_uninstall, XmIcons.Outlined.DeleteOutline, canUninstall, onUninstall)
-    }
-}
-
-@Composable
-internal fun ToolbarAction(@StringRes label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier.widthIn(min = 64.dp).clip(MaterialTheme.shapes.large)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.38f)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Icon(icon, contentDescription = null)
-        Text(stringResource(label), style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
 }
 

@@ -2,7 +2,6 @@
 
 package com.xuleo.xmplus.md3.ui.components
 
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -66,7 +64,7 @@ fun List<DownloadTask>.songDownload(song: MusicItem): DownloadTask? =
 internal fun SongDownloadSheet(song: MusicItem, onDismiss: () -> Unit) {
     val downloads = LocalSongDownloads.current ?: return
     val preferred by downloads.quality.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val queued = stringResource(R.string.downloads_queued)
     val scope = rememberCoroutineScope()
     val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -96,7 +94,7 @@ internal fun SongDownloadSheet(song: MusicItem, onDismiss: () -> Unit) {
                             sheet.hide()
                             if (!sheet.isVisible) {
                                 onDismiss()
-                                if (downloads.download(song, quality)) Toast.makeText(context, queued, Toast.LENGTH_SHORT).show()
+                                if (downloads.download(song, quality)) showMessage(queued)
                             }
                         }
                     }.padding(horizontal = 8.dp),

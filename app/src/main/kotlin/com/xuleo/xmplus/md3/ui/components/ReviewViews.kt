@@ -1,7 +1,6 @@
 package com.xuleo.xmplus.md3.ui.components
 
 import android.content.ClipData
-import android.widget.Toast
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -114,7 +112,7 @@ private fun percent(share: Double): String = "${(share * 100).roundToInt()}%"
 fun ReviewRow(review: AlbumReview, onReplies: (AlbumReview) -> Unit, modifier: Modifier = Modifier) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val copied = stringResource(R.string.album_review_copied)
     val locale = LocalConfiguration.current.locales[0]
     Column(
@@ -122,7 +120,7 @@ fun ReviewRow(review: AlbumReview, onReplies: (AlbumReview) -> Unit, modifier: M
             .combinedClickable(onLongClick = {
                 scope.launch {
                     clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, review.content)))
-                    Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+                    showMessage(copied)
                 }
             }, onClick = {})
             .padding(horizontal = XmLayout.PagePadding, vertical = 12.dp),

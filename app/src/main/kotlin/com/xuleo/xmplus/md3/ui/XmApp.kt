@@ -102,7 +102,11 @@ fun XmApp() {
             application.downloadActions::downloadSong, application.downloadActions::pause, application.downloadActions::resume,
         )
     }
+    val appSnackbar = remember { SnackbarHostState() }
+    val appScope = rememberCoroutineScope()
     CompositionLocalProvider(
+        com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar provides appSnackbar,
+        com.xuleo.xmplus.md3.ui.components.LocalAppSnackbarScope provides appScope,
         com.xuleo.xmplus.md3.ui.components.LocalMusicLibrary provides application.musicLibrary,
         com.xuleo.xmplus.md3.ui.components.LocalSongDownloads provides songDownloads,
     ) { XmAppContent(
@@ -287,10 +291,11 @@ internal fun XmAppContent(
     ) {
         // One player on every page, outside every entry transition. IME insets move it above the keyboard.
         Column(Modifier.fillMaxSize().imePadding()) {
+            Box(Modifier.weight(1f)) {
             NavDisplay(
                 backStack = pages,
                 onBack = { if (!isPlayer) navigator.pop() },
-                modifier = Modifier.weight(1f).clipToBounds(),
+                modifier = Modifier.fillMaxSize().clipToBounds(),
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), routeDecorator),
                 transitionSpec = { openTransform(direction, spatial, effects) },
                 // Back, by gesture from either edge or by button, is the opening slide in reverse (see BackMotion.kt).
@@ -439,6 +444,11 @@ internal fun XmAppContent(
                     }
                 },
             )
+            // Messages show just above the mini player and the bottom bar, never over them.
+            com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar.current?.let { host ->
+                SnackbarHost(host, Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
+            }
+            }
             var miniQueue by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
             MiniPlayer(playback, onOpen = ::openPlayer, music = musicPlayer?.playback, onQueue = { miniQueue = true })
             if (importing && musicPlayer != null) {
@@ -460,14 +470,16 @@ internal fun XmAppContent(
         }
     }
     val songActive = playingSong != null
+    // The players cover everything, so their messages show in the player itself.
+    val playerSnackbar = remember { SnackbarHostState() }
     if (isPlayer && musicPlayer != null && songActive) {
-        MusicPlayerSheet(
+        CompositionLocalProvider(com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar provides playerSnackbar) { MusicPlayerSheet(
             musicPlayer,
             onDismiss = { stack.remove(AppRoute.Player) },
             onOpenMusic = ::openMusic,
-        )
+        ) }
     } else if (isPlayer && playback != null) {
-        PlayerSheet(
+        CompositionLocalProvider(com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar provides playerSnackbar) { PlayerSheet(
             playback,
             onDismiss = { stack.remove(AppRoute.Player) },
             onOpenAlbum = ::openAlbum,
@@ -477,7 +489,7 @@ internal fun XmAppContent(
             libraryActions = libraryActions,
             comments = comments,
             downloads = downloadActions,
-        )
+        ) }
     }
     accounts?.archive?.let {
         ArchiveDialog(it, accounts.busy, accounts.errorCode, accounts::confirmArchive, accounts::dismissArchive)

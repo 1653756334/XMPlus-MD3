@@ -1,7 +1,5 @@
 package com.xuleo.xmplus.md3.ui.components
 
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -140,7 +138,7 @@ fun SongMenu(
     var adding by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val added = stringResource(R.string.music_play_next_added)
     val library = LocalMusicLibrary.current
     val downloads = LocalSongDownloads.current
@@ -158,7 +156,7 @@ fun SongMenu(
                     stringResource(R.string.music_play_next), {
                         open = false
                         onPlayNext()
-                        Toast.makeText(context, added, Toast.LENGTH_SHORT).show()
+                        showMessage(added)
                     }, index++, count,
                     icon = XmIcons.Outlined.QueueMusic, enabled = !playing,
                 )

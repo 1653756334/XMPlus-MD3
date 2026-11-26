@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import android.provider.Settings
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.border
@@ -63,6 +62,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -116,6 +117,9 @@ import com.xuleo.xmplus.md3.core.plugin.parseLrc
 import com.xuleo.xmplus.md3.library.ListPage
 import com.xuleo.xmplus.md3.library.ListSection
 import com.xuleo.xmplus.md3.music.MusicDetailKind
+import com.xuleo.xmplus.md3.ui.components.ListSkeleton
+import com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
 import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
 import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
@@ -179,7 +183,7 @@ internal fun MusicPlayerSheet(
     val speed by music.speed.collectAsStateWithLifecycle()
     val sleep by music.sleepTimer.collectAsStateWithLifecycle()
     val liked by deps.library.liked.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val qualityFailed = stringResource(R.string.music_quality_failed)
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -277,6 +281,10 @@ internal fun MusicPlayerSheet(
                     }
                 }
             }
+
+            LocalAppSnackbar.current?.let { host ->
+                SnackbarHost(host, Modifier.align(Alignment.BottomCenter).padding(WindowInsets.safeDrawing.asPaddingValues()))
+            }
         }
         if (showQueue) {
             MusicQueueSheet(music, onClear = { closeThen { music.clear() } }, onDismiss = { showQueue = false })
@@ -286,7 +294,7 @@ internal fun MusicPlayerSheet(
                 current = state.quality,
                 onSelect = { quality ->
                     scope.launch {
-                        if (!music.changeQuality(quality)) Toast.makeText(context, qualityFailed, Toast.LENGTH_SHORT).show()
+                        if (!music.changeQuality(quality)) showMessage(qualityFailed)
                     }
                 },
                 onDismiss = { showQuality = false },
@@ -959,8 +967,8 @@ private suspend fun LazyListState.anchor(index: Int, spec: AnimationSpec<Float>?
 /** Lyrics found by the plugins that search lyrics; choosing one uses it for the song from now on. */
 @Composable
 private fun LyricSearchSheet(song: MusicItem, deps: MusicPlayerDeps, onChosen: () -> Unit, onDismiss: () -> Unit) {
-    val context = LocalContext.current
     val failed = stringResource(R.string.music_lyric_failed)
+    val lyricSnackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var results by remember(song.key) { mutableStateOf<List<MusicItem>?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -989,9 +997,7 @@ private fun LyricSearchSheet(song: MusicItem, deps: MusicPlayerDeps, onChosen: (
             Box(Modifier.padding(horizontal = XmLayout.PagePadding)) { SheetHeader(stringResource(R.string.music_lyric_search), song.title) }
             val found = results
             when {
-                found == null -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                found == null -> ListSkeleton(Modifier.heightIn(max = 520.dp))
                 found.isEmpty() -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.music_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -1009,12 +1015,14 @@ private fun LyricSearchSheet(song: MusicItem, deps: MusicPlayerDeps, onChosen: (
                                     false
                                 }
                                 busy = false
-                                if (chosen) onChosen() else Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
+                                if (chosen) onChosen() else scope.launch { lyricSnackbar.showSnackbar(failed) }
                             }
                         })
                     }
                 }
             }
+
+            SnackbarHost(lyricSnackbar)
         }
     }
 }
@@ -1045,9 +1053,7 @@ private fun MusicComments(song: MusicItem, lyrics: MusicLyrics, modifier: Modifi
     Box(modifier) {
         when {
             state.items.isEmpty() && failure != null -> InlineError(failure, onRetry = { list.refresh() }, modifier = Modifier.fillMaxSize())
-            state.items.isEmpty() && (!state.loaded || state.loading) -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            state.items.isEmpty() && (!state.loaded || state.loading) -> ListSkeleton()
             state.items.isEmpty() -> Column(
                 Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
             ) {

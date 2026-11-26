@@ -44,6 +44,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -107,6 +109,7 @@ import com.xuleo.xmplus.md3.core.model.AlbumSkip
 import com.xuleo.xmplus.md3.core.protocol.XmlyTranscript
 import com.xuleo.xmplus.md3.library.CommentActions
 import com.xuleo.xmplus.md3.library.LibraryActions
+import com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.DetailArtworkBackdrop
 import com.xuleo.xmplus.md3.ui.components.DetailTopBarHeight
@@ -243,6 +246,10 @@ internal fun PlayerSheet(
                         }
                     }
                 }
+            }
+
+            LocalAppSnackbar.current?.let { host ->
+                SnackbarHost(host, Modifier.align(Alignment.BottomCenter).padding(WindowInsets.safeDrawing.asPaddingValues()))
             }
         }
         if (showActions && episode != null) {

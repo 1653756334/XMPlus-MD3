@@ -144,7 +144,7 @@ internal fun LibrarySearchScreen(
             if (found.albums.isNotEmpty()) {
                 item(key = "albums-head") { SectionHead(R.string.music_tab_albums, found.albums.size) }
                 items(found.albums, key = { "album:${it.albumId}" }) { record ->
-                    ListingRow(record.coverUrl, record.albumTitle, record.anchor, "", onOpen = { onOpenAlbum(record.albumId) })
+                    ListingRow(record.coverUrl, record.albumTitle, record.anchor, "", onOpen = { onOpenAlbum(record.albumId) }, large = true)
                 }
             }
             if (found.songs.isNotEmpty()) {
@@ -161,6 +161,7 @@ internal fun LibrarySearchScreen(
                         hit.cover, hit.name, "",
                         if (starredSheet == null) pluralStringResource(R.plurals.music_song_count, hit.count, hit.count) else "",
                         music = true,
+                        large = true,
                         onOpen = { if (starredSheet == null) onOpenSheet(hit.id) else onOpenStarred(starredSheet) },
                     )
                 }

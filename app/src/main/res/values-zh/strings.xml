@@ -562,4 +562,10 @@
     <string name="music_import_none">没有能导入链接的插件</string>
     <string name="music_importing">正在导入…</string>
     <string name="library_search_section">%1$s %2$d</string>
+    <string name="music_sheets_unstar_title">取消收藏所选歌单？</string>
+    <string name="music_star_done">已收藏</string>
+    <string name="music_unstar_done">已取消收藏</string>
+    <plurals name="music_download_added">
+        <item quantity="other">已加入下载 %1$d 首</item>
+    </plurals>
 </resources>

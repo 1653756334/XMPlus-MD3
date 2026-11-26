@@ -78,6 +78,9 @@ import com.xuleo.xmplus.md3.ui.components.pressable
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbar
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbarSpace
+import com.xuleo.xmplus.md3.ui.components.ToolbarAction
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** How many items 继续听 shows. */
@@ -185,9 +188,6 @@ fun LibraryScreen(
                         tint = if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                     )
                 }
-                IconButton(onClick = { confirmDelete = true }, enabled = selected.isNotEmpty()) {
-                    Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.downloads_delete))
-                }
             } else {
                 links.onSearch?.let { search ->
                     IconButton(onClick = search) { Icon(XmIcons.Outlined.Search, stringResource(R.string.library_search)) }
@@ -196,7 +196,11 @@ fun LibraryScreen(
             }
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), list, contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+            Modifier.fillMaxSize(), list,
+            contentPadding = PaddingValues(bottom = if (managing) SelectionToolbarSpace else XmLayout.SectionGap),
+        ) {
             if (recent.isNotEmpty() && !managing) {
                 item(key = "continue") {
                     ContinueRow(recent, nowPlaying, links.onOpenRecent) { record ->
@@ -262,6 +266,15 @@ fun LibraryScreen(
                 }
             }
         }
+        val starredGroup = group == SheetGroup.Starred
+        SelectionToolbar(managing) {
+            ToolbarAction(
+                if (starredGroup) R.string.music_unstar else R.string.downloads_delete,
+                if (starredGroup) XmIcons.Filled.Star else XmIcons.Outlined.DeleteOutline,
+                selected.isNotEmpty(),
+            ) { confirmDelete = true }
+        }
+        }
     }
     if (creating && music != null) {
         NewSheetDialog(onDismiss = { creating = false }) { name ->
@@ -272,14 +285,14 @@ fun LibraryScreen(
     if (confirmDelete && music != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text(stringResource(R.string.music_sheets_delete_title)) },
+            title = { Text(stringResource(if (group == SheetGroup.Mine) R.string.music_sheets_delete_title else R.string.music_sheets_unstar_title)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     if (group == SheetGroup.Mine) music.deleteSheets(sheets.filter { sheetKey(it) in selected }.map { it.id })
                     else starred.filter { starredKey(it) in selected }.forEach(music::unstar)
                     endManage()
-                }) { Text(stringResource(R.string.downloads_delete)) }
+                }) { Text(stringResource(if (group == SheetGroup.Mine) R.string.downloads_delete else R.string.music_unstar)) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
         )

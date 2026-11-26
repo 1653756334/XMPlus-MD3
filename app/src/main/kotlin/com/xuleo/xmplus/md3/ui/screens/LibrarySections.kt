@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +47,7 @@ import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.BrowsePage
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.ErrorState
+import com.xuleo.xmplus.md3.ui.components.ListSkeleton
 import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
 import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.PagingFooter
@@ -172,6 +173,7 @@ fun LibrarySectionScreen(
                         subtitle = item.latestTitle,
                         meta = if (unread > 0) pluralStringResource(R.plurals.listen_unplayed, unread, unread) else "",
                         onOpen = { openAlbum(item.album.id) },
+                        large = true,
                         trailing = {
                             IconButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
                                 Icon(XmIcons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
@@ -196,6 +198,7 @@ fun LibrarySectionScreen(
                         subtitle = track.albumTitle,
                         meta = "",
                         onOpen = { openAlbum(track.albumId) },
+                        large = true,
                         trailing = {
                             IconButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
                                 Icon(XmIcons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
@@ -282,9 +285,7 @@ private fun <T> ListingPage(
     val failure = state.failure
     when {
         !state.signedIn -> Note(stringResource(signedOutText))
-        !state.loaded && failure == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        !state.loaded && failure == null -> ListSkeleton()
         state.items.isEmpty() && failure != null -> ErrorState(failure, onRefresh)
         state.items.isEmpty() -> Note(stringResource(emptyText))
         else -> LazyColumn(Modifier.fillMaxSize(), state = lazy) {
@@ -295,7 +296,8 @@ private fun <T> ListingPage(
 }
 
 /**
- * One row of a 听过 list: the cover, a title with its details, an optional trailing action, and a tap that opens it.
+ * One row of a 听过 list: the cover, a title on one line, one quiet line with [subtitle] and [meta], an optional trailing
+ * action, and a tap that opens it. Episodes and songs have a 48dp cover; [large] gives albums and sheets 56dp.
  * [music] gives the cover the music placeholder; [onLongClick] starts selection where a list has it.
  */
 @Composable
@@ -308,6 +310,7 @@ internal fun ListingRow(
     modifier: Modifier = Modifier,
     circle: Boolean = false,
     music: Boolean = false,
+    large: Boolean = false,
     highlighted: Boolean = false,
     /** Marks the cover as 听书 or 音乐 where both kinds share a list. */
     kind: ContentKind? = null,
@@ -315,30 +318,28 @@ internal fun ListingRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val click = if (onLongClick != null) Modifier.combinedClickable(onClick = onOpen, onLongClick = onLongClick) else Modifier.clickable(onClick = onOpen)
+    val shape = if (large) MaterialTheme.shapes.medium else MaterialTheme.shapes.small
     Row(
-        modifier.fillMaxWidth().then(click).padding(horizontal = XmLayout.PagePadding, vertical = 10.dp),
+        modifier.fillMaxWidth().then(click).heightIn(min = 64.dp).padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        Box(Modifier.size(56.dp)) {
+        Box(Modifier.size(if (large) 56.dp else 48.dp)) {
             when {
                 circle -> Avatar(cover, Modifier.matchParentSize())
-                music -> MusicCover(cover, Modifier.matchParentSize())
-                else -> Cover(cover, Modifier.matchParentSize())
+                music -> MusicCover(cover, Modifier.matchParentSize(), shape)
+                else -> Cover(cover, Modifier.matchParentSize(), shape)
             }
             if (kind != null) KindBadge(kind, Modifier.align(Alignment.BottomStart).padding(3.dp), size = 16.dp)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Unspecified,
             )
-            if (subtitle.isNotEmpty()) Text(
-                subtitle, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (meta.isNotEmpty()) Text(
-                meta, style = MaterialTheme.typography.bodySmall,
+            val line = joinMeta(subtitle, meta)
+            if (line.isNotEmpty()) Text(
+                line, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }

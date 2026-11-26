@@ -2,7 +2,6 @@
 
 package com.xuleo.xmplus.md3.ui.screens
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -66,7 +65,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -90,6 +89,7 @@ import com.xuleo.xmplus.md3.core.model.Track
 import com.xuleo.xmplus.md3.core.model.XmlyException
 import com.xuleo.xmplus.md3.download.DownloadRange
 import com.xuleo.xmplus.md3.library.LibraryToggle
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
 import com.xuleo.xmplus.md3.ui.components.*
 
 /** The pages of an album, in the order of their tabs. */
@@ -118,7 +118,8 @@ internal fun AlbumScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.start() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
+    val showMessage = rememberShowMessage()
     val notice = state.subscriptionNotice
     LaunchedEffect(viewModel, notice) {
         val message = when (notice) {
@@ -127,7 +128,7 @@ internal fun AlbumScreen(
             SubscriptionNotice.Failed -> R.string.library_action_failed
             null -> return@LaunchedEffect
         }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        showMessage(resources.getString(message))
         viewModel.clearSubscriptionNotice()
     }
     val prompt = rememberDownloadPrompt(viewModel.downloads)

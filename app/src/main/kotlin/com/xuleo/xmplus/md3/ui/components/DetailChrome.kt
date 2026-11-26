@@ -71,6 +71,10 @@ internal fun DetailPage(
     title: String = "",
     header: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    /** Replaces the back button, as ✕ does while selecting. */
+    navigation: (@Composable () -> Unit)? = null,
+    /** Keeps [title] shown while the header is still in view, as 已选 3 is while selecting. */
+    pinTitle: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -103,6 +107,8 @@ internal fun DetailPage(
             onBack = onBack,
             onShowHeader = { scope.launch { chrome.animateExpand(motion) } },
             actions = actions,
+            navigation = navigation,
+            pinTitle = pinTitle,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }
@@ -151,6 +157,8 @@ private fun DetailTopBar(
     onBack: () -> Unit,
     onShowHeader: () -> Unit,
     actions: @Composable RowScope.() -> Unit,
+    navigation: (@Composable () -> Unit)?,
+    pinTitle: Boolean,
     modifier: Modifier,
 ) {
     val surface = MaterialTheme.colorScheme.surface
@@ -159,14 +167,18 @@ private fun DetailTopBar(
     Column(modifier.fillMaxWidth().drawBehind { drawRect(surface, alpha = progress()) }) {
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
         Row(Modifier.fillMaxWidth().height(DetailTopBarHeight).padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Crossfade(showBack, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "detailTopButton") { back ->
-                IconButton(if (back) onBack else onShowHeader, Modifier.padding(start = 4.dp)) {
-                    if (back) Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
-                    else Icon(XmIcons.Filled.KeyboardArrowUp, stringResource(R.string.detail_show_header))
+            if (navigation != null) {
+                Box(Modifier.padding(start = 4.dp)) { navigation() }
+            } else {
+                Crossfade(showBack, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "detailTopButton") { back ->
+                    IconButton(if (back) onBack else onShowHeader, Modifier.padding(start = 4.dp)) {
+                        if (back) Icon(XmIcons.Filled.ArrowBack, stringResource(R.string.action_back))
+                        else Icon(XmIcons.Filled.KeyboardArrowUp, stringResource(R.string.detail_show_header))
+                    }
                 }
             }
             Text(
-                title, Modifier.weight(1f).padding(end = XmLayout.PagePadding).graphicsLayer { alpha = progress() },
+                title, Modifier.weight(1f).padding(end = XmLayout.PagePadding).graphicsLayer { alpha = if (pinTitle) 1f else progress() },
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

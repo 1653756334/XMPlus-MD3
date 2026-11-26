@@ -1,6 +1,6 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import android.widget.Toast
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.media.PlaybackSelection
@@ -29,7 +28,7 @@ internal fun rememberEpisodeLibrary(episode: PlaybackSelection?, actions: Librar
     val trackId = episode?.track?.id
     val albumId = episode?.album?.id
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val failed = stringResource(R.string.library_action_failed)
     var favorite by remember(trackId) { mutableStateOf<Boolean?>(null) }
     var busy by remember(trackId) { mutableStateOf(false) }
@@ -53,7 +52,7 @@ internal fun rememberEpisodeLibrary(episode: PlaybackSelection?, actions: Librar
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
+                showMessage(failed)
             } finally {
                 busy = false
             }

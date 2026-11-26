@@ -3,22 +3,15 @@
 package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,22 +22,17 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingToolbarDefaults
-import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -71,6 +60,11 @@ import com.xuleo.xmplus.md3.core.media.MusicPlaySource
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.ui.components.AddToSheetSheet
 import com.xuleo.xmplus.md3.ui.components.Cover
+import com.xuleo.xmplus.md3.ui.components.DetailHero
+import com.xuleo.xmplus.md3.ui.components.DetailPage
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbar
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbarSpace
+import com.xuleo.xmplus.md3.ui.components.ToolbarAction
 import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.ReorderHandle
 import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
@@ -87,7 +81,6 @@ import kotlinx.coroutines.launch
 private enum class SheetMode { Normal, Selecting, Sorting }
 
 private val MosaicSize = 120.dp
-private val ToolbarSpace = 112.dp
 
 /**
  * 我喜欢 ([MusicLibrary.LikesId]) or one of the user's sheets: the cover mosaic, name and count, 播放全部, then the songs.
@@ -128,7 +121,6 @@ internal fun LocalSheetScreen(
     val removedText = stringResource(R.string.music_sheet_removed)
     val undoText = stringResource(R.string.history_undo)
     val reorder = rememberReorderState<MusicItem>(list, { it.key }) { from, to -> library.moveSong(sheetId, from, to) }
-    val showTitle by remember { derivedStateOf { list.firstVisibleItemIndex > 0 } }
 
     fun endMode() {
         mode = SheetMode.Normal
@@ -152,62 +144,51 @@ internal fun LocalSheetScreen(
     }
     val chosen = songs.filter { it.key in selected }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    val title = when (mode) {
-                        SheetMode.Selecting -> stringResource(R.string.history_selected, selected.size)
-                        SheetMode.Sorting -> stringResource(R.string.plugin_sort)
-                        SheetMode.Normal -> if (showTitle) name else ""
-                    }
-                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                navigationIcon = {
-                    if (mode == SheetMode.Normal) {
-                        IconButton(onClick = onBack) { Icon(XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back)) }
-                    } else {
-                        IconButton(onClick = ::endMode) { Icon(XmIcons.Outlined.Close, stringResource(R.string.action_cancel)) }
-                    }
-                },
-                actions = {
-                    XmSwap(mode, contentAlignment = Alignment.CenterEnd) { shown ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            when (shown) {
-                                SheetMode.Selecting -> {
-                                    val all = songs.isNotEmpty() && selected.size == songs.size
-                                    IconButton(onClick = { selected = if (all) emptySet() else songs.mapTo(HashSet()) { it.key } }) {
-                                        Icon(
-                                            XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
-                                            tint = if (all) MaterialTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current,
-                                        )
-                                    }
-                                }
-                                SheetMode.Sorting -> TextButton(onClick = ::endMode) { Text(stringResource(R.string.plugin_done)) }
-                                SheetMode.Normal -> SheetOverflow(
-                                    canEdit = songs.isNotEmpty(),
-                                    canSort = songs.size > 1,
-                                    own = !likes,
-                                    onSelect = { mode = SheetMode.Selecting },
-                                    onSort = { mode = SheetMode.Sorting },
-                                    onRename = { renaming = true },
-                                    onDelete = { deleting = true },
+    val title = when (mode) {
+        SheetMode.Selecting -> stringResource(R.string.history_selected, selected.size)
+        SheetMode.Sorting -> stringResource(R.string.plugin_sort)
+        SheetMode.Normal -> name
+    }
+    DetailPage(
+        onBack, title,
+        header = { SheetHero(name, songs) },
+        navigation = if (mode == SheetMode.Normal) null else ({
+            IconButton(onClick = ::endMode) { Icon(XmIcons.Outlined.Close, stringResource(R.string.action_cancel)) }
+        }),
+        pinTitle = mode != SheetMode.Normal,
+        actions = {
+            XmSwap(mode, contentAlignment = Alignment.CenterEnd) { shown ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    when (shown) {
+                        SheetMode.Selecting -> {
+                            val all = songs.isNotEmpty() && selected.size == songs.size
+                            IconButton(onClick = { selected = if (all) emptySet() else songs.mapTo(HashSet()) { it.key } }) {
+                                Icon(
+                                    XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
+                                    tint = if (all) MaterialTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current,
                                 )
                             }
                         }
+                        SheetMode.Sorting -> TextButton(onClick = ::endMode) { Text(stringResource(R.string.plugin_done)) }
+                        SheetMode.Normal -> SheetOverflow(
+                            canEdit = songs.isNotEmpty(),
+                            canSort = songs.size > 1,
+                            own = !likes,
+                            onSelect = { mode = SheetMode.Selecting },
+                            onSort = { mode = SheetMode.Sorting },
+                            onRename = { renaming = true },
+                            onDelete = { deleting = true },
+                        )
                     }
-                },
-            )
+                }
+            }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+    ) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 Modifier.fillMaxSize(), list,
-                contentPadding = PaddingValues(bottom = if (mode == SheetMode.Selecting) ToolbarSpace else 8.dp),
+                contentPadding = PaddingValues(bottom = if (mode == SheetMode.Selecting) SelectionToolbarSpace else 8.dp),
             ) {
-                item(key = "header") { SheetHeader(name, songs) }
                 if (songs.isEmpty()) {
                     item(key = "empty") { Note(stringResource(if (likes) R.string.music_likes_empty else R.string.music_nothing)) }
                 } else {
@@ -241,23 +222,16 @@ internal fun LocalSheetScreen(
                     }
                 }
             }
-            val motion = MaterialTheme.motionScheme
-            AnimatedVisibility(
-                visible = mode == SheetMode.Selecting,
-                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = FloatingToolbarDefaults.ScreenOffset),
-                enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.defaultEffectsSpec()),
-                exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
-            ) {
-                HorizontalFloatingToolbar(expanded = true, colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors()) {
-                    val any = chosen.isNotEmpty()
-                    ToolbarAction(R.string.music_add_to_sheet, XmIcons.Outlined.PlaylistAdd, any) { adding = chosen }
-                    ToolbarAction(R.string.music_move_to, XmIcons.Outlined.SwapVert, any) { moving = chosen }
-                    ToolbarAction(R.string.music_queue_remove, XmIcons.Outlined.DeleteOutline, any) {
-                        remove(chosen)
-                        endMode()
-                    }
+            SelectionToolbar(mode == SheetMode.Selecting) {
+                val any = chosen.isNotEmpty()
+                ToolbarAction(R.string.music_add_to_sheet, XmIcons.Outlined.PlaylistAdd, any) { adding = chosen }
+                ToolbarAction(R.string.music_move_to, XmIcons.Outlined.SwapVert, any) { moving = chosen }
+                ToolbarAction(R.string.music_queue_remove, XmIcons.Outlined.DeleteOutline, any) {
+                    remove(chosen)
+                    endMode()
                 }
             }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
         }
     }
     adding?.let { AddToSheetSheet(it, onDismiss = { adding = null }, from = sheetId, onDone = ::endMode) }
@@ -311,20 +285,24 @@ private fun SheetOverflow(
     }
 }
 
+/** The head as on a plugin sheet: the first cover blurred behind, the mosaic, the name and the count. */
 @Composable
-private fun SheetHeader(name: String, songs: List<MusicItem>) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding).padding(top = 8.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SheetMosaic(songs, Modifier.size(MosaicSize))
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(
-                pluralStringResource(R.plurals.music_song_count, songs.size, songs.size),
-                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+private fun SheetHero(name: String, songs: List<MusicItem>) {
+    val shape = MaterialTheme.shapes.large
+    DetailHero(songs.firstNotNullOfOrNull { it.artwork }) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = XmLayout.PagePadding).padding(bottom = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SheetMosaic(songs, Modifier.size(MosaicSize).shadow(elevation = 10.dp, shape = shape), shape)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    pluralStringResource(R.plurals.music_song_count, songs.size, songs.size),
+                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import android.widget.Toast
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -135,7 +134,7 @@ internal fun rememberDownloadPrompt(actions: DownloadActions?): DownloadPrompt? 
 @Composable
 internal fun DownloadPromptHost(prompt: DownloadPrompt?) {
     if (prompt == null) return
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val notice = prompt.notice
     val message = when (notice) {
         is DownloadNotice.Added -> pluralStringResource(R.plurals.downloads_added, notice.count, notice.count)
@@ -145,7 +144,7 @@ internal fun DownloadPromptHost(prompt: DownloadPrompt?) {
     }
     LaunchedEffect(notice) {
         if (message == null) return@LaunchedEffect
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        showMessage(message)
         prompt.notice = null
     }
     prompt.checking?.let { (done, total) -> CheckingDialog(done, total, prompt::cancelCheck) }

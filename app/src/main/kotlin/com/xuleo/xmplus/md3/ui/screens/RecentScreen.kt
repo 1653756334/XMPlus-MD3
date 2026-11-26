@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,9 @@ import com.xuleo.xmplus.md3.core.media.ListenRecord
 import com.xuleo.xmplus.md3.core.media.SongResume
 import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.library.LibraryViewModel
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbar
+import com.xuleo.xmplus.md3.ui.components.SelectionToolbarSpace
+import com.xuleo.xmplus.md3.ui.components.ToolbarAction
 import com.xuleo.xmplus.md3.ui.components.XmSwap
 import com.xuleo.xmplus.md3.ui.components.formatDate
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
@@ -121,9 +125,6 @@ fun RecentScreen(
                         }) {
                             Icon(XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all))
                         }
-                        IconButton(onClick = deleteSelected, enabled = selected.isNotEmpty()) {
-                            Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.history_remove))
-                        }
                     }
                 },
             )
@@ -147,10 +148,14 @@ fun RecentScreen(
                     )
                 }
             }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 history == null -> Box(Modifier.fillMaxSize())
                 rows.isEmpty() -> Note(stringResource(R.string.library_recent_empty))
-                else -> LazyColumn(Modifier.fillMaxSize()) {
+                else -> LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = if (selecting) SelectionToolbarSpace else 0.dp),
+                ) {
                     items(rows, key = { "${it.kind.key}:${it.albumId}" }) { record ->
                         RecentRow(
                             record,
@@ -171,6 +176,10 @@ fun RecentScreen(
                         )
                     }
                 }
+            }
+            SelectionToolbar(selecting) {
+                ToolbarAction(R.string.history_remove, XmIcons.Outlined.DeleteOutline, selected.isNotEmpty(), deleteSelected)
+            }
             }
         }
     }

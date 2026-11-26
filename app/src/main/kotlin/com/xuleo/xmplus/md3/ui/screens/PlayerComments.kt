@@ -1,6 +1,5 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -55,6 +53,8 @@ import com.xuleo.xmplus.md3.core.protocol.TrackComment
 import com.xuleo.xmplus.md3.library.CommentActions
 import com.xuleo.xmplus.md3.library.ListPage
 import com.xuleo.xmplus.md3.library.ListSection
+import com.xuleo.xmplus.md3.ui.components.ListSkeleton
+import com.xuleo.xmplus.md3.ui.components.rememberShowMessage
 import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.InlineError
 import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
@@ -74,7 +74,7 @@ private const val FirstPage = 1L
 @Composable
 internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Modifier = Modifier) {
     if (actions == null) return
-    val context = LocalContext.current
+    val showMessage = rememberShowMessage()
     val locale = LocalConfiguration.current.locales[0]
     val scope = rememberCoroutineScope()
     val failed = stringResource(R.string.comment_failed)
@@ -111,7 +111,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
         scope.launch {
             try {
                 if (!actions.signedIn()) {
-                    Toast.makeText(context, signIn, Toast.LENGTH_SHORT).show()
+                    showMessage(signIn)
                 } else {
                     action()
                     onDone()
@@ -119,7 +119,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                Toast.makeText(context, failed, Toast.LENGTH_SHORT).show()
+                showMessage(failed)
             } finally {
                 busy = false
                 posting = false
@@ -145,9 +145,7 @@ internal fun PlayerComments(track: Track, actions: CommentActions?, modifier: Mo
         val failure = state.failure
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                !state.loaded && failure == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                !state.loaded && failure == null -> ListSkeleton()
                 state.items.isEmpty() && failure != null -> InlineError(failure, onRetry = { list.refresh() }, modifier = Modifier.fillMaxSize())
                 state.items.isEmpty() -> Column(
                     Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
