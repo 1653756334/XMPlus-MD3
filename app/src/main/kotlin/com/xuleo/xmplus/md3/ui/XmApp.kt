@@ -225,10 +225,9 @@ internal fun XmAppContent(
         onOpenSection = { navigator.push(AppRoute.LibraryPage(it.name)) },
         onOpenDownloads = { onSelect(Destination.Downloads) },
         onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
-        // Hooks for the next steps: the sheet page (我喜欢 and 自建), library search, 管理歌单 and 导入.
+        // Hooks for the next steps: library search and 导入.
         onOpenSheet = { navigator.push(AppRoute.LocalSheet(it)) },
         onSearch = null,
-        onManageSheets = null,
         onImportSheet = null,
     )
     val libraryTab: @Composable () -> Unit = {

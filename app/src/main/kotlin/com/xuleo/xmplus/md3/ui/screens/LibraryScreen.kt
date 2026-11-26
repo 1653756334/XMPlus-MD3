@@ -26,7 +26,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.xuleo.xmplus.md3.ui.components.ReorderHandle
+import com.xuleo.xmplus.md3.ui.components.ReorderState
+import com.xuleo.xmplus.md3.ui.components.SheetNameDialog
+import com.xuleo.xmplus.md3.ui.components.rememberReorderState
+import com.xuleo.xmplus.md3.ui.components.reorderItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,8 +50,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,7 +71,6 @@ import com.xuleo.xmplus.md3.ui.Destination
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.ModeSwitch
 import com.xuleo.xmplus.md3.ui.components.MusicCover
-import com.xuleo.xmplus.md3.ui.components.MusicSheetRow
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** How many items 继续听 shows. */
@@ -89,7 +97,6 @@ class LibraryLinks(
     /** 我喜欢 ([MusicLibrary.LikesId]) and 自建 sheets. */
     val onOpenSheet: ((String) -> Unit)? = null,
     val onSearch: (() -> Unit)? = null,
-    val onManageSheets: (() -> Unit)? = null,
     val onImportSheet: (() -> Unit)? = null,
 )
 
@@ -117,6 +124,29 @@ fun LibraryScreen(
     val starred = music?.starred?.collectAsStateWithLifecycle()?.value.orEmpty()
     var group by rememberSaveable { mutableStateOf(SheetGroup.Mine) }
     var creating by rememberSaveable { mutableStateOf(false) }
+    // 管理歌单: check boxes and drag handles on the shown group, in place.
+    var managing by rememberSaveable { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val list = rememberLazyListState()
+    val animated = rememberAnimationsEnabled()
+    val haptics = LocalHapticFeedback.current
+    val sheetOrder = rememberReorderState<UserSheet>(list, { sheetKey(it) }) { from, to -> music?.moveSheet(from, to) }
+    val starredOrder = rememberReorderState<MusicSheet>(list, { starredKey(it) }) { from, to -> music?.moveStarred(from, to) }
+    val keys = if (group == SheetGroup.Mine) sheets.map(::sheetKey) else starred.map(::starredKey)
+    fun endManage() {
+        managing = false
+        selected = emptySet()
+    }
+    fun toggle(key: String) {
+        selected = if (key in selected) selected - key else selected + key
+    }
+    fun startManage(key: String) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        managing = true
+        selected = setOf(key)
+    }
+    BackHandler(enabled = managing, onBack = ::endManage)
     LaunchedEffect(Unit) { viewModel.loadBookmarks() }
     val recent = history.orEmpty().take(ContinueCount)
     val tiles = buildList {
@@ -136,26 +166,43 @@ fun LibraryScreen(
     }
     TabScaffold(
         Destination.Library.label,
+        headline = if (managing) stringResource(R.string.history_selected, selected.size) else null,
+        navigation = {
+            if (managing) IconButton(onClick = ::endManage) { Icon(XmIcons.Outlined.Close, stringResource(R.string.action_cancel)) }
+        },
         actions = {
-            links.onSearch?.let { search ->
-                IconButton(onClick = search) { Icon(XmIcons.Outlined.Search, stringResource(R.string.library_search)) }
+            if (managing) {
+                val all = keys.isNotEmpty() && keys.all { it in selected }
+                IconButton(onClick = { selected = if (all) emptySet() else keys.toSet() }, enabled = keys.isNotEmpty()) {
+                    Icon(
+                        XmIcons.Filled.DoneAll, stringResource(R.string.history_select_all),
+                        tint = if (all) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
+                IconButton(onClick = { confirmDelete = true }, enabled = selected.isNotEmpty()) {
+                    Icon(XmIcons.Outlined.DeleteOutline, stringResource(R.string.downloads_delete))
+                }
+            } else {
+                links.onSearch?.let { search ->
+                    IconButton(onClick = search) { Icon(XmIcons.Outlined.Search, stringResource(R.string.library_search)) }
+                }
+                if (music != null) OverflowMenu { managing = true }
             }
-            links.onManageSheets?.let { manage -> OverflowMenu(manage) }
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
-            if (recent.isNotEmpty()) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding), list, contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
+            if (recent.isNotEmpty() && !managing) {
                 item(key = "continue") {
                     ContinueRow(recent, nowPlaying, links.onOpenRecent) { record ->
                         viewModel.resume(record, links.onPlay, links.onPlaySong)
                     }
                 }
             }
-            item(key = "tiles") { TileGrid(tiles) }
+            if (!managing) item(key = "tiles") { TileGrid(tiles) }
             if (music != null) {
                 item(key = "sheetsHeader") {
                     SheetsHeader(
-                        group, sheets.size, starred.size, { group = it },
+                        group, sheets.size, starred.size, { group = it; selected = emptySet() },
                         onCreate = { creating = true }, onImport = links.onImportSheet,
                     )
                 }
@@ -163,15 +210,34 @@ fun LibraryScreen(
                     SheetGroup.Mine -> if (sheets.isEmpty()) {
                         item(key = "sheetsEmpty") { EmptySheets { creating = true } }
                     } else {
-                        items(sheets, key = { "sheet:${it.id}" }) { sheet ->
-                            UserSheetRow(sheet, links.onOpenSheet?.let { open -> { open(sheet.id) } })
+                        items(if (managing) sheetOrder.items(sheets) else sheets, key = ::sheetKey) { sheet ->
+                            val key = sheetKey(sheet)
+                            SheetListRow(
+                                sheet.coverUrl, sheet.name,
+                                pluralStringResource(R.plurals.music_song_count, sheet.songs.size, sheet.songs.size),
+                                modifier = if (managing) Modifier.reorderItem(this, sheetOrder, sheet, animated) else Modifier,
+                                onClick = if (managing) ({ toggle(key) }) else links.onOpenSheet?.let { open -> { open(sheet.id) } },
+                                onLongClick = if (managing) null else ({ startManage(key) }),
+                                trailing = if (managing) ({ ManageTrailing(key in selected, sheetOrder, sheet) }) else null,
+                            )
                         }
                     }
                     SheetGroup.Starred -> if (starred.isEmpty()) {
                         item(key = "starredEmpty") { Note(stringResource(R.string.library_starred_empty)) }
                     } else {
-                        items(starred, key = { "starred:${it.platform}:${it.id}" }) { sheet ->
-                            MusicSheetRow(sheet) { links.onOpenStarred(sheet) }
+                        items(if (managing) starredOrder.items(starred) else starred, key = ::starredKey) { sheet ->
+                            val key = starredKey(sheet)
+                            SheetListRow(
+                                sheet.coverUrl, sheet.title,
+                                listOfNotNull(
+                                    sheet.artist.takeIf { it.isNotBlank() },
+                                    sheet.worksNum?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.music_song_count, it, it) },
+                                ).joinToString(" · ").ifEmpty { null },
+                                modifier = if (managing) Modifier.reorderItem(this, starredOrder, sheet, animated) else Modifier,
+                                onClick = if (managing) ({ toggle(key) }) else ({ links.onOpenStarred(sheet) }),
+                                onLongClick = if (managing) null else ({ startManage(key) }),
+                                trailing = if (managing) ({ ManageTrailing(key in selected, starredOrder, sheet) }) else null,
+                            )
                         }
                     }
                 }
@@ -183,6 +249,33 @@ fun LibraryScreen(
             creating = false
             music.createSheet(name)
         }
+    }
+    if (confirmDelete && music != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.music_sheets_delete_title)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    if (group == SheetGroup.Mine) music.deleteSheets(sheets.filter { sheetKey(it) in selected }.map { it.id })
+                    else starred.filter { starredKey(it) in selected }.forEach(music::unstar)
+                    endManage()
+                }) { Text(stringResource(R.string.downloads_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+private fun sheetKey(sheet: UserSheet) = "sheet:${sheet.id}"
+
+private fun starredKey(sheet: MusicSheet) = "starred:${sheet.platform}:${sheet.id}"
+
+@Composable
+private fun <T> ManageTrailing(checked: Boolean, order: ReorderState<T>, item: T) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        ReorderHandle(order, item)
     }
 }
 
@@ -321,41 +414,44 @@ private fun EmptySheets(onCreate: () -> Unit) {
     }
 }
 
+/** A sheet on the overview: cover, name and one quiet line; while managing, a check box and a drag handle end it. */
 @Composable
-private fun UserSheetRow(sheet: UserSheet, onClick: (() -> Unit)?) {
+private fun SheetListRow(
+    cover: String?,
+    name: String,
+    meta: String?,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val click = when {
+        onClick == null -> Modifier
+        onLongClick != null -> Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        else -> Modifier.clickable(onClick = onClick)
+    }
     Row(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).heightIn(min = 64.dp)
-            .padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        modifier.fillMaxWidth().then(click).heightIn(min = 64.dp)
+            .padding(start = XmLayout.PagePadding, end = if (trailing != null) 4.dp else XmLayout.PagePadding)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        MusicCover(sheet.coverUrl, Modifier.size(56.dp))
+        MusicCover(cover, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(sheet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                pluralStringResource(R.plurals.music_song_count, sheet.songs.size, sheet.songs.size),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-            )
+            Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (meta != null) {
+                Text(
+                    meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+        trailing?.invoke()
     }
 }
 
 /** 新建歌单: one name field. */
 @Composable
-internal fun NewSheetDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_sheet_new)) },
-        text = {
-            OutlinedTextField(
-                name, { name = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
-                label = { Text(stringResource(R.string.library_sheet_name)) },
-            )
-        },
-        confirmButton = { TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.library_sheet_create)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
-}
+internal fun NewSheetDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) =
+    SheetNameDialog(stringResource(R.string.library_sheet_new), stringResource(R.string.library_sheet_create), onDismiss, onConfirm = onCreate)
