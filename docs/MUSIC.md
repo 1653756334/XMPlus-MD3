@@ -213,11 +213,11 @@ Same player shell as 听书; only the content differs.
 
 - Pages: 播放 · 歌词 · 评论. 评论 is shown only when the plugin supports comments.
 - 播放: cover, title, artist (opens the artist), and the current lyric line under them; tapping it opens 歌词.
-- Action row: 喜欢 · 加入歌单 · 下载 · 更多. 喜欢 adds to or removes from 我喜欢.
+- Action row: 喜欢 · 加入歌单 · 定时关闭 · 评论 · 更多. 喜欢 adds to or removes from 我喜欢. 评论 opens the 评论 page and is left out when the plugin has no comments. 下载 replaces 定时关闭 in M5.
 - Progress bar as in 听书, with the playing quality as a small tag that opens the quality sheet.
 - Transport: 播放模式 · 上一首 · 播放/暂停 · 下一首 · 播放列表. No 15 s seek buttons and no 倍速 row.
 - 更多: 查看歌手, 查看专辑, 音质, 定时关闭, 倍速, 来源.
-- 歌词: lines centred, the current one larger and in the accent colour, auto-scrolling. Dragging shows a time line with a play button to jump there; auto-scroll returns after a few seconds. A 译 toggle when there is a translation. No lyrics → 暂无歌词 with 搜索歌词.
+- 歌词: lines left-aligned in one size, the current one bold, bright and slightly larger, the rest fading with distance; the lyric starts at the top and the current line settles about a third of the way down, with the edges fading out. A thin progress bar with both times and 播放模式 · 上一首 · 播放/暂停 · 下一首 · 播放列表 sit under it. Dragging shows a time line with a play button to jump there; auto-scroll returns after a few seconds. A 译 toggle when there is a translation. No lyrics → 暂无歌词 with 搜索歌词.
 - Queue sheet: play mode and count in the header, 清空; drag handles, remove per row, locate the current song.
 - System controls: previous, play / pause, next. Audio is declared as music, so short sounds from other apps duck it instead of pausing.
 

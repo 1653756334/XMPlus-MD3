@@ -2,10 +2,33 @@
 
 package com.xuleo.xmplus.md3.ui.screens
 
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,7 +53,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -240,21 +265,24 @@ internal fun MusicPlayerSheet(
                                     onOpenQueue = { showQueue = true },
                                     onOpenQuality = { showQuality = true },
                                     onOpenSleep = { showSleep = true },
+                                    sleepActive = sleep.active,
+                                    onOpenComments = if (MusicPage.Comments in pages) {
+                                        { openPage(MusicPage.Comments) }
+                                    } else null,
                                     onOpenSpeed = { showSpeed = true },
                                 )
                             },
                             modifier = Modifier.fillMaxSize(),
+                            stretchControls = true,
                         )
                         MusicPage.Lyrics -> PlayerPageFrame {
                             LyricsPage(
                                 holder = lyric,
-                                positionMs = state.positionMs,
-                                onSeek = music::seekTo,
-                                onPlayFrom = { position ->
-                                    music.seekTo(position)
-                                    if (!music.state.value.wantsToPlay) music.resume()
-                                },
+                                state = state,
+                                queue = queue,
+                                music = music,
                                 onSearch = { showSearch = true },
+                                onOpenQueue = { showQueue = true },
                             )
                         }
                         MusicPage.Comments -> PlayerPageFrame { MusicComments(song, deps.lyrics, Modifier.fillMaxSize()) }
@@ -326,10 +354,13 @@ private fun MusicControls(
     onOpenQueue: () -> Unit,
     onOpenQuality: () -> Unit,
     onOpenSleep: () -> Unit,
+    sleepActive: Boolean,
+    onOpenComments: (() -> Unit)?,
     onOpenSpeed: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth()) {
+    // Given more height than it needs, the spare goes between the song, its actions and the transport.
+    Column(Modifier.fillMaxSize()) {
         Text(
             song.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -358,6 +389,7 @@ private fun MusicControls(
             style = MaterialTheme.typography.bodyMedium, color = scheme.primary,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.weight(1f))
         SongActions(
             liked = liked,
             platform = song.platform,
@@ -367,9 +399,12 @@ private fun MusicControls(
             onOpenAlbum = onOpenAlbum,
             onOpenQuality = onOpenQuality,
             onOpenSleep = onOpenSleep,
+            sleepActive = sleepActive,
+            onOpenComments = onOpenComments,
             onOpenSpeed = onOpenSpeed,
             modifier = Modifier.padding(top = 4.dp),
         )
+        Spacer(Modifier.weight(1f))
         Row(
             Modifier.fillMaxWidth().padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -426,6 +461,8 @@ private fun SongActions(
     onOpenAlbum: (() -> Unit)?,
     onOpenQuality: () -> Unit,
     onOpenSleep: () -> Unit,
+    sleepActive: Boolean,
+    onOpenComments: (() -> Unit)?,
     onOpenSpeed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -465,6 +502,22 @@ private fun SongActions(
             }
         }
         ActionSlot {
+            IconButton(
+                onClick = onOpenSleep,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = if (sleepActive) scheme.primary else scheme.onSurfaceVariant),
+            ) {
+                Icon(if (sleepActive) XmIcons.Filled.Timer else XmIcons.Outlined.Timer, stringResource(R.string.player_sleep))
+            }
+        }
+        if (onOpenComments != null) {
+            ActionSlot {
+                IconButton(
+                    onClick = onOpenComments,
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = scheme.onSurfaceVariant),
+                ) { Icon(XmIcons.Outlined.ChatBubbleOutline, stringResource(R.string.player_page_comments)) }
+            }
+        }
+        ActionSlot {
             Box {
                 IconButton(
                     onClick = { more = true },
@@ -475,7 +528,7 @@ private fun SongActions(
                         more = false
                         action()
                     }
-                    val count = 6
+                    val count = 5
                     XmMenuItem(
                         stringResource(R.string.music_view_artist), pick { onOpenArtist?.invoke() }, 0, count,
                         icon = XmIcons.Outlined.Person, enabled = onOpenArtist != null,
@@ -485,9 +538,8 @@ private fun SongActions(
                         icon = XmIcons.Outlined.Album, enabled = onOpenAlbum != null,
                     )
                     XmMenuItem(stringResource(R.string.music_quality), pick(onOpenQuality), 2, count, icon = XmIcons.Outlined.Tune)
-                    XmMenuItem(stringResource(R.string.player_sleep), pick(onOpenSleep), 3, count, icon = XmIcons.Outlined.Timer)
-                    XmMenuItem(stringResource(R.string.player_speed), pick(onOpenSpeed), 4, count, icon = XmIcons.Outlined.Speed)
-                    XmMenuItem(stringResource(R.string.music_source_value, platform), pick {}, 5, count, icon = XmIcons.Outlined.Link)
+                    XmMenuItem(stringResource(R.string.player_speed), pick(onOpenSpeed), 3, count, icon = XmIcons.Outlined.Speed)
+                    XmMenuItem(stringResource(R.string.music_source_value, platform), pick {}, 4, count, icon = XmIcons.Outlined.Link)
                 }
             }
         }
@@ -594,40 +646,73 @@ private fun LyricSource.parsed(): SongLyric? {
     return SongLyric(main, translation.filter { it.text.isNotBlank() }.associate { it.timeMs to it.text })
 }
 
-/** 歌词: the lyric, or 暂无歌词 with 搜索歌词. */
+/** 歌词: the lyric over a compact transport, or 暂无歌词 with 搜索歌词. */
 @Composable
 private fun LyricsPage(
     holder: LyricHolder,
-    positionMs: Long,
-    onSeek: (Long) -> Unit,
-    onPlayFrom: (Long) -> Unit,
+    state: MusicPlaybackState,
+    queue: MusicQueueState,
+    music: MusicPlayback,
     onSearch: () -> Unit,
+    onOpenQueue: () -> Unit,
 ) {
     val lyric = holder.lyric
-    when {
-        !holder.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        lyric == null -> Column(
-            Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(XmIcons.Outlined.Lyrics, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.size(12.dp))
-            Text(stringResource(R.string.music_lyric_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.size(16.dp))
-            FilledTonalButton(onClick = onSearch) { Text(stringResource(R.string.music_lyric_search)) }
+    var translated by rememberSaveable { mutableStateOf(true) }
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                !holder.loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                lyric == null -> Column(
+                    Modifier.align(Alignment.Center).padding(horizontal = PlayerPagePadding),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(XmIcons.Outlined.Lyrics, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.size(12.dp))
+                    Text(stringResource(R.string.music_lyric_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.size(16.dp))
+                    FilledTonalButton(onClick = onSearch) { Text(stringResource(R.string.music_lyric_search)) }
+                }
+                else -> {
+                    LyricLines(
+                        lyric = lyric,
+                        translated = translated,
+                        positionMs = state.positionMs,
+                        onSeek = music::seekTo,
+                        onPlayFrom = { position ->
+                            music.seekTo(position)
+                            if (!music.state.value.wantsToPlay) music.resume()
+                        },
+                    )
+                    if (lyric.translations.isNotEmpty()) {
+                        FilterChip(
+                            selected = translated,
+                            onClick = { translated = !translated },
+                            label = { Text(stringResource(R.string.music_lyric_translation)) },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(end = PlayerPagePadding),
+                        )
+                    }
+                }
+            }
         }
-        else -> LyricLines(lyric, positionMs, onSeek, onPlayFrom)
+        LyricTransport(state, queue, music, onOpenQueue)
     }
 }
 
 /**
- * Centred lines with the current one larger and in the accent colour, kept in the middle. A drag shows a time line with
- * a play button at the middle; the lyric follows the song again a few seconds after the drag ends.
+ * Left-aligned lines in one size: the current one bright and a little larger, the rest fading with distance, kept in
+ * the middle and fading out at the edges. A drag shows a time line with a play button at the middle; the lyric follows
+ * the song again a few seconds after the drag ends.
  */
 @Composable
-private fun LyricLines(lyric: SongLyric, positionMs: Long, onSeek: (Long) -> Unit, onPlayFrom: (Long) -> Unit) {
+private fun LyricLines(
+    lyric: SongLyric,
+    translated: Boolean,
+    positionMs: Long,
+    onSeek: (Long) -> Unit,
+    onPlayFrom: (Long) -> Unit,
+) {
     val animated = rememberAnimationsEnabled()
     val spec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
-    var translated by rememberSaveable { mutableStateOf(true) }
     val current = lyric.indexAt(positionMs)
     val list = rememberLazyListState()
     val dragged by list.interactionSource.collectIsDraggedAsState()
@@ -644,23 +729,29 @@ private fun LyricLines(lyric: SongLyric, positionMs: Long, onSeek: (Long) -> Uni
     var placed by remember(lyric) { mutableStateOf(false) }
     LaunchedEffect(lyric, current, browsing) {
         if (browsing) return@LaunchedEffect
-        list.centre(current.coerceAtLeast(0), if (animated && placed) spec else null)
+        list.anchor(current.coerceAtLeast(0), if (animated && placed) spec else null)
         placed = true
     }
     val centred by remember(list) {
         derivedStateOf {
             val info = list.layoutInfo
-            val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2
-            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - middle) }?.index ?: 0
+            val target = info.anchorOffset()
+            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - target) }?.index ?: 0
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(vertical = maxHeight / 2)) {
+        // The lyric starts at the top and the line being sung settles a third of the way down.
+        LazyColumn(
+            Modifier.fillMaxSize().lyricFade(),
+            state = list,
+            contentPadding = PaddingValues(top = maxHeight * LyricFadeEdge, bottom = maxHeight * (1f - LyricAnchor)),
+        ) {
             itemsIndexed(lyric.lines) { index, line ->
                 LyricRow(
                     line = line,
                     translation = if (translated) lyric.translations[line.timeMs] else null,
-                    active = index == current,
+                    distance = abs(index - current),
+                    animated = animated,
                     onClick = { onSeek(line.timeMs) },
                 )
             }
@@ -669,7 +760,8 @@ private fun LyricLines(lyric: SongLyric, positionMs: Long, onSeek: (Long) -> Uni
             lyric.lines.getOrNull(centred)?.let { line ->
                 val accent = MaterialTheme.colorScheme.primary
                 Row(
-                    Modifier.align(Alignment.Center).fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+                    Modifier.align(Alignment.TopStart).offset(y = maxHeight * LyricAnchor - 24.dp)
+                        .fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -684,44 +776,189 @@ private fun LyricLines(lyric: SongLyric, positionMs: Long, onSeek: (Long) -> Uni
                 }
             }
         }
-        if (lyric.translations.isNotEmpty()) {
-            FilterChip(
-                selected = translated,
-                onClick = { translated = !translated },
-                label = { Text(stringResource(R.string.music_lyric_translation)) },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = PlayerPagePadding, bottom = 8.dp),
-            )
-        }
     }
 }
 
+/** One line and its translation; [distance] is how many lines it is from the one being sung. */
 @Composable
-private fun LyricRow(line: LyricLine, translation: String?, active: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val color by animateColorAsState(
-        if (active) scheme.primary else scheme.onSurfaceVariant, MaterialTheme.motionScheme.defaultEffectsSpec(), label = "lyricColor",
+private fun LyricRow(line: LyricLine, translation: String?, distance: Int, animated: Boolean, onClick: () -> Unit) {
+    val active = distance == 0
+    val motion = MaterialTheme.motionScheme
+    val alpha by animateFloatAsState(
+        when (distance) {
+            0 -> 1f
+            1 -> 0.55f
+            else -> 0.38f
+        },
+        if (animated) motion.defaultEffectsSpec() else snap(),
+        label = "lyricAlpha",
     )
+    val scale by animateFloatAsState(
+        if (active) ActiveLyricScale else 1f,
+        if (animated) motion.defaultSpatialSpec() else snap(),
+        label = "lyricScale",
+    )
+    val color = MaterialTheme.colorScheme.onSurface
     Column(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = PlayerPagePadding, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(start = PlayerPagePadding, end = PlayerPagePadding + 16.dp, top = 10.dp, bottom = 10.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0.5f)
+                this.alpha = alpha
+            },
     ) {
         Text(
             line.text,
-            style = if (active) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-            else MaterialTheme.typography.titleMedium,
-            color = color, textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, lineHeight = 30.sp),
+            color = color,
         )
         if (!translation.isNullOrBlank()) {
             Text(
-                translation, Modifier.padding(top = 2.dp), style = MaterialTheme.typography.bodyMedium,
-                color = color.copy(alpha = 0.8f), textAlign = TextAlign.Center,
+                translation, Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodyLarge, color = color.copy(alpha = 0.8f),
             )
         }
     }
 }
 
-/** Scrolls so the item at [index] sits in the middle; instantly when [spec] is null. */
-private suspend fun LazyListState.centre(index: Int, spec: AnimationSpec<Float>?) {
+/** The lyric fades out at its top and bottom instead of being cut off. */
+private fun Modifier.lyricFade(): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawRect(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    LyricFadeEdge to Color.Black,
+                    1f - LyricFadeEdge to Color.Black,
+                    1f to Color.Transparent,
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+
+/** Under the lyric: a thin progress bar with both times, then the play mode, the transport and the queue. */
+@Composable
+private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, music: MusicPlayback, onOpenQueue: () -> Unit) {
+    val hasQueue = queue.items.isNotEmpty()
+    Column(Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding, bottom = 16.dp)) {
+        LyricProgress(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            enabled = state.durationMs > 0 && state.phase != PlaybackPhase.Failed && state.phase != PlaybackPhase.Preparing,
+            trackId = state.song?.key,
+            onSeek = music::seekTo,
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = music::toggleMode) {
+                XmSwap(queue.mode) { mode -> Icon(mode.icon, stringResource(mode.label)) }
+            }
+            IconButton(music::previous, Modifier.size(48.dp), enabled = hasQueue) {
+                Icon(XmIcons.Filled.SkipPrevious, stringResource(R.string.music_previous), Modifier.size(32.dp))
+            }
+            PlayerPlayButton(state.phase, state.wantsToPlay, loadingQueue = false, onClick = music::toggle, size = 56.dp)
+            IconButton(music::next, Modifier.size(48.dp), enabled = hasQueue) {
+                Icon(XmIcons.Filled.SkipNext, stringResource(R.string.music_next), Modifier.size(32.dp))
+            }
+            IconButton(onClick = onOpenQueue, enabled = hasQueue) {
+                Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
+            }
+        }
+    }
+}
+
+/** A thin bar between the played and the total time; tap or drag to seek. */
+@Composable
+private fun LyricProgress(positionMs: Long, durationMs: Long, enabled: Boolean, trackId: Any?, onSeek: (Long) -> Unit) {
+    val duration = durationMs.coerceAtLeast(0L)
+    var dragging by remember(trackId, enabled) { mutableStateOf<Float?>(null) }
+    var width by remember { mutableIntStateOf(0) }
+    val played = if (duration > 0) positionMs.toFloat() / duration else 0f
+    val fraction = (dragging ?: played).coerceIn(0f, 1f)
+    val shownMs = dragging?.let { (it * duration).toLong() } ?: positionMs
+    val seek by rememberUpdatedState(onSeek)
+    val total by rememberUpdatedState(duration)
+    fun fractionAt(x: Float): Float = if (width <= 0) 0f else (x / width).coerceIn(0f, 1f)
+
+    val scheme = MaterialTheme.colorScheme
+    val activeColor = if (enabled) scheme.onSurface else scheme.outline
+    val trackColor = scheme.onSurface.copy(alpha = 0.2f)
+    val timeStyle = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum")
+    val label = stringResource(R.string.player_progress)
+    val time = "${formatDuration(shownMs / 1000.0)} / ${formatDuration(duration / 1000.0)}"
+    val thumb = if (dragging != null) 7.dp else 5.dp
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(formatDuration(shownMs / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
+        Box(
+            Modifier.weight(1f).height(32.dp)
+                .onSizeChanged { width = it.width }
+                .pointerInput(enabled, trackId) {
+                    if (enabled) detectTapGestures { seek((fractionAt(it.x) * total).toLong()) }
+                }
+                .pointerInput(enabled, trackId) {
+                    if (enabled) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { dragging = fractionAt(it.x) },
+                            onDragEnd = {
+                                dragging?.let { seek((it * total).toLong()) }
+                                dragging = null
+                            },
+                            onDragCancel = { dragging = null },
+                        ) { change, _ ->
+                            change.consume()
+                            dragging = fractionAt(change.position.x)
+                        }
+                    }
+                }
+                .clearAndSetSemantics {
+                    contentDescription = label
+                    stateDescription = time
+                    progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+                    if (enabled) {
+                        setProgress { target ->
+                            seek((target.coerceIn(0f, 1f) * total).toLong())
+                            true
+                        }
+                    } else {
+                        disabled()
+                    }
+                },
+        ) {
+            Canvas(Modifier.matchParentSize()) {
+                val y = size.height / 2f
+                val stroke = 3.dp.toPx()
+                val radius = thumb.toPx()
+                val head = size.width * fraction
+                drawLine(trackColor, Offset(0f, y), Offset(size.width, y), stroke, StrokeCap.Round)
+                drawLine(activeColor, Offset(0f, y), Offset(head, y), stroke, StrokeCap.Round)
+                drawCircle(activeColor, radius, Offset(head.coerceIn(radius, (size.width - radius).coerceAtLeast(radius)), y))
+            }
+        }
+        Text(formatDuration(duration / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
+    }
+}
+
+private const val ActiveLyricScale = 1.05f
+private const val LyricFadeEdge = 0.1f
+
+/** Where the line being sung settles, as a share of the lyric's height. */
+private const val LyricAnchor = 0.35f
+
+private fun LazyListLayoutInfo.anchorOffset(): Int =
+    viewportStartOffset + ((viewportEndOffset - viewportStartOffset) * LyricAnchor).toInt()
+
+/** Scrolls so the item at [index] sits at the anchor, or as close as the list allows; instantly when [spec] is null. */
+private suspend fun LazyListState.anchor(index: Int, spec: AnimationSpec<Float>?) {
     repeat(2) {
         val info = layoutInfo
         val item = info.visibleItemsInfo.firstOrNull { it.index == index }
@@ -729,7 +966,7 @@ private suspend fun LazyListState.centre(index: Int, spec: AnimationSpec<Float>?
             scrollToItem(index)
             return@repeat
         }
-        val delta = (item.offset + item.size / 2 - (info.viewportStartOffset + info.viewportEndOffset) / 2).toFloat()
+        val delta = (item.offset + item.size / 2 - info.anchorOffset()).toFloat()
         if (spec == null) scrollBy(delta) else animateScrollBy(delta, spec)
         return
     }

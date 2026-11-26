@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <!-- The provider still returns HTTP for some CDN audio URLs. The API always uses HTTPS. -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">xmcdn.com</domain>
-    </domain-config>
+    <!-- Music plugins (MusicFree compatible) may return HTTP URLs on any host, as MusicFree allows. -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

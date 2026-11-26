@@ -361,7 +361,12 @@ internal fun <T> PlayerTopBar(pages: List<T>, page: T, label: @Composable (T) ->
  * smallest cover does not fit (short screens, large text) the page scrolls. Wide screens put the cover beside them.
  */
 @Composable
-internal fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable () -> Unit, modifier: Modifier = Modifier) {
+internal fun PlayerLayout(
+    cover: @Composable () -> Unit,
+    controls: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    stretchControls: Boolean = false,
+) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         val viewport = maxHeight
         val scroll = rememberScrollState()
@@ -385,10 +390,21 @@ internal fun PlayerLayout(cover: @Composable () -> Unit, controls: @Composable (
                 },
                 modifier = Modifier.widthIn(max = PlayerPageWidth).fillMaxWidth().verticalScroll(scroll).padding(horizontal = PlayerPagePadding),
             ) { measurables, constraints ->
-                val controlsPlaceable = measurables[1].measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
                 val gap = CoverGap.roundToPx()
                 val bottom = PlayerBottomPadding.roundToPx()
                 val largest = minOf(MaxCover.roundToPx(), constraints.maxWidth)
+                val natural = if (stretchControls) measurables[1].minIntrinsicHeight(constraints.maxWidth) else 0
+                // When the cover is as large as it gets, stretched controls take most of the space left instead of
+                // leaving it above and under the cover; the rest stays around the cover as before.
+                val spare = if (stretchControls) {
+                    (viewport.roundToPx() - natural - bottom - gap * 2 - largest).coerceAtLeast(0)
+                } else 0
+                val stretch = minOf(spare * 3 / 4, MaxControlsStretch.roundToPx())
+                val controlsPlaceable = if (stretchControls) {
+                    measurables[1].measure(Constraints.fixed(constraints.maxWidth, natural + stretch))
+                } else {
+                    measurables[1].measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                }
                 val room = viewport.roundToPx() - controlsPlaceable.height - bottom - gap * 2
                 val edge = room.coerceIn(minOf(MinCover.roundToPx(), largest), largest)
                 val coverPlaceable = measurables[0].measure(Constraints.fixed(edge, edge))
@@ -919,7 +935,13 @@ private fun MainPlaybackButton(state: PlaybackState, loadingQueue: Boolean, onCl
 
 /** The large play / pause button of both players. */
 @Composable
-internal fun PlayerPlayButton(phase: PlaybackPhase, wantsToPlay: Boolean, loadingQueue: Boolean, onClick: () -> Unit) {
+internal fun PlayerPlayButton(
+    phase: PlaybackPhase,
+    wantsToPlay: Boolean,
+    loadingQueue: Boolean,
+    onClick: () -> Unit,
+    size: Dp = 72.dp,
+) {
     val retry = phase == PlaybackPhase.Failed
     val waitingForQueue = loadingQueue && !wantsToPlay
     val loading = phase == PlaybackPhase.Preparing || phase == PlaybackPhase.Buffering || waitingForQueue
@@ -929,10 +951,10 @@ internal fun PlayerPlayButton(phase: PlaybackPhase, wantsToPlay: Boolean, loadin
         wantsToPlay -> R.string.action_pause
         else -> R.string.action_play
     })
-    FilledIconButton(onClick, Modifier.size(72.dp).semantics { contentDescription = label }, shape = CircleShape) {
+    FilledIconButton(onClick, Modifier.size(size).semantics { contentDescription = label }, shape = CircleShape) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp,
+                modifier = Modifier.size(size * 0.39f), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp,
             )
         } else {
             val icon = when {
@@ -940,7 +962,7 @@ internal fun PlayerPlayButton(phase: PlaybackPhase, wantsToPlay: Boolean, loadin
                 wantsToPlay -> XmIcons.Filled.Pause
                 else -> XmIcons.Filled.PlayArrow
             }
-            Icon(icon, contentDescription = null, modifier = Modifier.size(36.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(size / 2))
         }
     }
 }
@@ -954,6 +976,7 @@ private val MaxCover = 400.dp
 private val CoverGap = 16.dp
 private val CoverElevation = 12.dp
 private val PlayerBottomPadding = 16.dp
+private val MaxControlsStretch = 120.dp
 private const val PausedCoverScale = 0.9f
 
 private val SeekBarHeight = 40.dp
