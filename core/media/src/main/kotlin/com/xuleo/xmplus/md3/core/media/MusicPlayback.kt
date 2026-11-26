@@ -46,7 +46,12 @@ import okhttp3.OkHttpClient
  */
 @MainThread
 @androidx.annotation.OptIn(UnstableApi::class)
-class MusicPlayback(context: Context, private val resolver: SongSourceResolver, private val mediaCache: MusicMediaCache) {
+class MusicPlayback(
+    context: Context,
+    private val resolver: SongSourceResolver,
+    private val mediaCache: MusicMediaCache,
+    private val info: SongInfoResolver? = null,
+) {
     /** Called when a song is about to start, so that 听书 stops. */
     var onStart: () -> Unit = {}
 
@@ -407,8 +412,40 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
             if (found == null) return@launch fail(request, SongUnavailable)
             load(player, song, found.first, found.second, positionMs, play = true)
             remember()
+            supplement(request, song)
         }
     }
+
+    /**
+     * MusicFree asks the plugin for the song's details once it plays and shows them in its place: the cover a list gives
+     * is often small, the one here full size. The queue and the notification take them too.
+     */
+    private fun supplement(request: Long, song: MusicItem) {
+        val read = info ?: return
+        scope.launch {
+            val fuller = try {
+                read.info(song)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            } ?: return@launch
+            if (request != revision || mutableState.value.song?.key != song.key || fuller == song) return@launch
+            list.update(fuller)
+            mutableState.value = mutableState.value.copy(song = fuller)
+            engine.value?.takeIf(::isCurrent)?.let { player ->
+                val item = player.currentMediaItem ?: return@let
+                player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setMediaMetadata(metadata(fuller)).build())
+            }
+            publishQueue()
+            remember()
+        }
+    }
+
+    private fun metadata(song: MusicItem): MediaMetadata = MediaMetadata.Builder()
+        .setTitle(song.title).setArtist(song.artist).setAlbumTitle(song.album)
+        .setArtworkUri(song.artwork?.let(Uri::parse))
+        .build()
 
     private suspend fun resolve(song: MusicItem, quality: MusicQuality): ResolvedSong? = try {
         resolver.resolve(song, quality)
@@ -419,10 +456,7 @@ class MusicPlayback(context: Context, private val resolver: SongSourceResolver, 
     }
 
     private fun load(player: ExoPlayer, song: MusicItem, quality: MusicQuality, source: ResolvedSong, positionMs: Long, play: Boolean) {
-        val metadata = MediaMetadata.Builder()
-            .setTitle(song.title).setArtist(song.artist).setAlbumTitle(song.album)
-            .setArtworkUri(song.artwork?.let(Uri::parse))
-            .build()
+        val metadata = metadata(song)
         val uri = source.uri()
         val mediaId = "song:${++media}"
         val hls = uri.isHls()

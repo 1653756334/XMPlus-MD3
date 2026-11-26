@@ -133,6 +133,18 @@ class MusicCatalog(private val manager: PluginManager) {
         return PluginPage(data.objects().mapNotNull(item), root.isEnd())
     }
 
+    /**
+     * MusicFree's `getMusicInfo` merge: the plugin's answer over the song, keeping its id and platform; a blank or
+     * non-text `url` is dropped. Null when the plugin has no such method or returns nothing.
+     */
+    suspend fun musicInfo(song: MusicItem): MusicItem? {
+        val info = call(song.platform, "getMusicInfo", song.raw) as? JsonObject ?: return null
+        val url = info["url"]
+        val usable = if (url is JsonPrimitive && url.isString && url.content.isNotBlank()) info else JsonObject(info - "url")
+        val id = song.raw["id"] ?: return null
+        return MusicItem.from(JsonObject(song.raw + usable + ("id" to id)), song.platform)
+    }
+
     private suspend fun call(platform: String, method: String, vararg args: JsonElement): JsonElement? {
         val host = manager.host(platform) ?: throw PluginCallException("unavailable")
         return host.call(method, args.toList())

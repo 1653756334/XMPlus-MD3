@@ -44,6 +44,12 @@ fun interface SongSourceResolver {
     suspend fun resolve(song: MusicItem, quality: MusicQuality): ResolvedSong?
 }
 
+/** MusicFree's `getMusicInfo`: the song with what its plugin adds once it plays, such as a larger cover. */
+fun interface SongInfoResolver {
+    /** Null when the plugin adds nothing. */
+    suspend fun info(song: MusicItem): MusicItem?
+}
+
 data class MusicQueueState(
     val items: List<MusicItem> = emptyList(),
     val currentKey: String? = null,
@@ -79,6 +85,11 @@ internal class MusicQueue {
     fun at(index: Int): MusicItem? {
         val size = items.size
         return if (size == 0) null else items[((index % size) + size) % size]
+    }
+
+    /** Puts [song] in place of the queued song with its key. */
+    fun update(song: MusicItem) {
+        items = items.map { if (it.key == song.key) song else it }
     }
 
     fun replace(songs: List<MusicItem>, shuffle: Boolean) {
