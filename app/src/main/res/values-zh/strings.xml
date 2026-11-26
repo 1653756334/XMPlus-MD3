@@ -97,7 +97,6 @@
     <string name="album_unsubscribed">已取消订阅</string>
     <string name="anchor_follow">关注</string>
     <string name="anchor_following">已关注</string>
-    <string name="history_empty">听过的节目会显示在这里</string>
     <string name="history_clear">清空历史</string>
     <string name="history_clear_title">清空听过记录？</string>
     <string name="history_clear_body">只清空本机的听过记录，不影响云端历史。</string>
@@ -304,11 +303,9 @@
     <string name="album_replies_title">评价回复</string>
     <string name="album_unavailable">专辑暂时无法收听</string>
     <string name="detail_show_header">展开头部</string>
-    <string name="listen_tab_history">历史</string>
     <string name="listen_tab_cloud">云历史</string>
     <string name="listen_tab_updates">听更新</string>
     <string name="listen_tab_subscriptions">订阅</string>
-    <string name="listen_tab_favorites">收藏</string>
     <string name="listen_tab_bookmarks">书签</string>
     <string name="listen_tab_anchors">关注的主播</string>
     <string name="listen_signed_out">登录后查看</string>
@@ -520,4 +517,19 @@
     <string name="music_play_next_added">已添加到下一首播放</string>
     <string name="music_queue_clear_title">清空播放列表？</string>
     <string name="music_cache_usage">已用 %1$s，上限 %2$s</string>
+    <string name="library_continue">继续听</string>
+    <string name="library_recent">最近播放</string>
+    <string name="library_recent_empty">播放过的内容会显示在这里</string>
+    <string name="library_following">关注</string>
+    <string name="library_favorites">收藏专辑</string>
+    <string name="library_search">搜索听过</string>
+    <string name="library_manage_sheets">管理歌单</string>
+    <string name="library_sheets_mine">自建 %1$d</string>
+    <string name="library_sheets_starred">收藏 %1$d</string>
+    <string name="library_sheets_empty">还没有歌单</string>
+    <string name="library_starred_empty">还没有收藏歌单</string>
+    <string name="library_sheet_new">新建歌单</string>
+    <string name="library_sheet_import">导入</string>
+    <string name="library_sheet_name">名称</string>
+    <string name="library_sheet_create">创建</string>
 </resources>

@@ -173,6 +173,8 @@ class MusicPlayback(
         index: Int,
         loadMore: (suspend () -> List<MusicItem>?)? = null,
         source: MusicPlaySource? = null,
+        /** Where the chosen song starts, as when 继续听 brings a song back. */
+        positionMs: Long = 0,
     ) {
         val target = songs.getOrNull(index) ?: return
         failures = 0
@@ -182,7 +184,7 @@ class MusicPlayback(
         list.replace(songs, shuffle = mutableQueue.value.mode == MusicPlayMode.Shuffle)
         singleSources.clear()
         setPlayed(SongQueue(UUID.randomUUID().toString(), source, SongQueue.window(songs, index)), save = true)
-        open(target)
+        open(target, positionMs.coerceAtLeast(0))
     }
 
     /** Plays [song] now, right after the current song; the rest of the queue is kept. */

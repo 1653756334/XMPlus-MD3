@@ -1,455 +1,361 @@
 package com.xuleo.xmplus.md3.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
-import com.xuleo.xmplus.md3.core.media.BookmarkEntry
 import com.xuleo.xmplus.md3.core.media.ListenRecord
+import com.xuleo.xmplus.md3.core.media.MusicLibrary
+import com.xuleo.xmplus.md3.core.media.SongResume
+import com.xuleo.xmplus.md3.core.media.UserSheet
+import com.xuleo.xmplus.md3.core.model.ContentKind
+import com.xuleo.xmplus.md3.core.model.MusicSheet
 import com.xuleo.xmplus.md3.library.LibraryViewModel
-import com.xuleo.xmplus.md3.library.ListState
 import com.xuleo.xmplus.md3.ui.Destination
-import com.xuleo.xmplus.md3.ui.components.Avatar
 import com.xuleo.xmplus.md3.ui.components.Cover
-import com.xuleo.xmplus.md3.ui.components.ErrorState
-import com.xuleo.xmplus.md3.ui.components.LoadMoreEffect
-import com.xuleo.xmplus.md3.ui.components.PagingFooter
-import com.xuleo.xmplus.md3.ui.components.ScrollingDetailTabs
-import com.xuleo.xmplus.md3.ui.components.SettlingPager
-import com.xuleo.xmplus.md3.ui.components.formatCount
-import com.xuleo.xmplus.md3.ui.components.formatDate
-import com.xuleo.xmplus.md3.ui.components.formatDuration
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import com.xuleo.xmplus.md3.ui.components.ModeSwitch
+import com.xuleo.xmplus.md3.ui.components.MusicCover
+import com.xuleo.xmplus.md3.ui.components.MusicSheetRow
+import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
-/** An episode counts as finished when it is within this many milliseconds of its end. */
-private const val FinishedToleranceMs = 1_000L
+/** How many items 继续听 shows. */
+private const val ContinueCount = 10
+private const val GridColumns = 4
 
-/** The 听过 sections, in the order XMPlus shows them. */
-private enum class ListeningSection(@StringRes val label: Int) {
-    History(R.string.listen_tab_history),
-    Cloud(R.string.listen_tab_cloud),
-    Updates(R.string.listen_tab_updates),
-    Subscriptions(R.string.listen_tab_subscriptions),
-    Favorites(R.string.listen_tab_favorites),
-    Bookmarks(R.string.listen_tab_bookmarks),
-    Anchors(R.string.listen_tab_anchors),
+/** What is playing now, so 继续听 can mark it: a song's key or an episode's track id. */
+data class NowPlaying(val songKey: String? = null, val trackId: String? = null) {
+    fun matches(record: ListenRecord): Boolean = when (record.kind) {
+        ContentKind.Song -> songKey != null && record.albumId == songKey
+        ContentKind.Episode -> trackId != null && record.trackId == trackId
+    }
 }
 
+/** Where the 听过 overview leads. Null hooks hide what they would open until it exists. */
+class LibraryLinks(
+    val onOpenAlbum: (String) -> Unit,
+    val onPlay: (String, String, Long) -> Unit,
+    val onPlaySong: (SongResume) -> Unit,
+    val onOpenRecent: () -> Unit,
+    val onOpenSection: (LibrarySection) -> Unit,
+    val onOpenDownloads: () -> Unit,
+    val onOpenStarred: (MusicSheet) -> Unit,
+    /** 我喜欢 ([MusicLibrary.LikesId]) and 自建 sheets. */
+    val onOpenSheet: ((String) -> Unit)? = null,
+    val onSearch: (() -> Unit)? = null,
+    val onManageSheets: (() -> Unit)? = null,
+    val onImportSheet: (() -> Unit)? = null,
+)
+
+private enum class SheetGroup { Mine, Starred }
+
+private class Tile(@StringRes val label: Int, val icon: ImageVector, val count: Int?, val onClick: () -> Unit)
+
 /**
- * 听过. History and bookmarks are this device's; the other sections are the account's and are read the first time they
- * are shown. Tapping a history row, a cloud history row or a bookmark plays it from its saved position; other rows open their album or anchor page. Unsubscribing and unfavouriting happen in place.
+ * 听过, after QQ 音乐's 我的: 继续听 with the latest of both kinds, a grid of shortcuts to each collection, and the
+ * user's own and starred sheets. Account collections are left out when no account is signed in.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(viewModel: LibraryViewModel, onOpenAlbum: (String) -> Unit, onOpenAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit) {
-    val pager = rememberPagerState { ListeningSection.entries.size }
-    val scope = rememberCoroutineScope()
-    val snackbar = remember { SnackbarHostState() }
+fun LibraryScreen(
+    viewModel: LibraryViewModel,
+    music: MusicLibrary?,
+    signedIn: Boolean,
+    downloadCount: Int?,
+    nowPlaying: NowPlaying,
+    links: LibraryLinks,
+) {
     val history by viewModel.listenHistory.collectAsStateWithLifecycle()
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
-    val cloud by viewModel.cloudHistory.flow.collectAsStateWithLifecycle()
-    val updates by viewModel.updates.flow.collectAsStateWithLifecycle()
-    val subscriptions by viewModel.subscriptions.flow.collectAsStateWithLifecycle()
-    val favorites by viewModel.favorites.flow.collectAsStateWithLifecycle()
-    val anchors by viewModel.followings.flow.collectAsStateWithLifecycle()
-    val section = ListeningSection.entries[pager.currentPage]
-    var selecting by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(emptySet<String>()) }
-    val removed = stringResource(R.string.history_removed)
-    val undo = stringResource(R.string.history_undo)
-    val failed = stringResource(R.string.library_action_failed)
-    val openAlbum: (String) -> Unit = { albumId -> if (albumId.isNotEmpty()) onOpenAlbum(albumId) }
-    val historyRows = history.orEmpty()
-    val historySelecting = selecting && section == ListeningSection.History
-    val allSelected = historyRows.isNotEmpty() && selected.size == historyRows.size
-    // Leaving the tab, or pressing back, ends selection.
-    LaunchedEffect(section) {
-        selecting = false
-        selected = emptySet()
-    }
-    BackHandler(enabled = historySelecting) {
-        selecting = false
-        selected = emptySet()
-    }
-    // The selected rows leave together, and one Undo puts them all back.
-    val deleteSelected: () -> Unit = {
-        val chosen = historyRows.filter { it.albumId in selected }
-        chosen.forEach(viewModel::removeHistory)
-        selecting = false
-        selected = emptySet()
-        scope.launch {
-            if (snackbar.showSnackbar(removed, undo, duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed) {
-                chosen.forEach(viewModel::restoreHistory)
-            }
+    val liked = music?.liked?.collectAsStateWithLifecycle()?.value.orEmpty()
+    val sheets = music?.sheets?.collectAsStateWithLifecycle()?.value.orEmpty()
+    val starred = music?.starred?.collectAsStateWithLifecycle()?.value.orEmpty()
+    var group by rememberSaveable { mutableStateOf(SheetGroup.Mine) }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) { viewModel.loadBookmarks() }
+    val recent = history.orEmpty().take(ContinueCount)
+    val tiles = buildList {
+        val openSheet = links.onOpenSheet
+        if (music != null && openSheet != null) add(Tile(R.string.music_favorites, XmIcons.Outlined.FavoriteBorder, liked.size) { openSheet(MusicLibrary.LikesId) })
+        if (signedIn) {
+            add(Tile(R.string.listen_tab_updates, XmIcons.Outlined.AutoAwesome, null) { links.onOpenSection(LibrarySection.Updates) })
+            add(Tile(R.string.listen_tab_subscriptions, XmIcons.Outlined.LibraryAdd, null) { links.onOpenSection(LibrarySection.Subscriptions) })
         }
-    }
-    LaunchedEffect(pager.currentPage) {
-        when (ListeningSection.entries[pager.currentPage]) {
-            ListeningSection.History -> Unit
-            ListeningSection.Cloud -> viewModel.cloudHistory.ensureLoaded()
-            ListeningSection.Updates -> viewModel.updates.ensureLoaded()
-            ListeningSection.Subscriptions -> viewModel.subscriptions.ensureLoaded()
-            ListeningSection.Favorites -> viewModel.favorites.ensureLoaded()
-            ListeningSection.Bookmarks -> viewModel.loadBookmarks()
-            ListeningSection.Anchors -> viewModel.followings.ensureLoaded()
+        add(Tile(R.string.listen_tab_bookmarks, XmIcons.Outlined.BookmarkBorder, bookmarks?.size) { links.onOpenSection(LibrarySection.Bookmarks) })
+        if (signedIn) {
+            add(Tile(R.string.library_favorites, XmIcons.Outlined.Star, null) { links.onOpenSection(LibrarySection.Favorites) })
+            add(Tile(R.string.library_following, XmIcons.Outlined.Person, null) { links.onOpenSection(LibrarySection.Anchors) })
+            add(Tile(R.string.listen_tab_cloud, XmIcons.Outlined.Sync, null) { links.onOpenSection(LibrarySection.Cloud) })
         }
-    }
-    // A change to the account. If the server refuses it, the row stays where it was and the snackbar says so.
-    val attempt: (suspend () -> Unit) -> Unit = { change ->
-        scope.launch {
-            try {
-                change()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                snackbar.showSnackbar(failed)
-            }
-        }
+        add(Tile(R.string.tab_downloads, XmIcons.Outlined.Download, downloadCount, links.onOpenDownloads))
     }
     TabScaffold(
         Destination.Library.label,
-        headline = if (historySelecting) stringResource(R.string.history_selected, selected.size) else null,
-        navigation = {
-            if (historySelecting) IconButton(onClick = { selecting = false; selected = emptySet() }) {
-                Icon(XmIcons.Filled.Close, contentDescription = stringResource(R.string.action_cancel))
-            }
-        },
         actions = {
-            if (section == ListeningSection.History && historyRows.isNotEmpty()) {
-                if (selecting) {
-                    IconButton(onClick = {
-                        selected = if (allSelected) emptySet<String>() else historyRows.mapTo(HashSet()) { it.albumId }
-                    }) {
-                        Icon(XmIcons.Filled.DoneAll, contentDescription = stringResource(R.string.history_select_all))
-                    }
-                    IconButton(onClick = deleteSelected, enabled = selected.isNotEmpty()) {
-                        Icon(XmIcons.Outlined.DeleteOutline, contentDescription = stringResource(R.string.history_remove))
-                    }
-                } else {
-                    IconButton(onClick = { selecting = true }) {
-                        Icon(XmIcons.Outlined.Checklist, contentDescription = stringResource(R.string.history_select))
-                    }
-                }
+            links.onSearch?.let { search ->
+                IconButton(onClick = search) { Icon(XmIcons.Outlined.Search, stringResource(R.string.library_search)) }
             }
+            links.onManageSheets?.let { manage -> OverflowMenu(manage) }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            ScrollingDetailTabs(pager.currentPage, ListeningSection.entries.map { stringResource(it.label) }, { index -> scope.launch { pager.animateScrollToPage(index) } })
-            SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
-                when (ListeningSection.entries[index]) {
-                    ListeningSection.History -> HistoryPage(
-                        history,
-                        selecting = selecting,
-                        selected = selected,
-                        onPlay = { record -> onPlay(record.albumId, record.trackId, resumeAt(record.positionMs, record.durationMs)) },
-                        onToggle = { albumId -> selected = if (albumId in selected) selected - albumId else selected + albumId },
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = XmLayout.SectionGap)) {
+            if (recent.isNotEmpty()) {
+                item(key = "continue") {
+                    ContinueRow(recent, nowPlaying, links.onOpenRecent) { record ->
+                        viewModel.resume(record, links.onPlay, links.onPlaySong)
+                    }
+                }
+            }
+            item(key = "tiles") { TileGrid(tiles) }
+            if (music != null) {
+                item(key = "sheetsHeader") {
+                    SheetsHeader(
+                        group, sheets.size, starred.size, { group = it },
+                        onCreate = { creating = true }, onImport = links.onImportSheet,
                     )
-                    ListeningSection.Cloud -> ListingPage(
-                        state = cloud,
-                        signedOutText = R.string.listen_signed_out,
-                        emptyText = R.string.listen_empty_cloud,
-                        onRefresh = { viewModel.cloudHistory.refresh() },
-                        onLoadMore = { viewModel.cloudHistory.loadMore() },
-                        key = { "${it.albumId}/${it.trackId}" },
-                    ) { record ->
-                        val locale = LocalConfiguration.current.locales[0]
-                        ListingRow(
-                            cover = record.coverUrl,
-                            title = record.trackTitle.ifEmpty { record.albumTitle },
-                            subtitle = record.albumTitle,
-                            meta = joinMeta(
-                                progressText(record.progress.positionMs, record.durationSeconds * 1_000L),
-                                formatDate(record.progress.observedAtMs, locale),
-                            ),
-                            onOpen = { onPlay(record.albumId, record.trackId, resumeAt(record.progress.positionMs, record.durationSeconds * 1_000L)) },
-                        )
+                }
+                when (group) {
+                    SheetGroup.Mine -> if (sheets.isEmpty()) {
+                        item(key = "sheetsEmpty") { EmptySheets { creating = true } }
+                    } else {
+                        items(sheets, key = { "sheet:${it.id}" }) { sheet ->
+                            UserSheetRow(sheet, links.onOpenSheet?.let { open -> { open(sheet.id) } })
+                        }
                     }
-                    ListeningSection.Updates -> ListingPage(
-                        state = updates,
-                        signedOutText = R.string.listen_signed_out,
-                        emptyText = R.string.listen_empty_updates,
-                        onRefresh = { viewModel.updates.refresh() },
-                        onLoadMore = { viewModel.updates.loadMore() },
-                        key = { "${it.track.id}/${it.publishedAtMillis}" },
-                    ) { update ->
-                        val locale = LocalConfiguration.current.locales[0]
-                        ListingRow(
-                            cover = update.track.coverUrl,
-                            title = update.track.title,
-                            subtitle = update.track.albumTitle,
-                            meta = formatDate(update.publishedAtMillis, locale),
-                            onOpen = { openAlbum(update.track.albumId) },
-                        )
-                    }
-                    ListeningSection.Subscriptions -> ListingPage(
-                        state = subscriptions,
-                        signedOutText = R.string.listen_signed_out,
-                        emptyText = R.string.listen_empty_subscriptions,
-                        onRefresh = { viewModel.subscriptions.refresh() },
-                        onLoadMore = { viewModel.subscriptions.loadMore() },
-                        key = { it.album.id },
-                    ) { item ->
-                        val unread = item.unreadCount.toInt()
-                        ListingRow(
-                            cover = item.album.coverUrl,
-                            title = item.album.title,
-                            subtitle = item.latestTitle,
-                            meta = if (unread > 0) pluralStringResource(R.plurals.listen_unplayed, unread, unread) else "",
-                            onOpen = { openAlbum(item.album.id) },
-                            trailing = {
-                                IconButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
-                                    Icon(XmIcons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
-                                }
-                            },
-                        )
-                    }
-                    ListeningSection.Favorites -> ListingPage(
-                        state = favorites,
-                        signedOutText = R.string.listen_signed_out,
-                        emptyText = R.string.listen_empty_favorites,
-                        onRefresh = { viewModel.favorites.refresh() },
-                        onLoadMore = { viewModel.favorites.loadMore() },
-                        key = { it.id },
-                    ) { track ->
-                        ListingRow(
-                            cover = track.coverUrl,
-                            title = track.title,
-                            subtitle = track.albumTitle,
-                            meta = "",
-                            onOpen = { openAlbum(track.albumId) },
-                            trailing = {
-                                IconButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
-                                    Icon(XmIcons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
-                                }
-                            },
-                        )
-                    }
-                    ListeningSection.Bookmarks -> BookmarkPage(bookmarks, onPlay = { entry -> onPlay(entry.albumId, entry.trackId, entry.positionMs) })
-                    ListeningSection.Anchors -> ListingPage(
-                        state = anchors,
-                        signedOutText = R.string.listen_signed_out,
-                        emptyText = R.string.listen_empty_anchors,
-                        onRefresh = { viewModel.followings.refresh() },
-                        onLoadMore = { viewModel.followings.loadMore() },
-                        key = { it.uid },
-                    ) { anchor ->
-                        val fans = anchor.fans
-                        ListingRow(
-                            cover = anchor.avatarUrl,
-                            title = anchor.nickname,
-                            subtitle = "",
-                            meta = if (fans != null) pluralStringResource(R.plurals.anchor_follower_count, fans, formatCount(fans.toLong())) else "",
-                            onOpen = { onOpenAnchor(anchor.uid) },
-                            circle = true,
-                        )
+                    SheetGroup.Starred -> if (starred.isEmpty()) {
+                        item(key = "starredEmpty") { Note(stringResource(R.string.library_starred_empty)) }
+                    } else {
+                        items(starred, key = { "starred:${it.platform}:${it.id}" }) { sheet ->
+                            MusicSheetRow(sheet) { links.onOpenStarred(sheet) }
+                        }
                     }
                 }
             }
         }
     }
+    if (creating && music != null) {
+        NewSheetDialog(onDismiss = { creating = false }) { name ->
+            creating = false
+            music.createSheet(name)
+        }
+    }
 }
 
 @Composable
-private fun HistoryPage(
-    records: List<ListenRecord>?,
-    selecting: Boolean,
-    selected: Set<String>,
-    onPlay: (ListenRecord) -> Unit,
-    onToggle: (String) -> Unit,
-) {
-    when {
-        records == null -> Box(Modifier.fillMaxSize())
-        records.isEmpty() -> Note(stringResource(R.string.history_empty))
-        else -> LazyColumn(Modifier.fillMaxSize()) {
-            items(records, key = { it.albumId }) { record ->
-                HistoryRow(
-                    record,
-                    selecting = selecting,
-                    checked = record.albumId in selected,
-                    onPlay = { onPlay(record) },
-                    onToggle = { onToggle(record.albumId) },
-                )
+private fun OverflowMenu(onManageSheets: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(XmIcons.Outlined.MoreVert, stringResource(R.string.search_more)) }
+        com.xuleo.xmplus.md3.ui.components.XmMenu(open, { open = false }) {
+            com.xuleo.xmplus.md3.ui.components.XmMenuItem(
+                stringResource(R.string.library_manage_sheets), { open = false; onManageSheets() }, 0, 1,
+                icon = XmIcons.Outlined.SwapVert,
+            )
+        }
+    }
+}
+
+/** 继续听: the latest items of both kinds; its title opens 最近播放. */
+@Composable
+private fun ContinueRow(records: List<ListenRecord>, nowPlaying: NowPlaying, onOpenRecent: () -> Unit, onResume: (ListenRecord) -> Unit) {
+    Column {
+        Row(
+            Modifier.clickable(onClick = onOpenRecent).heightIn(min = 48.dp)
+                .padding(start = XmLayout.PagePadding, end = XmLayout.PagePadding / 2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.library_continue), style = MaterialTheme.typography.titleMedium)
+            Icon(XmIcons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = XmLayout.PagePadding),
+            horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+        ) {
+            items(records, key = { "${it.kind.key}:${it.albumId}" }) { record ->
+                ContinueCard(record, nowPlaying.matches(record)) { onResume(record) }
             }
         }
     }
 }
 
-/** One album in local history: its latest episode, where playback stopped in it, and when. In selection mode a tap ticks the row. */
 @Composable
-private fun HistoryRow(record: ListenRecord, selecting: Boolean, checked: Boolean, onPlay: () -> Unit, onToggle: () -> Unit) {
-    val locale = LocalConfiguration.current.locales[0]
-    ListingRow(
-        cover = record.coverUrl,
-        title = record.albumTitle,
-        subtitle = record.trackTitle,
-        meta = joinMeta(progressText(record.positionMs, record.durationMs), formatDate(record.playedAtMs, locale)),
-        onOpen = if (selecting) onToggle else onPlay,
-        modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-        trailing = { com.xuleo.xmplus.md3.ui.components.XmSwap(selecting) { if (it) Checkbox(checked = checked, onCheckedChange = null) } },
-    )
-}
-@Composable
-private fun BookmarkPage(bookmarks: List<BookmarkEntry>?, onPlay: (BookmarkEntry) -> Unit) {
-    val locale = LocalConfiguration.current.locales[0]
-    when {
-        bookmarks == null -> Box(Modifier.fillMaxSize())
-        bookmarks.isEmpty() -> Note(stringResource(R.string.listen_empty_bookmarks))
-        else -> LazyColumn(Modifier.fillMaxSize()) {
-            items(bookmarks, key = { "${it.trackId}/${it.createdAtMs}" }) { entry ->
-                ListingRow(
-                    cover = entry.source.coverUrl,
-                    title = entry.source.trackTitle.ifEmpty { stringResource(R.string.listen_untitled) },
-                    subtitle = entry.source.albumTitle,
-                    meta = joinMeta(
-                        stringResource(R.string.listen_bookmark_at, formatDuration(entry.positionMs / 1_000.0)),
-                        entry.note.ifEmpty { stringResource(R.string.bookmark_no_note) },
-                        formatDate(entry.createdAtMs, locale),
-                    ),
-                    onOpen = { onPlay(entry) },
+private fun ContinueCard(record: ListenRecord, playing: Boolean, onClick: () -> Unit) {
+    val song = record.kind == ContentKind.Song
+    Column(Modifier.width(112.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(MaterialTheme.shapes.medium)) {
+            if (song) MusicCover(record.coverUrl, Modifier.matchParentSize()) else Cover(record.coverUrl, Modifier.matchParentSize())
+            if (!song && record.durationMs > 0) {
+                val progress = (record.positionMs.toFloat() / record.durationMs).coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp).heightIn(max = 3.dp),
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
+                    trackColor = Color.White.copy(alpha = 0.4f),
                 )
+            }
+            if (playing) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(XmIcons.Filled.Equalizer, contentDescription = null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        }
+        Text(
+            if (song) record.trackTitle else record.trackTitle.ifEmpty { record.albumTitle },
+            style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/** Shortcuts in rows of four; tiles that are left out close up rather than leave a gap. */
+@Composable
+private fun TileGrid(tiles: List<Tile>) {
+    Column(Modifier.padding(horizontal = XmLayout.PagePadding / 2, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        tiles.chunked(GridColumns).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { tile -> ShortcutTile(tile, Modifier.weight(1f)) }
+                repeat(GridColumns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
-/**
- * One list read page by page: the account's sign-in prompt, a spinner, a failure with a retry, an empty note, or the rows
- * with a footer that loads the next page as the end comes into view.
- */
 @Composable
-private fun <T> ListingPage(
-    state: ListState<T>,
-    @StringRes signedOutText: Int,
-    @StringRes emptyText: Int,
-    onRefresh: () -> Unit,
-    onLoadMore: () -> Unit,
-    key: (T) -> Any,
-    row: @Composable (T) -> Unit,
-) {
-    val lazy = rememberLazyListState()
-    LoadMoreEffect(
-        { lazy.layoutInfo.visibleItemsInfo.lastOrNull()?.index },
-        { state.items.size + 1 },
-        state.next,
-        state.items.size,
-        onLoadMore = onLoadMore,
-    )
-    val failure = state.failure
-    when {
-        !state.signedIn -> Note(stringResource(signedOutText))
-        !state.loaded && failure == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        state.items.isEmpty() && failure != null -> ErrorState(failure, onRefresh)
-        state.items.isEmpty() -> Note(stringResource(emptyText))
-        else -> LazyColumn(Modifier.fillMaxSize(), state = lazy) {
-            items(state.items, key = key) { row(it) }
-            item(key = "footer") { PagingFooter(state.loading, failure != null, state.next != null, onLoadMore) }
+private fun ShortcutTile(tile: Tile, modifier: Modifier = Modifier) {
+    Column(
+        modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = tile.onClick).padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(tile.icon, contentDescription = null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(stringResource(tile.label), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            tile.count?.takeIf { it > 0 }?.let {
+                Text("$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
         }
     }
 }
 
-/** One row of a 听过 list: the cover, a title with its details, an optional trailing action, and a tap that opens it. */
+/** 自建 n · 收藏 n, switched in place, with 新建 and 导入 at the end. */
 @Composable
-private fun ListingRow(
-    cover: String?,
-    title: String,
-    subtitle: String,
-    meta: String,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier,
-    circle: Boolean = false,
-    trailing: @Composable () -> Unit = {},
+private fun SheetsHeader(
+    group: SheetGroup,
+    mine: Int,
+    starred: Int,
+    onGroup: (SheetGroup) -> Unit,
+    onCreate: () -> Unit,
+    onImport: (() -> Unit)?,
 ) {
+    Row(Modifier.fillMaxWidth().padding(top = XmLayout.ItemGap, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        ModeSwitch(
+            SheetGroup.entries, group,
+            label = { if (it == SheetGroup.Mine) stringResource(R.string.library_sheets_mine, mine) else stringResource(R.string.library_sheets_starred, starred) },
+            onSelect = onGroup, modifier = Modifier.weight(1f), textStyle = MaterialTheme.typography.titleMedium,
+        )
+        IconButton(onClick = onCreate) { Icon(XmIcons.Outlined.Add, stringResource(R.string.library_sheet_new)) }
+        onImport?.let { IconButton(onClick = it) { Icon(XmIcons.Outlined.Link, stringResource(R.string.library_sheet_import)) } }
+    }
+}
+
+@Composable
+private fun EmptySheets(onCreate: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(XmLayout.PagePadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
+    ) {
+        Text(stringResource(R.string.library_sheets_empty), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = onCreate) { Text(stringResource(R.string.library_sheet_new)) }
+    }
+}
+
+@Composable
+private fun UserSheetRow(sheet: UserSheet, onClick: (() -> Unit)?) {
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = XmLayout.PagePadding, vertical = 10.dp),
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).heightIn(min = 64.dp)
+            .padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        if (circle) Avatar(cover, Modifier.size(56.dp)) else Cover(cover, Modifier.size(56.dp))
+        MusicCover(sheet.coverUrl, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (subtitle.isNotEmpty()) Text(
-                subtitle, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (meta.isNotEmpty()) Text(
-                meta, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text(sheet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                pluralStringResource(R.plurals.music_song_count, sheet.songs.size, sheet.songs.size),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
             )
         }
-        trailing()
     }
 }
 
+/** 新建歌单: one name field. */
 @Composable
-private fun Note(text: String) {
-    Box(Modifier.fillMaxSize().padding(XmLayout.PagePadding), contentAlignment = Alignment.Center) {
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+internal fun NewSheetDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.library_sheet_new)) },
+        text = {
+            OutlinedTextField(
+                name, { name = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
+                label = { Text(stringResource(R.string.library_sheet_name)) },
+            )
+        },
+        confirmButton = { TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.library_sheet_create)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
-
-/** Where playback starts from a saved position: a finished episode starts over. */
-private fun resumeAt(positionMs: Long, durationMs: Long): Long {
-    val finished = durationMs > 0 && positionMs >= durationMs - FinishedToleranceMs
-    return if (finished) 0L else positionMs
-}
-
-@Composable
-private fun progressText(positionMs: Long, durationMs: Long): String {
-    val finished = durationMs > 0 && positionMs >= durationMs - FinishedToleranceMs
-    return when {
-        finished -> stringResource(R.string.history_finished)
-        durationMs > 0 -> stringResource(
-            R.string.history_progress,
-            formatDuration(positionMs / 1_000.0),
-            formatDuration(durationMs / 1_000.0),
-        )
-        else -> formatDuration(positionMs / 1_000.0)
-    }
-}
-
-private fun joinMeta(vararg parts: String): String = parts.filter { it.isNotEmpty() }.joinToString(" · ")

@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -80,12 +81,13 @@ fun PluginsScreen(viewModel: PluginsViewModel, onBack: () -> Unit) {
     val plugins by viewModel.plugins.collectAsStateWithLifecycle()
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             val text = when (event) {
-                is PluginEvent.Results -> installMessage(context.resources, event.results)
-                PluginEvent.LinkCopied -> context.getString(R.string.plugin_link_copied)
+                is PluginEvent.Results -> installMessage(resources, event.results)
+                PluginEvent.LinkCopied -> resources.getString(R.string.plugin_link_copied)
             }
             if (text != null) snackbar.showSnackbar(text)
         }

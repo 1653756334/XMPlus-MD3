@@ -22,6 +22,10 @@ internal sealed interface AppRoute : NavKey {
         val contentKey: String get() = "music:$kind:$platform:$id"
     }
     @Serializable data object MusicSearch : AppRoute
+    /** 最近播放, opened from 继续听 in 听过. */
+    @Serializable data object Recent : AppRoute
+    /** One 听书 collection of 听过; [section] is a `LibrarySection` name. */
+    @Serializable data class LibraryPage(val section: String) : AppRoute
     @Serializable data object Player : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object Plugins : AppRoute

@@ -21,8 +21,14 @@ import com.xuleo.xmplus.md3.R
 /** A pushed page of browsing content: a back arrow and a title above whatever [content] shows. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrowsePage(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun BrowsePage(
+    title: String,
+    onBack: () -> Unit,
+    snackbarHost: @Composable () -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Scaffold(
+        snackbarHost = snackbarHost,
         topBar = {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },

@@ -101,7 +101,6 @@
     <string name="album_unsubscribed">Unsubscribed</string>
     <string name="anchor_follow">Follow</string>
     <string name="anchor_following">Following</string>
-    <string name="history_empty">Episodes you listen to will show up here</string>
     <string name="history_clear">Clear history</string>
     <string name="history_clear_title">Clear listening history?</string>
     <string name="history_clear_body">This removes history from this device only. Cloud history is not changed.</string>
@@ -312,11 +311,9 @@
     <string name="album_replies_title">Replies</string>
     <string name="album_unavailable">This album isn\'t available right now.</string>
     <string name="detail_show_header">Show header</string>
-    <string name="listen_tab_history">History</string>
     <string name="listen_tab_cloud">Cloud history</string>
     <string name="listen_tab_updates">Updates</string>
     <string name="listen_tab_subscriptions">Subscriptions</string>
-    <string name="listen_tab_favorites">Favourites</string>
     <string name="listen_tab_bookmarks">Bookmarks</string>
     <string name="listen_tab_anchors">Following</string>
     <string name="listen_signed_out">Sign in to see this list</string>
@@ -539,4 +536,19 @@
     <string name="music_play_next_added">Plays next</string>
     <string name="music_queue_clear_title">Clear the queue?</string>
     <string name="music_cache_usage">%1$s of %2$s used</string>
+    <string name="library_continue">Continue</string>
+    <string name="library_recent">Recently played</string>
+    <string name="library_recent_empty">What you play will show up here</string>
+    <string name="library_following">Following</string>
+    <string name="library_favorites">Saved</string>
+    <string name="library_search">Search library</string>
+    <string name="library_manage_sheets">Manage playlists</string>
+    <string name="library_sheets_mine">Mine %1$d</string>
+    <string name="library_sheets_starred">Saved %1$d</string>
+    <string name="library_sheets_empty">No playlists yet</string>
+    <string name="library_starred_empty">No saved playlists yet</string>
+    <string name="library_sheet_new">New playlist</string>
+    <string name="library_sheet_import">Import</string>
+    <string name="library_sheet_name">Name</string>
+    <string name="library_sheet_create">Create</string>
 </resources>

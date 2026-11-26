@@ -1,6 +1,8 @@
 package com.xuleo.xmplus.md3.ui
 
 import com.xuleo.xmplus.md3.core.media.MusicPlaySource
+import com.xuleo.xmplus.md3.core.media.SongResume
+import com.xuleo.xmplus.md3.core.download.DownloadState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -137,7 +139,8 @@ internal fun XmAppContent(
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
-                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, AppRoute.MusicSearch -> Unit
+                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, AppRoute.MusicSearch,
+                AppRoute.Recent, is AppRoute.LibraryPage -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -153,6 +156,9 @@ internal fun XmAppContent(
     val accountState = accounts?.accounts?.collectAsStateWithLifecycle()?.value ?: AccountsState.Ready(emptyList())
     val hotWords = search?.state?.collectAsStateWithLifecycle()?.value?.hotWords.orEmpty()
     val playingSong = musicPlayer?.playback?.state?.collectAsStateWithLifecycle()?.value?.song
+    val playingTrack = playback?.state?.collectAsStateWithLifecycle()?.value?.selection?.track?.id
+    val nowPlaying = if (playingSong != null) NowPlaying(songKey = playingSong.key) else NowPlaying(trackId = playingTrack)
+    val downloadCount = downloads?.tasks?.collectAsStateWithLifecycle()?.value?.count { it.state == DownloadState.Completed }
 
     BackHandler(enabled = !isPlayer && isHome && selected != Destination.Discover) { onSelect(Destination.Discover) }
     LaunchedEffect(isHome) { if (isHome) suite.show() else suite.hide() }
@@ -204,6 +210,32 @@ internal fun XmAppContent(
         navigator.push(AppRoute.Player)
     }
     val links = DiscoverLinks(::openSearch, ::openAllAlbums, { navigator.push(AppRoute.HotRanking(it)) }, ::openCategory, ::openAlbum, ::openAnchor)
+    fun playSaved(albumId: String, trackId: String, positionMs: Long) {
+        playback?.playSaved(albumId, trackId, positionMs)
+    }
+    // 继续听 and 最近播放 bring a song back with the list it was played from, where it stopped.
+    fun playSong(resume: SongResume) {
+        musicPlayer?.playback?.playList(resume.songs, resume.index, source = resume.source, positionMs = resume.positionMs)
+    }
+    val libraryLinks = LibraryLinks(
+        onOpenAlbum = ::openAlbum,
+        onPlay = ::playSaved,
+        onPlaySong = ::playSong,
+        onOpenRecent = { navigator.push(AppRoute.Recent) },
+        onOpenSection = { navigator.push(AppRoute.LibraryPage(it.name)) },
+        onOpenDownloads = { onSelect(Destination.Downloads) },
+        onOpenStarred = { openMusic(MusicDetailKind.Sheet, it) },
+        // Hooks for the next steps: the sheet page (我喜欢 and 自建), library search, 管理歌单 and 导入.
+        onOpenSheet = null,
+        onSearch = null,
+        onManageSheets = null,
+        onImportSheet = null,
+    )
+    val libraryTab: @Composable () -> Unit = {
+        if (library != null) {
+            LibraryScreen(library, musicPlayer?.library, accountState.hasAccounts, downloadCount, nowPlaying, libraryLinks)
+        }
+    }
     fun openImport(identity: String? = null) {
         if (stack.lastOrNull() !is AppRoute.ImportLogin) accounts?.beginImport()
         navigator.push(AppRoute.ImportLogin(identity))
@@ -259,7 +291,7 @@ internal fun XmAppContent(
                                     { navigator.push(AppRoute.Accounts) }, ::openPhone, importArchive, playback?.historyUpload, library, downloads, ::openAlbum, ::openAnchor, { albumId, trackId, positionMs -> playback?.playSaved(albumId, trackId, positionMs) },
                                     { albumId, trackId -> playback?.playEpisode(albumId, trackId) }, plugins, { navigator.push(AppRoute.Plugins) }, musicBrowse,
                                     { sheet, ranking -> openMusic(if (ranking) MusicDetailKind.TopList else MusicDetailKind.Sheet, sheet) },
-                                    { navigator.push(AppRoute.MusicSearch) })
+                                    { navigator.push(AppRoute.MusicSearch) }, libraryTab = libraryTab)
                             }
                         }
                     }
@@ -315,6 +347,19 @@ internal fun XmAppContent(
                                     onPlayNext = { musicPlayer?.playback?.addNext(it) },
                                     playingKey = playingSong?.key,
                                 )
+                            }
+                        }
+                    }
+                    entry<AppRoute.Recent> {
+                        Surface(Modifier.fillMaxSize()) {
+                            if (library != null) RecentScreen(library, nowPlaying, { navigator.pop() }, ::playSaved, ::playSong)
+                        }
+                    }
+                    entry<AppRoute.LibraryPage> { route ->
+                        Surface(Modifier.fillMaxSize()) {
+                            val section = LibrarySection.entries.firstOrNull { it.name == route.section }
+                            if (library != null && section != null) {
+                                LibrarySectionScreen(library, section, { navigator.pop() }, ::openAlbum, ::openAnchor, ::playSaved)
                             }
                         }
                     }
@@ -392,14 +437,15 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
     onAccounts: () -> Unit, onLogin: () -> Unit, onImportBackup: () -> Unit, historyUpload: HistoryUploader?,
     library: LibraryViewModel?, downloads: DownloadsViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit,
     onPlayEpisode: (String, String) -> Unit, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {},
-    musicBrowse: MusicBrowseViewModel? = null, onOpenSheet: (MusicSheet, Boolean) -> Unit = { _, _ -> }, onMusicSearch: () -> Unit = {}) {
+    musicBrowse: MusicBrowseViewModel? = null, onOpenSheet: (MusicSheet, Boolean) -> Unit = { _, _ -> }, onMusicSearch: () -> Unit = {},
+    libraryTab: (@Composable () -> Unit)? = null) {
     val installed = plugins?.plugins?.collectAsStateWithLifecycle()?.value
     holder.SaveableStateProvider(destination.name) {
         when (destination) {
             Destination.Discover -> if (discover != null && categories != null && rankings != null) DiscoverScreen(discover, categories, rankings, hotWords, links) else EmptyTab(destination.label, destination.icon)
             Destination.Music -> MusicScreen(if (plugins == null) emptyList() else installed, onPlugins,
                 source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) }, browse = musicBrowse, onOpenSheet = onOpenSheet, onSearch = onMusicSearch)
-            Destination.Library -> if (library != null) LibraryScreen(library, onAlbum, onAnchor, onPlay) else EmptyTab(destination.label, destination.icon)
+            Destination.Library -> if (library != null && libraryTab != null) libraryTab() else EmptyTab(destination.label, destination.icon)
             Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode) else EmptyTab(destination.label, destination.icon)
             Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, installed?.size, onPlugins,
                 (LocalContext.current.applicationContext as? XmApplication)?.musicMediaCache)
