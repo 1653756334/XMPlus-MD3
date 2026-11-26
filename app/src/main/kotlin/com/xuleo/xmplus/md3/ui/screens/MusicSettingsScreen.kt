@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,7 @@ import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
 import com.xuleo.xmplus.md3.core.media.MusicMediaCache
 import com.xuleo.xmplus.md3.core.media.MusicQualitySettings
+import com.xuleo.xmplus.md3.ui.components.SectionCard
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
 /** 音乐 settings: the plugins, the qualities songs play and download in, and the room they may take on the phone. */
@@ -51,12 +54,13 @@ internal fun MusicSettingsScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             Column(
                 Modifier.align(Alignment.TopCenter).widthIn(max = XmLayout.ContentWidth).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).padding(XmLayout.PagePadding),
-                verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap),
+                    .verticalScroll(rememberScrollState()).padding(vertical = XmLayout.ItemGap),
+                verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
             ) {
-                Column {
+                SectionCard {
                     ListItem(
                         onClick = onPlugins,
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = { Icon(XmIcons.Outlined.QueueMusic, contentDescription = null) },
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -68,8 +72,8 @@ internal fun MusicSettingsScreen(
                         },
                     ) { Text(stringResource(R.string.plugins_title)) }
                 }
-                Column { if (quality != null) MusicPlaybackSettings(quality) }
-                Column { if (cache != null) MusicCacheSettings(cache) }
+                if (quality != null) SectionCard { MusicPlaybackSettings(quality) }
+                if (cache != null) SectionCard { MusicCacheSettings(cache) }
             }
         }
     }
