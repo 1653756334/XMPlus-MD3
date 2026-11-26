@@ -1,65 +1,97 @@
 package com.xuleo.xmplus.md3.core.download
 
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Puts a cover into a FLAC file. jaudiotagger reads FLAC pictures but writes none, so the block is added by hand: the
  * metadata blocks are walked, any picture is dropped, the new one goes last with the last-block flag, and the audio
  * frames are copied unchanged. A file that does not look like FLAC is left alone.
+ *
+ * The file is streamed into a sibling and moved over the original: a whole song does not fit in memory.
  */
 internal object FlacCover {
     fun write(file: File, image: ByteArray) {
-        val text = try {
-            file.readBytes()
-        } catch (_: Exception) {
-            return
-        }
-        if (text.size < 8 || text[0] != 'f'.code.toByte() || text[1] != 'L'.code.toByte() ||
-            text[2] != 'a'.code.toByte() || text[3] != 'C'.code.toByte()
-        ) return
-
-        val blocks = ArrayList<ByteArray>()
-        var offset = 4
-        var audio = -1
-        while (offset + 4 <= text.size) {
-            val first = text[offset].toInt() and 0xFF
-            val last = first and 0x80 != 0
-            val type = first and 0x7F
-            val end = offset + 4 + length(text, offset)
-            if (end > text.size) return
-            // Old pictures are replaced by the new one; the frames start after the last metadata block.
-            if (type != Picture) blocks += text.copyOfRange(offset, end)
-            if (last) {
-                audio = end
-                break
-            }
-            offset = end
-        }
-        if (audio < 0) return
-        val block = picture(image)
-        val out = java.io.ByteArrayOutputStream(text.size + block.size)
-        out.write(text, 0, 4)
-        blocks.forEach { old ->
-            // Only the block written last may carry the last-block flag.
-            out.write(old[0].toInt() and 0x7F)
-            out.write(old, 1, old.size - 1)
-        }
-        out.write(Picture or 0x80)
-        out.write(block.size ushr 16)
-        out.write(block.size ushr 8)
-        out.write(block.size)
-        out.write(block)
-        out.write(text, audio, text.size - audio)
+        val temp = File(file.parentFile, "${file.name}.cover")
         try {
-            file.writeBytes(out.toByteArray())
-        } catch (_: Exception) {
+            write(file, temp, image)
+        } catch (_: Throwable) {
             // The song keeps playing; the cover is lost.
+        } finally {
+            temp.delete()
         }
     }
 
-    private fun length(text: ByteArray, offset: Int): Int =
-        ((text[offset + 1].toInt() and 0xFF) shl 16) or ((text[offset + 2].toInt() and 0xFF) shl 8) or
-            (text[offset + 3].toInt() and 0xFF)
+    private fun write(file: File, temp: File, image: ByteArray) {
+        RandomAccessFile(file, "r").use { input ->
+            val magic = ByteArray(4)
+            if (input.read(magic) != 4 || magic[0] != 'f'.code.toByte() || magic[1] != 'L'.code.toByte() ||
+                magic[2] != 'a'.code.toByte() || magic[3] != 'C'.code.toByte()
+            ) return
+
+            // Walk the metadata, keeping where each block that is not a picture sits; the frames follow the last one.
+            val blocks = ArrayList<LongArray>()
+            var offset = 4L
+            var audio = -1L
+            while (offset + 4 <= input.length()) {
+                val header = ByteArray(4)
+                input.seek(offset)
+                if (input.read(header) != 4) return
+                val first = header[0].toInt() and 0xFF
+                val length = ((header[1].toInt() and 0xFF) shl 16) or ((header[2].toInt() and 0xFF) shl 8) or
+                    (header[3].toInt() and 0xFF)
+                val end = offset + 4 + length
+                if (end > input.length()) return
+                // Old pictures are replaced by the new one.
+                if (first and 0x7F != Picture) blocks += longArrayOf(offset, length.toLong())
+                if (first and 0x80 != 0) {
+                    audio = end
+                    break
+                }
+                offset = end
+            }
+            if (audio < 0) return
+
+            val block = picture(image)
+            BufferedOutputStream(FileOutputStream(temp), Buffer).use { out ->
+                out.write(magic)
+                blocks.forEach { old ->
+                    input.seek(old[0])
+                    val header = ByteArray(4)
+                    input.readFully(header)
+                    // Only the block written last may carry the last-block flag.
+                    out.write(header[0].toInt() and 0x7F)
+                    out.write(header, 1, 3)
+                    copy(input, out, old[1])
+                }
+                out.write(Picture or 0x80)
+                out.write(block.size ushr 16)
+                out.write(block.size ushr 8)
+                out.write(block.size)
+                out.write(block)
+                input.seek(audio)
+                copy(input, out, input.length() - audio)
+            }
+        }
+        Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    /** Copies a byte count in chunks, never the whole file. */
+    private fun copy(input: RandomAccessFile, out: OutputStream, bytes: Long) {
+        val buffer = ByteArray(Buffer)
+        var left = bytes
+        while (left > 0) {
+            val read = input.read(buffer, 0, minOf(left, buffer.size.toLong()).toInt())
+            if (read < 0) return
+            out.write(buffer, 0, read)
+            left -= read
+        }
+    }
 
     /** A FLAC picture block: front cover, no description, the frame size when the image tells it. */
     private fun picture(image: ByteArray): ByteArray {
@@ -121,4 +153,6 @@ internal object FlacCover {
         if (at + 1 < image.size) ((image[at].toInt() and 0xFF) shl 8) or (image[at + 1].toInt() and 0xFF) else 0
 
     private const val Picture = 6
+
+    private const val Buffer = 64 * 1024
 }
