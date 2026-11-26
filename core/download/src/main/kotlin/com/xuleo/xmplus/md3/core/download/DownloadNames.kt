@@ -35,8 +35,8 @@ internal object DownloadNames {
         return head + cut(clean(title).ifEmpty { songId }, room) + tail
     }
 
-    /** The folder songs go to, next to the albums. */
-    const val SongsFolder = "音乐"
+    /** The folder songs go to, next to the albums. A name on disk, not a label. */
+    const val SongsFolder = "音乐" // ui-text: data
 
     private fun clean(text: String): String {
         val safe = text.replace(Illegal, "_").trim().trimEnd('.', ' ')

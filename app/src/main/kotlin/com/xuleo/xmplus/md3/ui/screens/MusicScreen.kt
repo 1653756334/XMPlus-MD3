@@ -88,7 +88,7 @@ fun MusicScreen(
 @Composable
 internal fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val label = stringResource(R.string.music_source)
+    val description = stringResource(R.string.music_source_value, selected)
     val single = plugins.size <= 1
     val arrow by animateFloatAsState(if (open) 180f else 0f, MaterialTheme.motionScheme.fastSpatialSpec(), label = "arrow")
     Box {
@@ -98,7 +98,7 @@ internal fun SourcePicker(plugins: List<InstalledPlugin>, selected: String, onSe
             shape = CircleShape,
             color = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.heightIn(min = 32.dp).semantics { contentDescription = "$label $selected" },
+            modifier = Modifier.heightIn(min = 32.dp).semantics { contentDescription = if (single) selected else description },
         ) {
             Row(
                 Modifier.padding(start = 14.dp, end = if (single) 14.dp else 8.dp),

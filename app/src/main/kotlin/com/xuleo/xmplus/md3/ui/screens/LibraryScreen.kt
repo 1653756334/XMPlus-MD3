@@ -543,7 +543,7 @@ private fun ShortcutTile(tile: Tile, modifier: Modifier = Modifier) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             tile.count?.takeIf { it > 0 }?.let {
-                Text("$it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(it.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
     }

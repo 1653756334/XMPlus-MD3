@@ -213,7 +213,8 @@ class MusicCatalog(private val manager: PluginManager) {
     }
 
     private companion object {
-        const val DefaultTagTitle = "默认"
+        /** Sent to the plugin as the tag's title; the plugin's own text, not a label of ours. */
+        const val DefaultTagTitle = "默认" // ui-text: data
     }
 }
 
