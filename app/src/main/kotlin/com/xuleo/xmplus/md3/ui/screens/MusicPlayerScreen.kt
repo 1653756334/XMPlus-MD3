@@ -728,11 +728,14 @@ private fun LyricLines(
     val list = rememberLazyListState()
     val dragged by list.interactionSource.collectIsDraggedAsState()
     var browsing by remember { mutableStateOf(false) }
+    val settleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
     LaunchedEffect(dragged) {
         if (dragged) {
             browsing = true
         } else if (browsing) {
             snapshotFlow { list.isScrollInProgress }.first { !it }
+            // Once the lyric stops, the line nearest the pill eases onto it, so the pill sits in that line's middle.
+            list.anchor(list.layoutInfo.indexAtAnchor(), if (animated) settleSpec else null)
             delay(LyricFollowDelayMs)
             browsing = false
         }
@@ -745,9 +748,7 @@ private fun LyricLines(
     }
     val centred by remember(list) {
         derivedStateOf {
-            val info = list.layoutInfo
-            val target = info.anchorOffset()
-            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - target) }?.index ?: 0
+            list.layoutInfo.indexAtAnchor()
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -928,6 +929,12 @@ private const val LyricAnchor = 0.35f
 
 private fun LazyListLayoutInfo.anchorOffset(): Int =
     viewportStartOffset + ((viewportEndOffset - viewportStartOffset) * LyricAnchor).toInt()
+
+/** The line whose middle is nearest the anchor. */
+private fun LazyListLayoutInfo.indexAtAnchor(): Int {
+    val target = anchorOffset()
+    return visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - target) }?.index ?: 0
+}
 
 /** Scrolls so the item at [index] sits at the anchor, or as close as the list allows; instantly when [spec] is null. */
 private suspend fun LazyListState.anchor(index: Int, spec: AnimationSpec<Float>?) {
