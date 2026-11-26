@@ -273,7 +273,6 @@ internal fun MusicPlayerSheet(
                                 )
                             },
                             modifier = Modifier.fillMaxSize(),
-                            stretchControls = true,
                         )
                         MusicPage.Lyrics -> PlayerPageFrame {
                             LyricsPage(
@@ -359,8 +358,8 @@ private fun MusicControls(
     onOpenSpeed: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Given more height than it needs, the spare goes between the song, its actions and the transport.
-    Column(Modifier.fillMaxSize()) {
+    // The song, its actions, the progress and the transport keep even gaps, as in QQ音乐.
+    Column(Modifier.fillMaxWidth()) {
         Text(
             song.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -389,7 +388,6 @@ private fun MusicControls(
             style = MaterialTheme.typography.bodyMedium, color = scheme.primary,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.weight(1f))
         SongActions(
             liked = liked,
             platform = song.platform,
@@ -402,11 +400,10 @@ private fun MusicControls(
             sleepActive = sleepActive,
             onOpenComments = onOpenComments,
             onOpenSpeed = onOpenSpeed,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = ControlsGap),
         )
-        Spacer(Modifier.weight(1f))
         Row(
-            Modifier.fillMaxWidth().padding(top = 4.dp),
+            Modifier.fillMaxWidth().padding(top = ControlsGap),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -843,7 +840,7 @@ private fun Modifier.lyricFade(): Modifier =
 @Composable
 private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, music: MusicPlayback, onOpenQueue: () -> Unit) {
     val hasQueue = queue.items.isNotEmpty()
-    Column(Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding, bottom = 16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding, top = ControlsGap, bottom = 24.dp)) {
         LyricProgress(
             positionMs = state.positionMs,
             durationMs = state.durationMs,
@@ -852,7 +849,7 @@ private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, mu
             onSeek = music::seekTo,
         )
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -947,6 +944,9 @@ private fun LyricProgress(positionMs: Long, durationMs: Long, enabled: Boolean, 
         Text(formatDuration(duration / 1000.0), style = timeStyle, color = scheme.onSurfaceVariant)
     }
 }
+
+/** The gap between the groups of the player's controls. */
+private val ControlsGap = 16.dp
 
 private const val ActiveLyricScale = 1.05f
 private const val LyricFadeEdge = 0.1f
