@@ -59,6 +59,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -759,6 +760,7 @@ private fun LyricLines(
                     line = line,
                     translation = if (translated) lyric.translations[line.timeMs] else null,
                     distance = abs(index - current),
+                    focused = browsing && index == centred,
                     animated = animated,
                     onClick = { onSeek(line.timeMs) },
                 )
@@ -766,21 +768,33 @@ private fun LyricLines(
         }
         if (browsing) {
             lyric.lines.getOrNull(centred)?.let { line ->
-                val accent = MaterialTheme.colorScheme.primary
+                // The line in focus brightens and a small pill with its time sits at its end to play from there.
                 Row(
                     Modifier.align(Alignment.TopStart).offset(y = maxHeight * LyricAnchor - 24.dp)
-                        .fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 4.dp),
+                        .fillMaxWidth().height(48.dp).padding(start = PlayerPagePadding, end = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        formatDuration(line.timeMs / 1000.0), color = accent,
-                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                    )
-                    HorizontalDivider(Modifier.weight(1f).padding(horizontal = 8.dp), color = accent.copy(alpha = 0.4f))
-                    IconButton(onClick = {
-                        browsing = false
-                        onPlayFrom(line.timeMs)
-                    }) { Icon(XmIcons.Filled.PlayArrow, stringResource(R.string.music_lyric_play_here), tint = accent) }
+                    Spacer(Modifier.weight(1f))
+                    Surface(
+                        onClick = {
+                            browsing = false
+                            onPlayFrom(line.timeMs)
+                        },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Row(
+                            Modifier.heightIn(min = 28.dp).padding(start = 6.dp, end = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(XmIcons.Filled.PlayArrow, stringResource(R.string.music_lyric_play_here), Modifier.size(18.dp))
+                            Text(
+                                formatDuration(line.timeMs / 1000.0), Modifier.padding(start = 2.dp),
+                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -789,13 +803,21 @@ private fun LyricLines(
 
 /** One line and its translation; [distance] is how many lines it is from the one being sung. */
 @Composable
-private fun LyricRow(line: LyricLine, translation: String?, distance: Int, animated: Boolean, onClick: () -> Unit) {
+private fun LyricRow(
+    line: LyricLine,
+    translation: String?,
+    distance: Int,
+    focused: Boolean,
+    animated: Boolean,
+    onClick: () -> Unit,
+) {
     val active = distance == 0
     val motion = MaterialTheme.motionScheme
     val alpha by animateFloatAsState(
-        when (distance) {
-            0 -> 1f
-            1 -> 0.55f
+        when {
+            active -> 1f
+            focused -> 0.8f
+            distance == 1 -> 0.55f
             else -> 0.38f
         },
         if (animated) motion.defaultEffectsSpec() else snap(),
