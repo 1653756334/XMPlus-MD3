@@ -133,6 +133,7 @@ fun LibrarySectionScreen(
                             formatDate(record.progress.observedAtMs, locale),
                         ),
                         onOpen = { onPlay(record.albumId, record.trackId, resumeAt(record.progress.positionMs, record.durationSeconds * 1_000L)) },
+                        roomy = true,
                     )
                 }
             }
@@ -153,6 +154,7 @@ fun LibrarySectionScreen(
                         subtitle = update.track.albumTitle,
                         meta = formatDate(update.publishedAtMillis, locale),
                         onOpen = { openAlbum(update.track.albumId) },
+                        roomy = true,
                     )
                 }
             }
@@ -174,6 +176,7 @@ fun LibrarySectionScreen(
                         meta = if (unread > 0) pluralStringResource(R.plurals.listen_unplayed, unread, unread) else "",
                         onOpen = { openAlbum(item.album.id) },
                         large = true,
+                        roomy = true,
                         trailing = {
                             IconButton(onClick = { attempt { viewModel.unsubscribe(item) } }) {
                                 Icon(XmIcons.Filled.LibraryAddCheck, stringResource(R.string.listen_unsubscribe), tint = MaterialTheme.colorScheme.primary)
@@ -199,6 +202,7 @@ fun LibrarySectionScreen(
                         meta = "",
                         onOpen = { openAlbum(track.albumId) },
                         large = true,
+                        roomy = true,
                         trailing = {
                             IconButton(onClick = { attempt { viewModel.unfavorite(track) } }) {
                                 Icon(XmIcons.Filled.Favorite, stringResource(R.string.listen_unfavorite), tint = MaterialTheme.colorScheme.primary)
@@ -229,6 +233,7 @@ fun LibrarySectionScreen(
                         meta = if (fans != null) pluralStringResource(R.plurals.anchor_follower_count, fans, formatCount(fans.toLong())) else "",
                         onOpen = { onOpenAnchor(anchor.uid) },
                         circle = true,
+                        roomy = true,
                     )
                 }
             }
@@ -254,6 +259,7 @@ private fun BookmarkPage(bookmarks: List<BookmarkEntry>?, onPlay: (BookmarkEntry
                         formatDate(entry.createdAtMs, locale),
                     ),
                     onOpen = { onPlay(entry) },
+                    roomy = true,
                 )
             }
         }
@@ -296,8 +302,9 @@ private fun <T> ListingPage(
 }
 
 /**
- * One row of a 听过 list: the cover, a title on one line, one quiet line with [subtitle] and [meta], an optional trailing
+ * One row of a 听过 list: the cover, a title on one line, the quiet lines of [subtitle] and [meta], an optional trailing
  * action, and a tap that opens it. Episodes and songs have a 48dp cover; [large] gives albums and sheets 56dp.
+ * [roomy] gives a 听书 row more air: a 56dp cover and [subtitle] and [meta] on lines of their own.
  * [music] gives the cover the music placeholder; [onLongClick] starts selection where a list has it.
  */
 @Composable
@@ -311,6 +318,7 @@ internal fun ListingRow(
     circle: Boolean = false,
     music: Boolean = false,
     large: Boolean = false,
+    roomy: Boolean = false,
     highlighted: Boolean = false,
     /** Marks the cover as 听书 or 音乐 where both kinds share a list. */
     kind: ContentKind? = null,
@@ -318,13 +326,14 @@ internal fun ListingRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val click = if (onLongClick != null) Modifier.combinedClickable(onClick = onOpen, onLongClick = onLongClick) else Modifier.clickable(onClick = onOpen)
-    val shape = if (large) MaterialTheme.shapes.medium else MaterialTheme.shapes.small
+    val shape = if (large || roomy) MaterialTheme.shapes.medium else MaterialTheme.shapes.small
     Row(
-        modifier.fillMaxWidth().then(click).heightIn(min = 64.dp).padding(horizontal = XmLayout.PagePadding, vertical = 8.dp),
+        modifier.fillMaxWidth().then(click).heightIn(min = if (roomy) 76.dp else 64.dp)
+            .padding(horizontal = XmLayout.PagePadding, vertical = if (roomy) 10.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
     ) {
-        Box(Modifier.size(if (large) 56.dp else 48.dp)) {
+        Box(Modifier.size(if (large || roomy) 56.dp else 48.dp)) {
             when {
                 circle -> Avatar(cover, Modifier.matchParentSize())
                 music -> MusicCover(cover, Modifier.matchParentSize(), shape)
@@ -332,19 +341,30 @@ internal fun ListingRow(
             }
             if (kind != null) KindBadge(kind, Modifier.align(Alignment.BottomStart).padding(3.dp), size = 16.dp)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (roomy) 4.dp else 2.dp)) {
             Text(
                 title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Unspecified,
             )
-            val line = joinMeta(subtitle, meta)
-            if (line.isNotEmpty()) Text(
-                line, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            // A 听书 row has room for both quiet lines; a music row keeps them together on one.
+            if (roomy) {
+                if (subtitle.isNotEmpty()) QuietLine(subtitle)
+                if (meta.isNotEmpty()) QuietLine(meta)
+            } else {
+                val line = joinMeta(subtitle, meta)
+                if (line.isNotEmpty()) QuietLine(line)
+            }
         }
         trailing()
     }
+}
+
+@Composable
+private fun QuietLine(text: String) {
+    Text(
+        text, style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
