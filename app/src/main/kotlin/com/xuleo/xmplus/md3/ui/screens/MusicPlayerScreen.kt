@@ -273,6 +273,7 @@ internal fun MusicPlayerSheet(
                                 queue = queue,
                                 music = music,
                                 onSearch = { showSearch = true },
+                                onOpenQuality = { showQuality = true },
                                 onOpenQueue = { showQueue = true },
                             )
                         }
@@ -397,8 +398,41 @@ private fun MusicControls(
             onOpenSpeed = onOpenSpeed,
             modifier = Modifier.padding(top = ControlsGap),
         )
+        MusicTransport(
+            state = state,
+            queue = queue,
+            music = music,
+            onOpenQuality = onOpenQuality,
+            onOpenQueue = onOpenQueue,
+            modifier = Modifier.padding(top = ControlsGap),
+        )
+        val error = state.errorCode
+        if (error != null) {
+            Text(
+                stringResource(playbackMessage(error)), Modifier.fillMaxWidth().padding(top = 8.dp),
+                color = scheme.error, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
+ * The progress with the quality, then the play mode, the transport and the queue at its ends. 播放 and 歌词 both end
+ * with it, so the two pages keep one set of controls.
+ */
+@Composable
+private fun MusicTransport(
+    state: MusicPlaybackState,
+    queue: MusicQueueState,
+    music: MusicPlayback,
+    onOpenQuality: () -> Unit,
+    onOpenQueue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hasQueue = queue.items.isNotEmpty()
+    Column(modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(top = ControlsGap),
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -406,13 +440,12 @@ private fun MusicControls(
                 positionMs = state.positionMs,
                 durationMs = state.durationMs,
                 enabled = state.durationMs > 0 && state.phase != PlaybackPhase.Failed && state.phase != PlaybackPhase.Preparing,
-                trackId = song.key,
+                trackId = state.song?.key,
                 onSeek = music::seekTo,
                 modifier = Modifier.weight(1f),
             )
             QualityTag(state.quality ?: MusicQuality.Standard, onOpenQuality)
         }
-        val hasQueue = queue.items.isNotEmpty()
         Row(
             Modifier.fillMaxWidth().padding(top = TransportGap),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -431,13 +464,6 @@ private fun MusicControls(
             IconButton(onClick = onOpenQueue, enabled = hasQueue) {
                 Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
             }
-        }
-        val error = state.errorCode
-        if (error != null) {
-            Text(
-                stringResource(playbackMessage(error)), Modifier.fillMaxWidth().padding(top = 8.dp),
-                color = scheme.error, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-            )
         }
     }
 }
@@ -669,7 +695,7 @@ private fun List<LyricLine>.withInlineTranslation(): SongLyric {
 /** Fewer pairs than this are lines that happen to share a time, such as 词 and 曲 at the start. */
 private const val InlineTranslationMinPairs = 3
 
-/** 歌词: the lyric over a compact transport, or 暂无歌词 with 搜索歌词. */
+/** 歌词: the lyric over the same progress and transport as 播放, or 暂无歌词 with 搜索歌词. */
 @Composable
 private fun LyricsPage(
     holder: LyricHolder,
@@ -677,6 +703,7 @@ private fun LyricsPage(
     queue: MusicQueueState,
     music: MusicPlayback,
     onSearch: () -> Unit,
+    onOpenQuality: () -> Unit,
     onOpenQueue: () -> Unit,
 ) {
     val lyric = holder.lyric
@@ -717,7 +744,17 @@ private fun LyricsPage(
                 }
             }
         }
-        LyricTransport(state, queue, music, onOpenQueue)
+        MusicTransport(
+            state = state,
+            queue = queue,
+            music = music,
+            onOpenQuality = onOpenQuality,
+            onOpenQueue = onOpenQueue,
+            modifier = Modifier.padding(
+                start = PlayerPagePadding, end = PlayerPagePadding,
+                top = ControlsGap, bottom = PlayerBottomPadding,
+            ),
+        )
     }
 }
 
@@ -891,40 +928,6 @@ private fun Modifier.lyricFade(): Modifier =
                 blendMode = BlendMode.DstIn,
             )
         }
-
-/** Under the lyric: a thin progress bar with both times, then the play mode, the transport and the queue. */
-@Composable
-private fun LyricTransport(state: MusicPlaybackState, queue: MusicQueueState, music: MusicPlayback, onOpenQueue: () -> Unit) {
-    val hasQueue = queue.items.isNotEmpty()
-    Column(Modifier.fillMaxWidth().padding(start = PlayerPagePadding, end = PlayerPagePadding, top = ControlsGap, bottom = 24.dp)) {
-        PlayerSeekBar(
-            positionMs = state.positionMs,
-            durationMs = state.durationMs,
-            enabled = state.durationMs > 0 && state.phase != PlaybackPhase.Failed && state.phase != PlaybackPhase.Preparing,
-            trackId = state.song?.key,
-            onSeek = music::seekTo,
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(top = TransportGap),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = music::toggleMode) {
-                XmSwap(queue.mode) { mode -> Icon(mode.icon, stringResource(mode.label)) }
-            }
-            IconButton(music::previous, Modifier.size(48.dp), enabled = hasQueue) {
-                Icon(XmIcons.Filled.SkipPrevious, stringResource(R.string.music_previous), Modifier.size(32.dp))
-            }
-            PlayerPlayButton(state.phase, state.wantsToPlay, loadingQueue = false, onClick = music::toggle, size = 56.dp)
-            IconButton(music::next, Modifier.size(48.dp), enabled = hasQueue) {
-                Icon(XmIcons.Filled.SkipNext, stringResource(R.string.music_next), Modifier.size(32.dp))
-            }
-            IconButton(onClick = onOpenQueue, enabled = hasQueue) {
-                Icon(XmIcons.Outlined.QueueMusic, stringResource(R.string.player_queue))
-            }
-        }
-    }
-}
 
 /** The gap between the groups of the player's controls. */
 private val ControlsGap = 16.dp
