@@ -95,6 +95,16 @@ fun XmApp() {
         if (kind == null || item == null) null
         else viewModel(viewModelStoreOwner = routeStores.owner(route.contentKey), factory = MusicDetailViewModel.factory(application.musicCatalog, kind, item))
     }
+    // A song's artist or album, found in the song's plugin before the page loads.
+    val musicLookupPage: @Composable (AppRoute.MusicLookup) -> MusicDetailViewModel? = { route ->
+        val kind = MusicDetailKind.entries.firstOrNull { it.name == route.kind }
+        val found = kind?.let { com.xuleo.xmplus.md3.music.musicLookupRoute(it, route.platform, route.song, route.name) }
+        if (kind == null || found == null) null
+        else viewModel(
+            viewModelStoreOwner = routeStores.owner(route.contentKey),
+            factory = MusicDetailViewModel.factory(application.musicCatalog, kind, found.first, found.second),
+        )
+    }
     // 下载 in every song menu and on the player reads the same tasks and the same download quality setting.
     val songDownloads = remember(application) {
         com.xuleo.xmplus.md3.ui.components.SongDownloads(
@@ -113,7 +123,7 @@ fun XmApp() {
         selected, { selected = it }, accounts, discover, search, allAlbums, categories, categoryAlbums, rankings, albumPage,
         anchorPage = anchorPage, onRoutePopped = routeStores::remove, playback = application.playback, library = library, downloads = downloads, downloadActions = application.downloadActions,
         transcript = application.transcript, libraryActions = application.libraryActions, comments = application.commentActions,
-        plugins = plugins, musicBrowse = musicBrowse, musicPage = musicPage, musicSearch = musicSearch,
+        plugins = plugins, musicBrowse = musicBrowse, musicPage = musicPage, musicLookupPage = musicLookupPage, musicSearch = musicSearch,
         musicPlayer = remember(application) {
             MusicPlayerDeps(application.music, application.musicLyrics, application.musicCatalog, application.musicLibrary)
         },
@@ -144,6 +154,7 @@ internal fun XmAppContent(
     plugins: PluginsViewModel? = null,
     musicBrowse: MusicBrowseViewModel? = null,
     musicPage: @Composable (AppRoute.MusicDetail) -> MusicDetailViewModel? = { null },
+    musicLookupPage: @Composable (AppRoute.MusicLookup) -> MusicDetailViewModel? = { null },
     musicSearch: MusicSearchViewModel? = null,
     musicPlayer: MusicPlayerDeps? = null,
 ) {
@@ -154,7 +165,7 @@ internal fun XmAppContent(
                 is AppRoute.ImportLogin -> accounts?.closeImport()
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
-                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, AppRoute.MusicSearch,
+                is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, is AppRoute.MusicLookup, AppRoute.MusicSearch,
                 AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet, AppRoute.LibrarySearch -> Unit
                 else -> accounts?.clearError()
             }
@@ -207,6 +218,25 @@ internal fun XmAppContent(
     }
     fun openMusic(kind: MusicDetailKind, item: PluginMedia) {
         navigator.push(AppRoute.MusicDetail(kind.name, item.platform, item.id, item.routeRaw()))
+    }
+    /** A song's artist or album: the page opens at once on [name] and finds the plugin's own object. */
+    fun openLookup(kind: MusicDetailKind, song: com.xuleo.xmplus.md3.core.model.MusicItem, name: String) {
+        navigator.push(AppRoute.MusicLookup(kind.name, song.platform, song.routeRaw(), name))
+    }
+    /** Nothing matched: the page gives way to a search for [route]'s name on its plugin, and back skips it. */
+    fun lookupToSearch(route: AppRoute.MusicLookup) {
+        val kind = MusicDetailKind.entries.firstOrNull { it.name == route.kind }
+        val type = if (kind == MusicDetailKind.Album) com.xuleo.xmplus.md3.core.plugin.SearchType.Album
+        else com.xuleo.xmplus.md3.core.plugin.SearchType.Artist
+        musicSearch?.searchFor(route.name, route.platform, type)
+        val index = stack.indexOf(route)
+        if (index < 0) return
+        if (AppRoute.MusicSearch in stack || index != stack.lastIndex) {
+            stack.removeAt(index)
+            navigator.push(AppRoute.MusicSearch)
+        } else {
+            stack[index] = AppRoute.MusicSearch
+        }
     }
     fun openMusic(item: PluginMedia) = when (item) {
         is MusicSheet -> openMusic(MusicDetailKind.Sheet, item)
@@ -356,6 +386,31 @@ internal fun XmAppContent(
                             }
                         }
                     }
+                    entry<AppRoute.MusicLookup>(clazzContentKey = { it.contentKey }) { route ->
+                        Surface(Modifier.fillMaxSize()) {
+                            musicLookupPage(route)?.let { vm ->
+                                val notFound by vm.notFound.collectAsStateWithLifecycle()
+                                val message = stringResource(
+                                    if (route.kind == MusicDetailKind.Album.name) com.xuleo.xmplus.md3.R.string.music_album_not_found
+                                    else com.xuleo.xmplus.md3.R.string.music_artist_not_found,
+                                )
+                                val showMessage = com.xuleo.xmplus.md3.ui.components.rememberShowMessage()
+                                LaunchedEffect(notFound) {
+                                    if (notFound) {
+                                        showMessage(message)
+                                        lookupToSearch(route)
+                                    }
+                                }
+                                MusicDetailScreen(
+                                    vm, { navigator.pop() },
+                                    onOpenAlbum = { openMusic(MusicDetailKind.Album, it) },
+                                    onPlay = { songs, index -> musicPlayer?.playback?.playList(songs, index, vm.queuePages(), vm.playSource()) },
+                                    onPlayNext = { musicPlayer?.playback?.addNext(it) },
+                                    playingKey = playingSong?.key,
+                                )
+                            }
+                        }
+                    }
                     entry<AppRoute.MusicDetail>(clazzContentKey = { it.contentKey }) { route ->
                         Surface(Modifier.fillMaxSize()) {
                             musicPage(route)?.let { vm ->
@@ -493,6 +548,7 @@ internal fun XmAppContent(
             musicPlayer,
             onDismiss = { stack.remove(AppRoute.Player) },
             onOpenMusic = ::openMusic,
+            onLookup = ::openLookup,
         ) }
     } else if (isPlayer && playback != null) {
         CompositionLocalProvider(com.xuleo.xmplus.md3.ui.components.LocalAppSnackbar provides playerSnackbar) { PlayerSheet(

@@ -29,6 +29,8 @@ data class MusicSearchState(
     val keyword: String? = null,
     val history: List<String> = emptyList(),
     val results: Map<Pair<String, SearchType>, Paged<PluginMedia>> = emptyMap(),
+    /** A search opened for one plugin and type, as when a song's artist or album was not found: shown first. */
+    val pinned: Pair<String, SearchType>? = null,
 )
 
 /**
@@ -70,8 +72,16 @@ class MusicSearchViewModel(private val catalog: MusicCatalog, private val histor
     fun clear() {
         jobs.values.forEach { it.cancel() }
         jobs.clear()
-        mutable.update { it.copy(keyword = null, results = emptyMap()) }
+        mutable.update { it.copy(keyword = null, results = emptyMap(), pinned = null) }
     }
+
+    /** Searches [raw] on [platform] and opens it on [type]; the user's chosen source stays as it was. */
+    fun searchFor(raw: String, platform: String, type: SearchType) {
+        if (submit(raw)) mutable.update { it.copy(pinned = platform to type) }
+    }
+
+    /** The user picked a source, so a pinned plugin no longer applies. */
+    fun unpin() = mutable.update { it.copy(pinned = null) }
 
     fun removeHistory(keyword: String) {
         mutable.update { it.copy(history = it.history - keyword) }
@@ -109,9 +119,12 @@ class MusicSearchViewModel(private val catalog: MusicCatalog, private val histor
                 val result = catalog.search(key.first, keyword, page, key.second)
                 if (mutable.value.keyword != keyword) return@launch
                 edit(key) {
-                    // Plugins repeat items across pages now and then; each one is shown once.
+                    // Plugins repeat items across pages now and then; each one is shown once. A page that adds nothing
+                    // new ends the list: some plugins ignore the page and return the first one again, which would
+                    // otherwise ask for page after page with the footer spinning forever.
                     val items = (it.items + result.items).distinctBy { item -> item.id }
-                    it.copy(items = items, page = page, loading = false, isEnd = result.isEnd || result.items.isEmpty())
+                    val added = items.size > it.items.size
+                    it.copy(items = items, page = page, loading = false, isEnd = result.isEnd || !added)
                 }
             } catch (cancel: CancellationException) {
                 throw cancel

@@ -512,6 +512,9 @@
     <string name="music_added">Added</string>
     <string name="music_view_artist">View artist</string>
     <string name="music_view_album">View album</string>
+    <string name="music_pick_artist">Choose an artist</string>
+    <string name="music_artist_not_found">No exact match for this artist. Showing search results</string>
+    <string name="music_album_not_found">No exact match for this album. Showing search results</string>
     <string name="music_quality">Quality</string>
     <string name="music_quality_low">Low</string>
     <string name="music_quality_standard">Standard</string>

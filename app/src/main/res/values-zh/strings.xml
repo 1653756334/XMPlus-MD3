@@ -493,6 +493,9 @@
     <string name="music_added">已添加</string>
     <string name="music_view_artist">查看歌手</string>
     <string name="music_view_album">查看专辑</string>
+    <string name="music_pick_artist">选择歌手</string>
+    <string name="music_artist_not_found">没有找到完全一致的歌手，已为你搜索</string>
+    <string name="music_album_not_found">没有找到完全一致的专辑，已为你搜索</string>
     <string name="music_quality">音质</string>
     <string name="music_quality_low">低品质</string>
     <string name="music_quality_standard">标准</string>

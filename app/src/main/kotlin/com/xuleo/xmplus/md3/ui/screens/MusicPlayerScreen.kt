@@ -176,6 +176,7 @@ internal fun MusicPlayerSheet(
     deps: MusicPlayerDeps,
     onDismiss: () -> Unit,
     onOpenMusic: (MusicDetailKind, PluginMedia) -> Unit,
+    onLookup: (MusicDetailKind, MusicItem, String) -> Unit = { _, _, _ -> },
 ) {
     val music = deps.playback
     val state by music.state.collectAsStateWithLifecycle()
@@ -220,8 +221,17 @@ internal fun MusicPlayerSheet(
         var showSleep by remember { mutableStateOf(false) }
         var showSpeed by remember { mutableStateOf(false) }
         var showSearch by remember(song.key) { mutableStateOf(false) }
-        val artist = remember(song.key) { song.artistItem() }
-        val album = remember(song.key) { song.albumItem() }
+        // A song carries only names: the page that opens finds the plugin's own artist or album first.
+        val artists = remember(song.key) { com.xuleo.xmplus.md3.core.plugin.splitArtists(song.artist) }
+        val canArtist = artists.isNotEmpty() && deps.catalog.canFindArtist(song.platform)
+        val canAlbum = song.album.isNotBlank() && deps.catalog.canFindAlbum(song.platform)
+        var pickArtist by remember(song.key) { mutableStateOf(false) }
+        if (pickArtist) {
+            ArtistPicker(artists, onDismiss = { pickArtist = false }) { name ->
+                pickArtist = false
+                closeThen { onLookup(MusicDetailKind.Artist, song, name) }
+            }
+        }
         fun openPage(page: MusicPage) {
             val index = pages.indexOf(page)
             if (index >= 0) scope.launch { pager.animateScrollToPage(index) }
@@ -251,8 +261,15 @@ internal fun MusicPlayerSheet(
                                     currentLine = lyric.lyric?.lineAt(state.positionMs),
                                     music = music,
                                     onLike = { deps.library.toggleLike(song) },
-                                    onOpenArtist = artist?.let { { closeThen { onOpenMusic(MusicDetailKind.Artist, it) } } },
-                                    onOpenAlbum = album?.let { { closeThen { onOpenMusic(MusicDetailKind.Album, it) } } },
+                                    onOpenArtist = if (canArtist) {
+                                        {
+                                            if (artists.size > 1) pickArtist = true
+                                            else closeThen { onLookup(MusicDetailKind.Artist, song, artists.first()) }
+                                        }
+                                    } else null,
+                                    onOpenAlbum = if (canAlbum) {
+                                        { closeThen { onLookup(MusicDetailKind.Album, song, song.album) } }
+                                    } else null,
                                     onOpenLyrics = { openPage(MusicPage.Lyrics) },
                                     onOpenQueue = { showQueue = true },
                                     onOpenQuality = { showQuality = true },
@@ -881,10 +898,16 @@ private fun LyricRow(
         if (animated) motion.defaultSpatialSpec() else snap(),
         label = "lyricScale",
     )
-    val color = MaterialTheme.colorScheme.onSurface
+    // The line being sung takes the theme colour, so it stands out from the rest at a glance.
+    val base = MaterialTheme.colorScheme.onSurface
+    val color by animateColorAsState(
+        if (active) MaterialTheme.colorScheme.primary else base,
+        if (animated) motion.defaultEffectsSpec() else snap(),
+        label = "lyricColor",
+    )
     // While browsing, the line the pill plays from sits on a light band.
     val band by animateColorAsState(
-        color.copy(alpha = if (focused) FocusedLyricBand else 0f),
+        base.copy(alpha = if (focused) FocusedLyricBand else 0f),
         if (animated) motion.defaultEffectsSpec() else snap(),
         label = "lyricBand",
     )
@@ -1162,34 +1185,31 @@ internal val MusicQuality.label: Int
         MusicQuality.Super -> R.string.music_quality_super
     }
 
-/** The song's artist as MusicFree opens it: the `artistId` the song carries, or the name, on the song's plugin. */
-private fun MusicItem.artistItem(): MusicArtist? {
-    if (artist.isBlank()) return null
-    val raw = buildJsonObject {
-        put("id", raw.text("artistId") ?: artist)
-        put("name", artist)
-        put("platform", platform)
+/** A song sung by several artists: which one to open. Picking needs no network, so it answers at once. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ArtistPicker(artists: List<String>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            Text(
+                stringResource(R.string.music_pick_artist),
+                Modifier.padding(horizontal = XmLayout.PagePadding, vertical = 12.dp),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            artists.forEach { name ->
+                ListItem(
+                    headlineContent = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingContent = { com.xuleo.xmplus.md3.ui.components.MusicCover(null, Modifier.size(40.dp), CircleShape) },
+                    trailingContent = { Icon(XmIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable(role = Role.Button) { onPick(name) },
+                )
+            }
+        }
     }
-    return MusicArtist.from(raw, platform)
-}
-
-/** The song's album: the `albumId` the song carries, or the album's title, on the song's plugin. */
-private fun MusicItem.albumItem(): MusicAlbum? {
-    if (album.isBlank()) return null
-    val raw = buildJsonObject {
-        put("id", raw.text("albumId") ?: album)
-        put("title", album)
-        put("artist", artist)
-        artwork?.let { put("artwork", it) }
-        put("platform", platform)
-    }
-    return MusicAlbum.from(raw, platform)
-}
-
-private fun kotlinx.serialization.json.JsonObject.text(name: String): String? {
-    val value = this[name] as? JsonPrimitive ?: return null
-    if (value is JsonNull) return null
-    return value.contentOrNull?.takeIf { it.isNotBlank() }
 }
 
 /** How long the lyric waits after a drag before it follows the song again. */

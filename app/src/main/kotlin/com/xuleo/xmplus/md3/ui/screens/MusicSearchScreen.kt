@@ -86,6 +86,11 @@ internal fun MusicSearchScreen(
         if (viewModel.submit(text)) focus.clearFocus()
     }
     LaunchedEffect(Unit) { if (state.keyword == null && query.text.isEmpty()) focusRequester.requestFocus() }
+    // A search started from elsewhere (a song's artist or album) shows its keyword in the field.
+    LaunchedEffect(state.keyword) {
+        val keyword = state.keyword
+        if (keyword != null && query.text.toString() != keyword) query.setTextAndPlaceCursorAtEnd(keyword)
+    }
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         SearchFieldRow(query, focusRequester, invalid = false, R.string.music_search_hint, onBack, viewModel::clear, ::submit)
         val keyword = state.keyword
@@ -102,11 +107,13 @@ internal fun MusicSearchScreen(
         }
         // The source is the one 音乐 shows; a plugin that cannot search falls back to the first that can, without
         // changing the choice, as on 音乐.
-        val current = sources.firstOrNull { it.platform == source } ?: sources.first()
+        val pinned = state.pinned
+        val current = sources.firstOrNull { it.platform == (pinned?.first ?: source) } ?: sources.first()
         // Each plugin opens on its own default type; a type picked on one plugin does not carry to another.
         key(current.platform) {
             val types = current.searchTypes()
-            val pager = rememberPagerState { types.size }
+            val start = pinned?.takeIf { it.first == current.platform }?.second?.let(types::indexOf)?.coerceAtLeast(0) ?: 0
+            val pager = key(keyword, start) { rememberPagerState(initialPage = start) { types.size } }
             val scope = rememberCoroutineScope()
             val type = types[pager.currentPage.coerceIn(0, types.lastIndex)]
             // The tabs take only the space left of the source, so they scroll under nothing and the source stays clear.
@@ -115,7 +122,10 @@ internal fun MusicSearchScreen(
                     types.indexOf(type), types.map { stringResource(it.label()) },
                     { scope.launch { pager.scrollToPage(it) } }, Modifier.weight(1f).clipToBounds(),
                 )
-                SourcePicker(sources, current.platform, onSource)
+                SourcePicker(sources, current.platform) {
+                    viewModel.unpin()
+                    onSource(it)
+                }
                 Spacer(Modifier.width(XmLayout.PagePadding))
             }
             LaunchedEffect(keyword, current.platform, type) { viewModel.open(current.platform, type) }

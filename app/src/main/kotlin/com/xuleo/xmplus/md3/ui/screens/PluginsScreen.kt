@@ -587,18 +587,10 @@ private fun InstallResultRow(result: InstallResult, update: Boolean) {
     )
 }
 
-/** Starts with the link on the clipboard, if there is one. */
+/** Starts empty: the user brings their own link. */
 @Composable
 private fun LinkDialog(@StringRes title: Int, @StringRes confirm: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    val context = LocalContext.current
-    var text by rememberSaveable {
-        val clip = try {
-            context.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-        } catch (_: Exception) {
-            null
-        }
-        mutableStateOf(clip?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }.orEmpty())
-    }
+    var text by rememberSaveable { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,

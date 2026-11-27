@@ -117,15 +117,44 @@ class MusicCatalog(private val manager: PluginManager) {
     suspend fun artistAlbums(artist: MusicArtist, page: Int): PluginPage<MusicAlbum> =
         artistWorks(artist, page, SearchType.Album) { MusicAlbum.from(it, artist.platform) }
 
+    /** Whether 查看歌手 can work for a song of [platform]: the plugin searches artists and lists their works. */
+    fun canFindArtist(platform: String): Boolean =
+        enabledPlugin(platform)?.let { GetArtistWorks in it.info.methods && it.searches(SearchType.Artist) } == true
+
+    /** Whether 查看专辑 can work for a song of [platform]: the plugin searches albums and opens them. */
+    fun canFindAlbum(platform: String): Boolean =
+        enabledPlugin(platform)?.let { GetAlbumInfo in it.info.methods && it.searches(SearchType.Album) } == true
+
     /**
-     * The artist as the plugin's search knows them: opened from a song, an artist carries only a name, so this fills in
-     * the avatar and the numbers. The artist of the same id wins; otherwise the one of the same name. Null when the
-     * plugin lists neither.
+     * The artist [name] of [song] as the plugin's own search returns them, since a song carries no artist object to
+     * open. The song's `artistId` wins when it names this artist; otherwise the same name. Null when neither is listed.
      */
-    suspend fun artistInfo(artist: MusicArtist): MusicArtist? {
-        val found = search(artist.platform, artist.name, 1, SearchType.Artist).items.filterIsInstance<MusicArtist>()
-        return found.firstOrNull { it.id == artist.id }
-            ?: found.firstOrNull { it.name.equals(artist.name, ignoreCase = true) }
+    suspend fun findArtist(song: MusicItem, name: String): MusicArtist? {
+        val found = search(song.platform, name, 1, SearchType.Artist).items.filterIsInstance<MusicArtist>()
+        val artistId = song.raw.text("artistId")?.takeIf { it.isNotBlank() }
+        val single = splitArtists(song.artist).size <= 1
+        return found.firstOrNull { it.id == artistId && (single || sameName(it.name, name)) }
+            ?: found.firstOrNull { sameName(it.name, name) }
+    }
+
+    /**
+     * The album of [song] as the plugin's own search returns it: the song's `albumId`, otherwise the same title by one
+     * of the song's artists (or by no one). The title alone is tried first, then with the first artist.
+     */
+    suspend fun findAlbum(song: MusicItem): MusicAlbum? {
+        val title = song.album.takeIf { it.isNotBlank() } ?: return null
+        val albumId = song.raw.text("albumId")?.takeIf { it.isNotBlank() }
+        val artists = splitArtists(song.artist)
+        fun pick(found: List<MusicAlbum>): MusicAlbum? =
+            found.firstOrNull { albumId != null && it.id == albumId }
+                ?: found.firstOrNull { album ->
+                    sameName(album.title, title) &&
+                        (album.artist.isBlank() || splitArtists(album.artist).any { by -> artists.any { sameName(it, by) } })
+                }
+        fun albums(query: String) = suspend { search(song.platform, query, 1, SearchType.Album).items.filterIsInstance<MusicAlbum>() }
+        pick(albums(title)())?.let { return it }
+        val artist = artists.firstOrNull() ?: return null
+        return pick(albums("$title $artist")())
     }
 
     /** Songs for [SearchType.Music] and [SearchType.Lyric], otherwise albums, artists or sheets. */
@@ -185,6 +214,16 @@ class MusicCatalog(private val manager: PluginManager) {
         return MusicItem.from(JsonObject(song.raw + usable + ("id" to id)), song.platform)
     }
 
+    private fun enabledPlugin(platform: String): InstalledPlugin? =
+        manager.plugins.value.orEmpty().firstOrNull { it.platform == platform && it.enabled }
+
+    /** The plugin has `search` and lists [type] among its search types, or declares none, as MusicFree reads it. */
+    private fun InstalledPlugin.searches(type: SearchType): Boolean {
+        if (Search !in info.methods) return false
+        val declared = (info.declared["supportedSearchType"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        return declared.isNullOrEmpty() || type.key in declared
+    }
+
     private suspend fun call(platform: String, method: String, vararg args: JsonElement): JsonElement? {
         val host = manager.host(platform) ?: throw PluginCallException("unavailable")
         return host.call(method, args.toList())
@@ -215,8 +254,27 @@ class MusicCatalog(private val manager: PluginManager) {
     private companion object {
         /** Sent to the plugin as the tag's title; the plugin's own text, not a label of ours. */
         const val DefaultTagTitle = "默认" // ui-text: data
+        const val Search = "search"
+        const val GetArtistWorks = "getArtistWorks"
+        const val GetAlbumInfo = "getAlbumInfo"
     }
 }
+
+/** How plugins join several artists in one line: `&`, `、`, `/`, commas, ` x `, `feat.` and `ft.`. */
+private val ArtistSeparators = Regex("""&|\u3001|/|,|\uFF0C|\s+x\s+|\b(?:feat|ft)\.""", RegexOption.IGNORE_CASE)
+
+/** The artists of a song's artist line, in order, each once. */
+fun splitArtists(artist: String): List<String> =
+    artist.split(ArtistSeparators)
+        .map { part -> part.trim { it.isWhitespace() || it in "()[]\uFF08\uFF09" } }
+        .filter { it.isNotEmpty() }
+        .distinctBy(::nameKey)
+
+/** Names match ignoring case, spaces and full-width forms. */
+private fun sameName(a: String, b: String): Boolean = nameKey(a) == nameKey(b)
+
+private fun nameKey(name: String): String =
+    java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFKC).lowercase().filterNot { it.isWhitespace() }
 
 private fun JsonObject.isEnd(): Boolean = (this["isEnd"] as? JsonPrimitive)?.booleanOrNull != false
 

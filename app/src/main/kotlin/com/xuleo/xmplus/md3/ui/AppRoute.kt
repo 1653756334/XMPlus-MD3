@@ -21,6 +21,13 @@ internal sealed interface AppRoute : NavKey {
     @Serializable data class MusicDetail(val kind: String, val platform: String, val id: String, val raw: String) : AppRoute {
         val contentKey: String get() = "music:$kind:$platform:$id"
     }
+    /**
+     * A song's artist or album ([kind] is a `MusicDetailKind` name) found by [name] in the song's plugin first; the page
+     * opens at once and loads once the plugin's own object is found. [song] is the song's object as text.
+     */
+    @Serializable data class MusicLookup(val kind: String, val platform: String, val song: String, val name: String) : AppRoute {
+        val contentKey: String get() = "lookup:$kind:$platform:$name:${song.hashCode()}"
+    }
     @Serializable data object MusicSearch : AppRoute
     /** 最近播放, opened from 继续听 in 听过. */
     @Serializable data object Recent : AppRoute
