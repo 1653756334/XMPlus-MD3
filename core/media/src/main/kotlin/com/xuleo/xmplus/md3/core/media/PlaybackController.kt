@@ -607,6 +607,8 @@ class PlaybackController(
             open(selection, position)
             return
         }
+        // The loaded source plays on: the other kind of content still stops, as when it is opened again.
+        onStart()
         val request = supersede()
         mutableState.value = current.copy(phase = PlaybackPhase.Preparing, wantsToPlay = true, errorCode = null, canSeek = false)
         completeCommand(request) {
@@ -832,6 +834,9 @@ class PlaybackController(
     /** A song took the player: the episode stops, its progress is kept, and it is not brought back at the next launch. */
     fun stopForSong() {
         if (mutableState.value.selection == null && albumQueue == null) {
+            // Nothing is loaded, but an album may still be on its way: the song starting now wins over it, or it opens
+            // its episode a moment later and takes the player back. The player itself is left as the song finds it.
+            clearQueue()
             forgetSession()
             return
         }
@@ -890,6 +895,9 @@ class PlaybackController(
         position: Long?,
         refreshing: OpenSource? = null,
     ) {
+        // Told before anything is resolved: the other kind of content stops now rather than when the link arrives, so a
+        // song starting meanwhile cannot hand the player back once this episode finally loads.
+        onStart()
         val request = supersede()
         pendingAccount = null
         val restoreIntent = cloudIntent
@@ -952,7 +960,6 @@ class PlaybackController(
                 source.chosenStartMs = position?.takeIf { it != 0L }
             }
             opened = source
-            onStart()
             player.setAudioAttributes(SpeechAttributes, true)
             player.setMediaItem(item, start)
             player.setPlaybackSpeed(mutableSpeed.value)
