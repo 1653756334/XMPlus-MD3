@@ -359,10 +359,10 @@ internal fun MusicPlayerSheet(
 }
 
 /**
- * 播放 for songs in three groups, as QQ 音乐 lays it out: the cover with the song right under it, then the actions,
- * then the progress and the transport at the bottom. Spare height goes above the cover and between the song and its
- * actions, so the title always stays with the cover; a short window shrinks the cover first and then scrolls. Wide
- * windows use the shared side-by-side layout.
+ * 播放 for songs in three groups, as QQ 音乐 lays it out: the cover centered in the room above, the song right under
+ * it, then the actions, then the progress and the transport at the bottom. Spare height is split evenly above and
+ * below the cover, so the cover never sits on a wide strip of empty space; a short window shrinks the cover first
+ * and then scrolls. Wide windows use the shared side-by-side layout.
  */
 @Composable
 private fun MusicPlayerLayout(
@@ -404,14 +404,14 @@ private fun MusicPlayerLayout(
                 val largest = minOf(MusicMaxCover.roundToPx(), constraints.maxWidth)
                 val edge = (room - fixed).coerceIn(minOf(MusicMinCover.roundToPx(), largest), largest)
                 val coverPlaceable = measurables[0].measure(androidx.compose.ui.unit.Constraints.fixed(edge, edge))
-                // The gap over the actions grows by at most MusicMidExtra, so it never opens into a hole; the rest of
-                // the spare height goes above the cover.
+                // The cover is centered in the room over the actions, so the space above and below it stays even.
                 val spare = (room - fixed - edge).coerceAtLeast(0)
-                val coverTop = top + spare - minOf(spare / 2, MusicMidExtra.roundToPx())
+                val half = spare / 2
+                val coverTop = top + half
                 val height = maxOf(room, fixed + edge)
                 layout(constraints.maxWidth, height) {
                     coverPlaceable.place((constraints.maxWidth - edge) / 2, coverTop)
-                    infoPlaceable.place(0, coverTop + edge + under)
+                    infoPlaceable.place(0, coverTop + edge + spare - half + under)
                     controlsPlaceable.place(0, height - bottom - controlsPlaceable.height)
                 }
             }
@@ -1038,9 +1038,6 @@ private val MusicCoverInfoGap = 24.dp
 
 /** From the line being sung to the actions at least; most of the spare height is added to it. */
 private val MusicMidGap = 4.dp
-
-/** The most the gap over the actions grows on a tall screen. */
-private val MusicMidExtra = 4.dp
 
 /** Under the transport, on both 播放 and 歌词, so the controls stay put when the page is swiped. */
 private val MusicBottomPadding = 32.dp
