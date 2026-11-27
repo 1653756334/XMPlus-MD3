@@ -55,7 +55,7 @@ jobs:
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           # A hotfix keeps the displayed version and gets a new tag without moving the original.
-          if [[ "$GITHUB_REF_NAME" != "v$version" && ! "$GITHUB_REF_NAME" =~ ^"v${version}-hotfix."[1-9][0-9]*$ ]]; then
+          if [[ "$GITHUB_REF_NAME" != "v$version" && ! "$GITHUB_REF_NAME" =~ ^"v${version}-hotfix-"[1-9][0-9]*$ ]]; then
             echo "Tag $GITHUB_REF_NAME does not match versionName $version"
             exit 1
           fi
