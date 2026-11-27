@@ -18,6 +18,7 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -35,6 +36,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -232,6 +235,15 @@ internal fun MusicPlayerSheet(
                 closeThen { onLookup(MusicDetailKind.Artist, song, name) }
             }
         }
+        val openArtist: (() -> Unit)? = if (canArtist) {
+            {
+                if (artists.size > 1) pickArtist = true
+                else closeThen { onLookup(MusicDetailKind.Artist, song, artists.first()) }
+            }
+        } else null
+        val openAlbum: (() -> Unit)? = if (canAlbum) {
+            { closeThen { onLookup(MusicDetailKind.Album, song, song.album) } }
+        } else null
         fun openPage(page: MusicPage) {
             val index = pages.indexOf(page)
             if (index >= 0) scope.launch { pager.animateScrollToPage(index) }
@@ -250,27 +262,26 @@ internal fun MusicPlayerSheet(
                 )
                 SettlingPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
                     when (pages.getOrNull(index)) {
-                        MusicPage.Playing -> PlayerLayout(
+                        MusicPage.Playing -> MusicPlayerLayout(
                             cover = { PlayerCover(song.artwork, playing = state.wantsToPlay) },
+                            info = {
+                                SongHeadline(
+                                    song = song,
+                                    currentLine = lyric.lyric?.lineAt(state.positionMs),
+                                    onOpenArtist = openArtist,
+                                    onOpenLyrics = { openPage(MusicPage.Lyrics) },
+                                )
+                            },
                             controls = {
                                 MusicControls(
                                     song = song,
                                     state = state,
                                     queue = queue,
                                     liked = liked.any { it.isSame(song) },
-                                    currentLine = lyric.lyric?.lineAt(state.positionMs),
                                     music = music,
                                     onLike = { deps.library.toggleLike(song) },
-                                    onOpenArtist = if (canArtist) {
-                                        {
-                                            if (artists.size > 1) pickArtist = true
-                                            else closeThen { onLookup(MusicDetailKind.Artist, song, artists.first()) }
-                                        }
-                                    } else null,
-                                    onOpenAlbum = if (canAlbum) {
-                                        { closeThen { onLookup(MusicDetailKind.Album, song, song.album) } }
-                                    } else null,
-                                    onOpenLyrics = { openPage(MusicPage.Lyrics) },
+                                    onOpenArtist = openArtist,
+                                    onOpenAlbum = openAlbum,
                                     onOpenQueue = { showQueue = true },
                                     onOpenQuality = { showQuality = true },
                                     onOpenSleep = { showSleep = true },
@@ -348,33 +359,73 @@ internal fun MusicPlayerSheet(
 }
 
 /**
- * Top to bottom: the song, its artist and the line being sung; 喜欢, 加入歌单 and 更多; the progress with the quality;
- * then the transport with the play mode and the queue at its ends.
+ * 播放 for songs in three groups, as QQ 音乐 lays it out: the cover with the song right under it, then the actions,
+ * then the progress and the transport at the bottom. Spare height goes above the cover and between the song and its
+ * actions, so the title always stays with the cover; a short window shrinks the cover first and then scrolls. Wide
+ * windows use the shared side-by-side layout.
  */
 @Composable
-private fun MusicControls(
-    song: MusicItem,
-    state: MusicPlaybackState,
-    queue: MusicQueueState,
-    liked: Boolean,
-    currentLine: String?,
-    music: MusicPlayback,
-    onLike: () -> Unit,
-    onOpenArtist: (() -> Unit)?,
-    onOpenAlbum: (() -> Unit)?,
-    onOpenLyrics: () -> Unit,
-    onOpenQueue: () -> Unit,
-    onOpenQuality: () -> Unit,
-    onOpenSleep: () -> Unit,
-    sleepActive: Boolean,
-    onOpenComments: (() -> Unit)?,
-    onOpenSpeed: () -> Unit,
+private fun MusicPlayerLayout(
+    cover: @Composable () -> Unit,
+    info: @Composable () -> Unit,
+    controls: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        if (maxWidth >= 560.dp && maxWidth > maxHeight * 1.25f) {
+            PlayerLayout(cover, {
+                Column(Modifier.fillMaxWidth()) {
+                    info()
+                    Spacer(Modifier.height(MusicMidGap))
+                    controls()
+                }
+            })
+        } else {
+            val viewport = maxHeight
+            val scroll = androidx.compose.foundation.rememberScrollState()
+            androidx.compose.ui.layout.Layout(
+                content = {
+                    Box { cover() }
+                    Box { info() }
+                    Box { controls() }
+                },
+                modifier = Modifier.widthIn(max = PlayerPageWidth).fillMaxWidth()
+                    .verticalScroll(scroll).padding(horizontal = PlayerPagePadding),
+            ) { measurables, constraints ->
+                val loose = constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity)
+                val infoPlaceable = measurables[1].measure(loose)
+                val controlsPlaceable = measurables[2].measure(loose)
+                val top = MusicTopGap.roundToPx()
+                val under = MusicCoverInfoGap.roundToPx()
+                val mid = MusicMidGap.roundToPx()
+                val bottom = MusicBottomPadding.roundToPx()
+                val room = viewport.roundToPx()
+                val fixed = top + under + infoPlaceable.height + mid + controlsPlaceable.height + bottom
+                val largest = minOf(MusicMaxCover.roundToPx(), constraints.maxWidth)
+                val edge = (room - fixed).coerceIn(minOf(MusicMinCover.roundToPx(), largest), largest)
+                val coverPlaceable = measurables[0].measure(androidx.compose.ui.unit.Constraints.fixed(edge, edge))
+                // The gap over the actions grows by at most MusicMidExtra, so it never opens into a hole; the rest of
+                // the spare height goes above the cover.
+                val spare = (room - fixed - edge).coerceAtLeast(0)
+                val coverTop = top + spare - minOf(spare / 2, MusicMidExtra.roundToPx())
+                val height = maxOf(room, fixed + edge)
+                layout(constraints.maxWidth, height) {
+                    coverPlaceable.place((constraints.maxWidth - edge) / 2, coverTop)
+                    infoPlaceable.place(0, coverTop + edge + under)
+                    controlsPlaceable.place(0, height - bottom - controlsPlaceable.height)
+                }
+            }
+        }
+    }
+}
+
+/** The song, its artist (which opens the artist) and the line being sung (which opens 歌词). */
+@Composable
+private fun SongHeadline(song: MusicItem, currentLine: String?, onOpenArtist: (() -> Unit)?, onOpenLyrics: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    // The song, its actions, the progress and the transport keep even gaps, as in QQ音乐.
     Column(Modifier.fillMaxWidth()) {
         Text(
-            song.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+            song.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
         if (song.artist.isNotBlank()) {
@@ -384,7 +435,7 @@ private fun MusicControls(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    song.artist, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
+                    song.artist, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyLarge,
                     color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (onOpenArtist != null) {
@@ -392,15 +443,45 @@ private fun MusicControls(
                 }
             }
         }
-        // The line being sung keeps its height, so the controls do not jump between lines.
+        // The line being sung keeps its height, so the page does not jump between lines. It opens 歌词 without a ripple,
+        // as the text is not a button.
+        val lyricInteraction = remember { MutableInteractionSource() }
         Text(
             currentLine.orEmpty(),
-            Modifier.fillMaxWidth().heightIn(min = 32.dp).clip(MaterialTheme.shapes.small)
-                .clickable(onClickLabel = stringResource(R.string.player_page_lyrics), onClick = onOpenLyrics)
+            Modifier.fillMaxWidth().heightIn(min = 36.dp).clip(MaterialTheme.shapes.small)
+                .clickable(
+                    interactionSource = lyricInteraction,
+                    indication = null,
+                    onClickLabel = stringResource(R.string.player_page_lyrics),
+                    onClick = onOpenLyrics,
+                )
                 .padding(vertical = 6.dp),
-            style = MaterialTheme.typography.bodyMedium, color = scheme.primary,
+            style = MaterialTheme.typography.bodyLarge, color = scheme.primary,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/** 喜欢, 加入歌单 and 更多; the progress with the quality; then the transport with the play mode and the queue. */
+@Composable
+private fun MusicControls(
+    song: MusicItem,
+    state: MusicPlaybackState,
+    queue: MusicQueueState,
+    liked: Boolean,
+    music: MusicPlayback,
+    onLike: () -> Unit,
+    onOpenArtist: (() -> Unit)?,
+    onOpenAlbum: (() -> Unit)?,
+    onOpenQueue: () -> Unit,
+    onOpenQuality: () -> Unit,
+    onOpenSleep: () -> Unit,
+    sleepActive: Boolean,
+    onOpenComments: (() -> Unit)?,
+    onOpenSpeed: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth()) {
         SongActions(
             song = song,
             liked = liked,
@@ -413,7 +494,6 @@ private fun MusicControls(
             sleepActive = sleepActive,
             onOpenComments = onOpenComments,
             onOpenSpeed = onOpenSpeed,
-            modifier = Modifier.padding(top = ControlsGap),
         )
         MusicTransport(
             state = state,
@@ -421,7 +501,6 @@ private fun MusicControls(
             music = music,
             onOpenQuality = onOpenQuality,
             onOpenQueue = onOpenQueue,
-            modifier = Modifier.padding(top = ControlsGap),
         )
         val error = state.errorCode
         if (error != null) {
@@ -449,7 +528,7 @@ private fun MusicTransport(
     val hasQueue = queue.items.isNotEmpty()
     Column(modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(top = SeekGap),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -768,8 +847,7 @@ private fun LyricsPage(
             onOpenQuality = onOpenQuality,
             onOpenQueue = onOpenQueue,
             modifier = Modifier.padding(
-                start = PlayerPagePadding, end = PlayerPagePadding,
-                top = ControlsGap, bottom = PlayerBottomPadding,
+                start = PlayerPagePadding, end = PlayerPagePadding, bottom = MusicBottomPadding,
             ),
         )
     }
@@ -952,11 +1030,28 @@ private fun Modifier.lyricFade(): Modifier =
             )
         }
 
-/** The gap between the groups of the player's controls. */
-private val ControlsGap = 16.dp
+/** Above the cover at least; part of the spare height is added to it. */
+private val MusicTopGap = 16.dp
 
-/** The gap above the transport, wider so the tall play button does not crowd the progress bar. */
-private val TransportGap = 20.dp
+/** From the cover to the title, fixed, so the song reads as the cover's caption. */
+private val MusicCoverInfoGap = 24.dp
+
+/** From the line being sung to the actions at least; most of the spare height is added to it. */
+private val MusicMidGap = 4.dp
+
+/** The most the gap over the actions grows on a tall screen. */
+private val MusicMidExtra = 4.dp
+
+/** Under the transport, on both 播放 and 歌词, so the controls stay put when the page is swiped. */
+private val MusicBottomPadding = 32.dp
+private val MusicMinCover = 160.dp
+private val MusicMaxCover = 400.dp
+
+/** The gap above the progress bar, so the actions and the seek bar read as two groups. */
+private val SeekGap = 0.dp
+
+/** The gap above the transport; the progress bar already keeps some room under its track. */
+private val TransportGap = 12.dp
 
 private const val ActiveLyricScale = 1.05f
 private const val FocusedLyricBand = 0.08f

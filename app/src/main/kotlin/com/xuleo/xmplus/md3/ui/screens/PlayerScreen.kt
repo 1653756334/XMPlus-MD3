@@ -967,7 +967,7 @@ private val MaxCover = 400.dp
 private val CoverGap = 16.dp
 private val CoverElevation = 12.dp
 // The transport keeps clear of the bottom edge; the sheet already adds the navigation bar inset.
-internal val PlayerBottomPadding = 44.dp
+internal val PlayerBottomPadding = 48.dp
 private const val PausedCoverScale = 0.9f
 
 private val SeekBarHeight = 40.dp
