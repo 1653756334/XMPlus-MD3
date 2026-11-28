@@ -98,7 +98,6 @@ class PlaybackController(
     private class Prefetched(
         val trackId: String,
         val albumId: String,
-        val credentialsVersion: String?,
         val at: Long,
         val link: Deferred<PlaybackAuthorization?>,
     )
@@ -215,8 +214,10 @@ class PlaybackController(
                     if (admitted && player.isPlaying) opened?.let { source ->
                         observeProgress(player, source)
                         checkpointProgress(source)
-                        skipOutro(player, source)
+                        // Read ahead first: the outro skip jumps to the last frame, and the episode is over in the
+                        // same tick. Reading it from the position the listener reached is the last chance to start.
                         prefetchNext(player, source)
+                        skipOutro(player, source)
                         if (cloudRestore == null && player.playbackState == Player.STATE_READY) {
                             val selection = mutableState.value.selection
                             val position = source.observation?.positionMs
@@ -813,13 +814,16 @@ class PlaybackController(
      * time is still started and settled as it always is. A failure is left alone; the cache is an optimisation, and
      * changing episodes finds its own link.
      */
-    private suspend fun prefetchNext(player: ExoPlayer, source: OpenSource) {
+    private fun prefetchNext(player: ExoPlayer, source: OpenSource) {
         if (prefetchedFor == revision) return
+        // The episode may already have ended in this tick, and the one that follows is the one playing now.
+        if (!isCurrent(player)) return
         val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
         val skip = mutableSkip.value
-        val outro = if (skipApplies(duration, skip)) skip.outroSeconds * 1_000L else 0L
-        // Where the episode really ends: the outro skip finishes it early.
-        val ending = duration - outro
+        // The earliest this episode can end: the outro skip finishes it at the start of the outro, not at its last
+        // frame, so the listener may reach the next episode that much sooner. A skipped outro is heard from only when
+        // the listener sought into it, which cannot happen before this point, so it never moves the trigger later.
+        val ending = duration - if (skipApplies(duration, skip)) skip.outroSeconds * 1_000L else 0L
         val from = minOf((duration * PrefetchAt).toLong(), ending - PrefetchLeadMs).coerceAtLeast(0L)
         if (player.currentPosition < from) return
         if (mutableSleep.value.atEpisodeEnd) return
@@ -830,23 +834,20 @@ class PlaybackController(
         if (downloads.completedFile(next.id) != null) return
         // Marked only now, so an episode with nothing to read ahead of it tries again on the next tick.
         prefetchedFor = revision
-        val credentials = accounts.primaryCredentials()
         val key = "episode:$albumId:${next.id}"
         prefetch?.link?.cancel()
         prefetchCache?.cancel()
+        // The credentials are read here, not in the tick: waiting for them there would hold up the clock.
         val link = scope.async {
             try {
-                resolver.resolve(next.id, credentials, ledger::queryQuota)
+                resolver.resolve(next.id, accounts.primaryCredentials(), ledger::queryQuota)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 null
             }
         }
-        prefetch = Prefetched(
-            trackId = next.id, albumId = albumId, credentialsVersion = credentials?.cacheIdentity,
-            at = SystemClock.elapsedRealtime(), link = link,
-        )
+        prefetch = Prefetched(trackId = next.id, albumId = albumId, at = SystemClock.elapsedRealtime(), link = link)
         // The audio arrives on its own: switching waits for the link alone, and the rest is already on disk by then.
         prefetchCache = scope.launch {
             val resolved = try {
@@ -876,17 +877,22 @@ class PlaybackController(
     private suspend fun takePrefetched(selection: PlaybackSelection, credentials: Credentials?): PlaybackAuthorization? {
         val ready = prefetch ?: return null
         if (ready.trackId != selection.track.id || ready.albumId != selection.album.id) return null
-        if (ready.credentialsVersion != credentials?.cacheIdentity) return null
-        if (SystemClock.elapsedRealtime() - ready.at > PrefetchTtlMs) return null
+        if (SystemClock.elapsedRealtime() - ready.at > PrefetchTtlMs) {
+            prefetch = null
+            return null
+        }
         // One shot: whichever way it ends, it is not offered twice.
         prefetch = null
-        return try {
+        val resolved = try {
             ready.link.await()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             null
-        }
+        } ?: return null
+        // Read for another account: the balance it was priced against is not this one's.
+        if (resolved.credentialsVersion != credentials?.cacheIdentity) return null
+        return resolved
     }
 
     /**
