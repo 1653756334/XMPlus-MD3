@@ -204,8 +204,8 @@ class PlaybackController(
     init { restoreSession() }
 
     /**
-     * [cacheWriter] writes an episode into the disk cache ahead of play, built from the player's own data source so the
-     * same redirects and headers apply. Null keeps only what playing itself caches.
+     * [cacheWriter] writes the beginning of an episode into the disk cache ahead of play, built from the player's own
+     * data source so the same redirects and headers apply. Null keeps only what playing itself caches.
      */
     internal fun attach(player: ExoPlayer, cacheWriter: CacheDataSource.Factory? = null) {
         check(engine.value == null)
@@ -862,7 +862,7 @@ class PlaybackController(
             val url = resolved.url ?: return@launch
             if (resolved.localFile != null) return@launch
             try {
-                writeEpisodeToCache(key, url.toString())
+                writeHeadToCache(key, url.toString())
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -916,20 +916,25 @@ class PlaybackController(
     }
 
     /**
-     * Writes a whole episode into the cache, so opening it reads from disk while the rest is still fetched. One at a
-     * time: an episode opened while the previous one is still arriving must not have two writers on the same span.
+     * Writes the beginning of an episode into the cache: enough that switching to it starts without waiting for the
+     * network, and no more. The rest arrives while it plays, into the same cache. Fetching the whole episode here would
+     * arrive long before it is heard, and cost the listener a full episode of data for an episode they may never reach.
+     * One at a time: an episode opened while another is still arriving must not have two writers on the same span.
      */
-    private suspend fun writeEpisodeToCache(key: String, url: String) = cacheWrite.withLock {
+    private suspend fun writeHeadToCache(key: String, url: String) = cacheWrite.withLock {
         val factory = cacheWriter ?: return@withLock
-        // Already there in full: fetching it again would only read the same bytes a second time.
-        if (factory.cache?.isCached(key, 0, C.LENGTH_UNSET.toLong()) == true) return@withLock
+        val cache = factory.cache ?: return@withLock
+        // Already there in full, or already beginning: fetching it again would only read the same bytes a second time.
+        if (cache.isCached(key, 0, C.LENGTH_UNSET.toLong())) return@withLock
+        if (cache.isCached(key, 0, PrefetchHeadBytes)) return@withLock
         val writer = CacheWriter(
-            factory.createDataSourceForDownloading(), DataSpec.Builder().setUri(Uri.parse(url)).setKey(key).build(),
+            factory.createDataSourceForDownloading(),
+            DataSpec.Builder().setUri(Uri.parse(url)).setKey(key).setLength(PrefetchHeadBytes).build(),
             null, null,
         )
         prefetchWriter = writer
         try {
-            // The whole episode is copied here: off the main thread, or the app stops responding while it arrives.
+            // Off the main thread, or the app stops responding while it arrives.
             runInterruptible(Dispatchers.IO) { writer.cache() }
         } finally {
             writer.cancel()
@@ -1465,6 +1470,12 @@ class PlaybackController(
 
         /** How long a link read ahead is still worth playing: past this, switching asks for a fresh one. */
         const val PrefetchTtlMs = 30 * 60_000L
+
+        /**
+         * How much of the next episode is fetched ahead. Enough to start playing at once — the player buffers seconds,
+         * not minutes — while the rest arrives during play. About three minutes at 128 kbps.
+         */
+        const val PrefetchHeadBytes = 3L * 1024 * 1024
 
         val AccountSettlementErrors = setOf("login_required", "login_expired", "insufficient_quota")
     }
