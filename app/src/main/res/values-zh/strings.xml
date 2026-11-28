@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="tab_discover">听书</string>
     <string name="tab_library">听过</string>
-    <string name="tab_downloads">下载</string>
+    <string name="downloads_title">下载</string>
     <string name="tab_me">我的</string>
 
     <string name="mini_player_idle">未在播放</string>
@@ -91,6 +91,9 @@
     <string name="action_retry">重试</string>
     <string name="settings_general">通用</string>
     <string name="settings_music">音乐</string>
+    <string name="settings_listen">听书</string>
+    <string name="settings_episode_cache">剧集缓存</string>
+    <string name="settings_episode_cache_usage">已用 %1$s，共 %2$s</string>
     <string name="player_transcript_empty">这一集没有文稿</string>
     <string name="library_action_failed">操作失败，请重试</string>
     <string name="album_subscribe">订阅</string>

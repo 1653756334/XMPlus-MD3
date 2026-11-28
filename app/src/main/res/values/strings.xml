@@ -4,7 +4,7 @@
 
     <string name="tab_discover">Books</string>
     <string name="tab_library">Library</string>
-    <string name="tab_downloads">Downloads</string>
+    <string name="downloads_title">Downloads</string>
     <string name="tab_me">Me</string>
 
     <string name="mini_player_idle">Nothing playing</string>
@@ -95,6 +95,9 @@
     <string name="action_retry">Retry</string>
     <string name="settings_general">General</string>
     <string name="settings_music">Music</string>
+    <string name="settings_listen">Audiobooks</string>
+    <string name="settings_episode_cache">Episode storage</string>
+    <string name="settings_episode_cache_usage">%1$s of %2$s used</string>
     <string name="player_transcript_empty">No transcript for this episode</string>
     <string name="library_action_failed">Couldn’t update. Try again.</string>
     <string name="album_subscribe">Subscribe</string>

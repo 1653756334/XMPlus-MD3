@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -61,6 +62,8 @@ import com.xuleo.xmplus.md3.music.routeRaw
 import com.xuleo.xmplus.md3.core.model.PluginMedia
 import com.xuleo.xmplus.md3.music.PluginsViewModel
 import com.xuleo.xmplus.md3.ui.components.ImportSheetSheet
+import com.xuleo.xmplus.md3.settings.AppLanguage
+import com.xuleo.xmplus.md3.settings.setAppLanguage
 import com.xuleo.xmplus.md3.ui.screens.*
 
 @Composable
@@ -166,7 +169,8 @@ internal fun XmAppContent(
                 AppRoute.PhoneLogin -> accounts?.closePhone()
                 AppRoute.Search, is AppRoute.AllAlbums, is AppRoute.CategoryAlbums, is AppRoute.HotRanking,
                 is AppRoute.AlbumPage, is AppRoute.AnchorPage, AppRoute.Player, AppRoute.Plugins, is AppRoute.MusicDetail, is AppRoute.MusicLookup, AppRoute.MusicSearch,
-                AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet, AppRoute.LibrarySearch -> Unit
+                AppRoute.Recent, is AppRoute.LibraryPage, is AppRoute.LocalSheet, AppRoute.LibrarySearch,
+                AppRoute.Downloads -> Unit
                 else -> accounts?.clearError()
             }
         }
@@ -340,7 +344,7 @@ internal fun XmAppContent(
                                     { albumId, trackId -> playback?.playEpisode(albumId, trackId) },
                                     { songs -> musicPlayer?.playback?.playList(songs, 0, source = MusicPlaySource(MusicPlaySource.Type.Download)) }, plugins, { navigator.push(AppRoute.Plugins) }, musicBrowse,
                                     { sheet, ranking -> openMusic(if (ranking) MusicDetailKind.TopList else MusicDetailKind.Sheet, sheet) },
-                                    { navigator.push(AppRoute.MusicSearch) }, libraryTab = libraryTab, onMusicSettings = { navigator.push(AppRoute.MusicSettings) })
+                                    { navigator.push(AppRoute.MusicSearch) }, libraryTab = libraryTab, onDownloads = { navigator.push(AppRoute.Downloads) })
                             }
                         }
                     }
@@ -469,12 +473,12 @@ internal fun XmAppContent(
                     entry<AppRoute.Plugins> {
                         Surface(Modifier.fillMaxSize()) { if (plugins != null) PluginsScreen(plugins) { navigator.pop() } }
                     }
-                    entry<AppRoute.MusicSettings> {
+                    entry<AppRoute.Downloads> {
                         Surface(Modifier.fillMaxSize()) {
-                            val app = LocalContext.current.applicationContext as? XmApplication
-                            MusicSettingsScreen(
-                                app?.musicQuality, app?.musicMediaCache, installedPlugins.size,
-                                onPlugins = { navigator.push(AppRoute.Plugins) },
+                            if (downloads != null) DownloadsScreen(
+                                downloads, ::openAlbum,
+                                onPlay = { albumId, trackId -> playback?.playEpisode(albumId, trackId) },
+                                onPlaySongs = { songs -> musicPlayer?.playback?.playList(songs, 0, source = MusicPlaySource(MusicPlaySource.Type.Download)) },
                                 onBack = { navigator.pop() },
                             )
                         }
@@ -575,7 +579,7 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
     library: LibraryViewModel?, downloads: DownloadsViewModel?, onAlbum: (String) -> Unit, onAnchor: (String) -> Unit, onPlay: (String, String, Long) -> Unit,
     onPlayEpisode: (String, String) -> Unit, onPlaySongs: (List<MusicItem>) -> Unit = {}, plugins: PluginsViewModel? = null, onPlugins: () -> Unit = {},
     musicBrowse: MusicBrowseViewModel? = null, onOpenSheet: (MusicSheet, Boolean) -> Unit = { _, _ -> }, onMusicSearch: () -> Unit = {},
-    onMusicSettings: () -> Unit = {},
+    onDownloads: () -> Unit = {},
     libraryTab: (@Composable () -> Unit)? = null) {
     val installed = plugins?.plugins?.collectAsStateWithLifecycle()?.value
     holder.SaveableStateProvider(destination.name) {
@@ -584,8 +588,20 @@ private fun TabContent(destination: Destination, holder: SaveableStateHolder, ac
             Destination.Music -> MusicScreen(if (plugins == null) emptyList() else installed, onPlugins,
                 source = plugins?.source?.collectAsStateWithLifecycle()?.value, onSource = { plugins?.selectSource(it) }, browse = musicBrowse, onOpenSheet = onOpenSheet, onSearch = onMusicSearch)
             Destination.Library -> if (library != null && libraryTab != null) libraryTab() else EmptyTab(destination.label, destination.icon)
-            Destination.Downloads -> if (downloads != null) DownloadsScreen(downloads, onAlbum, onPlayEpisode, onPlaySongs) else EmptyTab(destination.label, destination.icon)
-            Destination.Me -> MeScreen(accounts, onAccounts, onLogin, onImportBackup, historyUpload, onMusicSettings)
+            Destination.Me -> {
+                val app = LocalContext.current.applicationContext as? XmApplication
+                val configuration = LocalConfiguration.current
+                val language = remember(configuration) { AppLanguage.current() }
+                var showLanguage by rememberSaveable { mutableStateOf(false) }
+                MeScreen(
+                    accounts, onAccounts, onLogin, onImportBackup,
+                    historyUpload = { historyUpload?.let { HistoryUploadSettings(it) } },
+                    episodeCache = app?.episodeCache, quality = app?.musicQuality, cache = app?.musicMediaCache,
+                    pluginCount = installed?.count { it.enabled }, language = language,
+                    onLanguage = { showLanguage = true }, onDownloads = onDownloads, onPlugins = onPlugins,
+                )
+                if (showLanguage) LanguageDialog(language, { showLanguage = false; setAppLanguage(it) }, { showLanguage = false })
+            }
         }
     }
 }

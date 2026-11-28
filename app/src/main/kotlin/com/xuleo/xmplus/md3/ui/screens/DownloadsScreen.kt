@@ -65,7 +65,7 @@ import com.xuleo.xmplus.md3.core.model.ContentKind
 import com.xuleo.xmplus.md3.core.model.MusicItem
 import com.xuleo.xmplus.md3.download.DownloadsViewModel
 import com.xuleo.xmplus.md3.download.downloadErrorMessage
-import com.xuleo.xmplus.md3.ui.Destination
+import com.xuleo.xmplus.md3.ui.components.BrowsePage
 import com.xuleo.xmplus.md3.ui.components.Cover
 import com.xuleo.xmplus.md3.ui.components.MusicCover
 import com.xuleo.xmplus.md3.ui.components.PagerTabs
@@ -100,7 +100,7 @@ private sealed interface PendingRemoval {
 /**
  * 下载: how much the downloads take and what is left, then 已下载 and 下载中, which swipe. 已下载 lists albums that open
  * into their episodes, or the downloaded songs; 下载中 shows each download's progress and speed, episodes and songs
- * alike. The top bar's icons act on everything in 下载中.
+ * alike. The top bar's icons act on everything in 下载中, and its back arrow returns to 我的.
  */
 @Composable
 fun DownloadsScreen(
@@ -108,6 +108,7 @@ fun DownloadsScreen(
     onOpenAlbum: (String) -> Unit,
     onPlay: (albumId: String, trackId: String) -> Unit,
     onPlaySongs: (List<MusicItem>) -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val free by viewModel.freeBytes.collectAsStateWithLifecycle()
@@ -128,9 +129,11 @@ fun DownloadsScreen(
     val scope = rememberCoroutineScope()
     val deleted = stringResource(R.string.downloads_deleted)
     val running = active.any { it.state == DownloadState.Queued || it.state == DownloadState.Running }
-    TabScaffold(
-        Destination.Downloads.label,
+    BrowsePage(
+        stringResource(R.string.downloads_title),
         snackbarHost = { SnackbarHost(snackbar) },
+        onBack = onBack ?: {},
+        navigation = onBack != null,
         actions = {
             if (pager.currentPage == ActiveTab && active.isNotEmpty()) {
                 if (running) {
@@ -143,8 +146,8 @@ fun DownloadsScreen(
                 }
             }
         },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+    ) {
+        Column(Modifier.fillMaxSize()) {
             StorageBar(used = done.sumOf { it.bytes } + active.sumOf { it.bytes }, free = free)
             PagerTabs(
                 pager,

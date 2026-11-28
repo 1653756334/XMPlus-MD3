@@ -12,6 +12,7 @@ import com.xuleo.xmplus.md3.core.download.DownloadManager
 import com.xuleo.xmplus.md3.core.download.DownloadStore
 import com.xuleo.xmplus.md3.core.download.SongSource
 import com.xuleo.xmplus.md3.core.media.AlbumAudioStore
+import com.xuleo.xmplus.md3.core.media.EpisodeMediaCache
 import com.xuleo.xmplus.md3.core.media.SleepTimerStore
 import com.xuleo.xmplus.md3.core.media.AlbumSkipStore
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
@@ -138,12 +139,16 @@ class XmApplication : Application(), PlaybackOwner {
             downloads.start()
         }
     }
+    /** Episodes heard lately, kept on disk so hearing one again is offline. Songs have a cache of their own. */
+    override val episodeCache: EpisodeMediaCache by lazy { EpisodeMediaCache(this) }
+
     override val playback by lazy {
         PlaybackController(
             accounts, usage, playbackApi, album, PlaybackProgressStore(this), history,
             HistoryUploader(this, accounts, history), bookmarks,
             AlbumSkipStore(this), AlbumAudioStore(this), SleepTimerStore(this), XmlySkip(http), PlaybackSessionStore(this), listens, downloads,
-        ) { usageReady.await() }
+            { usageReady.await() },
+        )
     }
 
     /** One login session per process: it owns the SMS cooldowns and the pending challenge. */

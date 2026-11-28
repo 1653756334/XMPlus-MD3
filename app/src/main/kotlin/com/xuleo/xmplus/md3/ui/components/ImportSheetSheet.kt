@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,33 @@ import kotlinx.serialization.json.contentOrNull
 private enum class ImportMode(@StringRes val label: Int, val method: String) {
     Sheet(R.string.music_type_sheet, "importMusicSheet"),
     Song(R.string.music_tab_songs, "importMusicItem"),
+}
+
+/**
+ * The link in [text]: what was shared is usually a sentence with the link inside it, so the first http(s) address is
+ * taken, and its host is kept for choosing the plugin. Null when the text holds no link.
+ */
+private val UrlPattern = Regex("""https?://[^\s　"」』】》〉。，]+""", RegexOption.IGNORE_CASE)
+
+private fun linkIn(text: String): String? = UrlPattern.find(text)?.value?.trimEnd('.', ',', ')', ']', '!')
+
+/** The bare host of a link, without `www.`, lower case; null when it is not a link. */
+private fun hostOf(link: String): String? = runCatching {
+    java.net.URI(link).host?.lowercase()?.removePrefix("www.")
+}.getOrNull()?.takeIf { it.isNotEmpty() }
+
+/**
+ * The plugin a [link] belongs to: the capable one whose platform name or installer package names the link's host or is
+ * named by it, as `kuwo` matches `kuwo.cn` and `bilibili` matches `bilibili.com`. A host matching nothing leaves the
+ * choice alone. A tie goes to the plugin already chosen.
+ */
+private fun pluginFor(link: String, capable: List<InstalledPlugin>, chosen: String?): InstalledPlugin? {
+    val host = hostOf(link) ?: return null
+    val hits = capable.filter { candidate ->
+        val platform = candidate.info.platform.lowercase()
+        platform.isNotEmpty() && (host.contains(platform) || platform.contains(host))
+    }
+    return hits.firstOrNull { it.platform == chosen } ?: hits.firstOrNull()
 }
 
 /** A plugin's hints for [method], as its `hints` field declares them. */
@@ -96,16 +124,22 @@ fun ImportSheetSheet(
     val capable = plugins.filter { it.enabled && mode.method in it.info.methods }
     val plugin = capable.firstOrNull { it.platform == chosen } ?: capable.firstOrNull()
     val link = url.trim()
+    // A shared message is pasted whole; the link inside it is what a plugin reads, and its host picks the plugin.
+    val found = remember(link, capable) { linkIn(link) }
+    val value = found ?: link
+    LaunchedEffect(found, capable) {
+        if (found != null) pluginFor(found, capable, chosen)?.let { chosen = it.platform }
+    }
 
     fun run() {
         val platform = plugin?.platform ?: return
-        if (link.isEmpty() || busy) return
+        if (value.isEmpty() || busy) return
         busy = true
         failed = false
         scope.launch {
             try {
                 if (mode == ImportMode.Sheet) {
-                    val found = onImportSheet(platform, link)
+                    val found = onImportSheet(platform, value)
                     if (found.songs.isEmpty()) {
                         failed = true
                     } else {
@@ -117,7 +151,7 @@ fun ImportSheetSheet(
                         onCreated(id)
                     }
                 } else {
-                    val song = onImportItem(platform, link)
+                    val song = onImportItem(platform, value)
                     if (song == null) failed = true else picked = song
                 }
             } catch (_: Exception) {
@@ -200,6 +234,10 @@ fun ImportSheetSheet(
                 OutlinedTextField(
                     url, { url = it; failed = false }, Modifier.weight(1f), singleLine = true, enabled = !busy,
                     label = { Text(stringResource(R.string.music_import_link), maxLines = 1) },
+                    // A pasted message gets shorter as the link is found in it, so the field shows what will be read.
+                    supportingText = if (found != null && found != link) {
+                        { Text(found, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    } else null,
                 )
                 TextButton(
                     onClick = {
@@ -252,7 +290,7 @@ fun ImportSheetSheet(
                     }
                     Spacer(Modifier.weight(1f))
                 }
-                Button(onClick = ::run, enabled = link.isNotEmpty() && !busy) { Text(stringResource(R.string.library_sheet_import)) }
+                Button(onClick = ::run, enabled = value.isNotEmpty() && !busy) { Text(stringResource(R.string.library_sheet_import)) }
             }
         }
     }

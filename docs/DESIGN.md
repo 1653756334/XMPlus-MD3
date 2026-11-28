@@ -82,7 +82,7 @@ Not carried over (not needed): 莘应用 update source and the update-source swi
 - [x] Bookmarks with notes
 - [x] Resume from local and cloud progress; optional upload with consent; an episode that played to its end is recorded as finished (see Episode end)
 - [x] Downloaded episodes play locally without using 听时
-- [ ] Listen while downloading (边听边下), prefetch the next episode
+- [x] Prefetch the next episode into the cache; 边听边下 (playing while a download is under way) is not built yet
 - [x] System controls: notification, lock screen, Bluetooth, headset (see Full player)
 
 ### 听过 Library

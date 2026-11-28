@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -268,8 +270,9 @@ private fun BookmarkPage(bookmarks: List<BookmarkEntry>?, onPlay: (BookmarkEntry
 
 /**
  * One list read page by page: the account's sign-in prompt, a spinner, a failure with a retry, an empty note, or the rows
- * with a footer that loads the next page as the end comes into view.
+ * with a footer that loads the next page as the end comes into view. Pulling the rows down reads the first page again.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> ListingPage(
     state: ListState<T>,
@@ -289,14 +292,17 @@ private fun <T> ListingPage(
         onLoadMore = onLoadMore,
     )
     val failure = state.failure
-    when {
-        !state.signedIn -> Note(stringResource(signedOutText))
-        !state.loaded && failure == null -> ListSkeleton()
-        state.items.isEmpty() && failure != null -> ErrorState(failure, onRefresh)
-        state.items.isEmpty() -> Note(stringResource(emptyText))
-        else -> LazyColumn(Modifier.fillMaxSize(), state = lazy) {
-            items(state.items, key = key) { row(it) }
-            item(key = "footer") { PagingFooter(state.loading, failure != null, state.next != null, onLoadMore) }
+    // A pull reads the first page again; the rows already shown stay under it until the new page arrives.
+    PullToRefreshBox(if (state.loaded) state.loading else false, onRefresh, Modifier.fillMaxSize()) {
+        when {
+            !state.signedIn -> Note(stringResource(signedOutText))
+            !state.loaded && failure == null -> ListSkeleton()
+            state.items.isEmpty() && failure != null -> ErrorState(failure, onRefresh)
+            state.items.isEmpty() -> Note(stringResource(emptyText))
+            else -> LazyColumn(Modifier.fillMaxSize(), state = lazy) {
+                items(state.items, key = key) { row(it) }
+                item(key = "footer") { PagingFooter(state.loading, failure != null, state.next != null, onLoadMore) }
+            }
         }
     }
 }

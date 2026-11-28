@@ -1002,13 +1002,19 @@ private fun LyricRow(
     ) {
         Text(
             line.text,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, lineHeight = 30.sp),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontSize = LyricFontSize, lineHeight = LyricLineHeight,
+                letterSpacing = LyricLetterSpacing, fontWeight = FontWeight.Bold,
+            ),
             color = color,
         )
         if (!translation.isNullOrBlank()) {
             Text(
                 translation, Modifier.padding(top = 4.dp),
-                style = MaterialTheme.typography.bodyLarge, color = color.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = LyricTranslationFontSize, letterSpacing = LyricTranslationLetterSpacing,
+                ),
+                color = color.copy(alpha = 0.8f),
             )
         }
     }
@@ -1054,6 +1060,16 @@ private const val ActiveLyricScale = 1.05f
 private const val FocusedLyricBand = 0.08f
 private val LyricBandInset = 12.dp
 private const val LyricFadeEdge = 0.1f
+
+/**
+ * The lyric reads as text to sing along to, not as a headline: a little smaller than a title, and spaced out so the
+ * characters of a line stay apart at a glance.
+ */
+private val LyricFontSize = 20.sp
+private val LyricLineHeight = 28.sp
+private val LyricTranslationFontSize = 14.sp
+private val LyricLetterSpacing = 2.sp
+private val LyricTranslationLetterSpacing = 1.2.sp
 
 /** Where the line being sung settles, as a share of the lyric's height. */
 private const val LyricAnchor = 0.35f

@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.cache.CacheDataSink
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -20,9 +23,36 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
 
-/** No account headers, no general redirects, and a separate connection pool from the API. */
+/**
+ * No account headers, no general redirects, and a separate connection pool from the API. [cache] keeps the episodes
+ * heard lately on disk: what is there plays while the rest is fetched and written, so hearing one again is offline.
+ */
 @UnstableApi
-internal fun createPlayer(context: Context): ExoPlayer {
+internal fun createPlayer(context: Context, cache: EpisodeMediaCache? = null): ExoPlayer {
+    val dataSource = audioDataSource()
+    val sources = mediaSources(context, dataSource, cache)
+    val media = ProgressiveMediaSource.Factory(sources).setLoadErrorHandlingPolicy(
+        object : DefaultLoadErrorHandlingPolicy() {
+            override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorInfo): Long =
+                if (loadErrorInfo.exception.hasExpiredAuthorization()) C.TIME_UNSET
+                else super.getRetryDelayMsFor(loadErrorInfo)
+        },
+    )
+    return ExoPlayer.Builder(context, media)
+        .setAudioAttributes(SpeechAttributes, true)
+        .setHandleAudioBecomingNoisy(true)
+        .setWakeMode(C.WAKE_MODE_NETWORK)
+        .setSeekBackIncrementMs(PlaybackSkipMillis)
+        .setSeekForwardIncrementMs(PlaybackSkipMillis)
+        .build()
+}
+
+/**
+ * The audio requests themselves: no account headers, no general redirects, and a pool of their own. Playback and the
+ * caching of the next episode go through the same rules.
+ */
+@UnstableApi
+internal fun audioDataSource(): OkHttpDataSource.Factory {
     val client = OkHttpClient.Builder()
         .followRedirects(false)
         .followSslRedirects(false)
@@ -31,23 +61,32 @@ internal fun createPlayer(context: Context): ExoPlayer {
         .readTimeout(25, TimeUnit.SECONDS)
         .addInterceptor(PlaybackRedirects)
         .build()
-    val dataSource = OkHttpDataSource.Factory(client).setUserAgent("XMPlus/1.0")
+    return OkHttpDataSource.Factory(client).setUserAgent("XMPlus/1.0")
         .setDefaultRequestProperties(mapOf("Accept" to "audio/*, application/octet-stream"))
-    val sources = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context, dataSource)).setLoadErrorHandlingPolicy(
-        object : DefaultLoadErrorHandlingPolicy() {
-            override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorInfo): Long =
-                if (loadErrorInfo.exception.hasExpiredAuthorization()) C.TIME_UNSET
-                else super.getRetryDelayMsFor(loadErrorInfo)
-        },
-    )
-    return ExoPlayer.Builder(context, sources)
-        .setAudioAttributes(SpeechAttributes, true)
-        .setHandleAudioBecomingNoisy(true)
-        .setWakeMode(C.WAKE_MODE_NETWORK)
-        .setSeekBackIncrementMs(PlaybackSkipMillis)
-        .setSeekForwardIncrementMs(PlaybackSkipMillis)
-        .build()
 }
+
+/**
+ * What episodes are read through: the disk first, then the network, with what is read written back. Without a cache it
+ * is the network alone. Exposed so a prefetched episode is written with the same redirects and headers as a played one.
+ */
+@UnstableApi
+internal fun cacheSourceFactory(
+    context: Context,
+    dataSource: OkHttpDataSource.Factory,
+    cache: EpisodeMediaCache,
+): CacheDataSource.Factory = CacheDataSource.Factory()
+    .setCache(cache.cache)
+    .setUpstreamDataSourceFactory(DefaultDataSource.Factory(context, dataSource))
+    .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(cache.cache))
+    .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+@UnstableApi
+private fun mediaSources(
+    context: Context,
+    dataSource: OkHttpDataSource.Factory,
+    cache: EpisodeMediaCache?,
+): DataSource.Factory = cache?.let { cacheSourceFactory(context, dataSource, it) }
+    ?: DefaultDataSource.Factory(context, dataSource)
 
 /** Spoken audio: another app's short sound pauses the story instead of talking over it. */
 internal val SpeechAttributes: AudioAttributes =
