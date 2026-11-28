@@ -34,6 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -152,6 +153,11 @@ class PlaybackController(
     private var prefetch: Prefetched? = null
     /** The audio of the next episode being written to the cache, apart from its link so that switching waits for neither. */
     private var prefetchCache: Job? = null
+    /**
+     * The writer filling the cache, so it can be told to stop. It polls this, where an interrupted thread would keep
+     * reading: the cache holds one writer per episode, and playback takes that place the moment it opens it.
+     */
+    private var prefetchWriter: CacheWriter? = null
     /** Writes the next episode into the cache; set by [attach] from the player's own data source. */
     private var cacheWriter: CacheDataSource.Factory? = null
     /** The revision the next episode was already cached for; the episode after it is not asked again. */
@@ -245,9 +251,7 @@ class PlaybackController(
         engine.value = null
         pendingAccount = opened?.authorization?.accountIdentity ?: pendingAccount
         opened = null
-        prefetch?.link?.cancel()
-        prefetchCache?.cancel()
-        prefetch = null
+        dropPrefetch()
         prefetchedFor = -1L
         clock?.cancel()
         val current = mutableState.value
@@ -474,9 +478,7 @@ class PlaybackController(
 
     private fun clearQueue() {
         cancelQueueWork()
-        prefetch?.link?.cancel()
-        prefetchCache?.cancel()
-        prefetch = null
+        dropPrefetch()
         pagingIntent++
         paging?.cancel()
         paging = null
@@ -835,8 +837,8 @@ class PlaybackController(
         // Marked only now, so an episode with nothing to read ahead of it tries again on the next tick.
         prefetchedFor = revision
         val key = "episode:$albumId:${next.id}"
-        prefetch?.link?.cancel()
-        prefetchCache?.cancel()
+        // Whatever was read ahead before is for another episode now.
+        dropPrefetch()
         // The credentials are read here, not in the tick: waiting for them there would hold up the clock.
         val link = scope.async {
             try {
@@ -869,6 +871,16 @@ class PlaybackController(
         }
     }
 
+    /** Lets go of everything read ahead, for an album, an episode or a player that no longer applies. */
+    private fun dropPrefetch() {
+        prefetch?.link?.cancel()
+        prefetchWriter?.cancel()
+        prefetchCache?.cancel()
+        prefetch = null
+        prefetchCache = null
+        prefetchWriter = null
+    }
+
     /**
      * The link read ahead for this episode, when it is still the one that was read and still worth trusting. Using it
      * saves the round trip that switching otherwise waits for; everything after it, the listening time included, runs
@@ -877,21 +889,29 @@ class PlaybackController(
     private suspend fun takePrefetched(selection: PlaybackSelection, credentials: Credentials?): PlaybackAuthorization? {
         val ready = prefetch ?: return null
         if (ready.trackId != selection.track.id || ready.albumId != selection.album.id) return null
-        if (SystemClock.elapsedRealtime() - ready.at > PrefetchTtlMs) {
-            prefetch = null
-            return null
-        }
-        // One shot: whichever way it ends, it is not offered twice.
+        // From here the episode being opened is the one that was read ahead, so it is taken over either way.
         prefetch = null
-        val resolved = try {
-            ready.link.await()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
+        val fresh = SystemClock.elapsedRealtime() - ready.at <= PrefetchTtlMs
+        val resolved = if (!fresh) {
             null
-        } ?: return null
-        // Read for another account: the balance it was priced against is not this one's.
-        if (resolved.credentialsVersion != credentials?.cacheIdentity) return null
+        } else {
+            try {
+                ready.link.await()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+        }
+        // Playing writes this episode itself from now on, and the cache holds one writer per episode: the read-ahead is
+        // told to stop and waited for, or opening it would stall until the whole download ends. What it already wrote
+        // stays, and playing reads it from there.
+        prefetchWriter?.cancel()
+        withContext(NonCancellable) { prefetchCache?.cancelAndJoin() }
+        prefetchCache = null
+        prefetchWriter = null
+        // A link past its time, or one read for another account, is not trusted: playing asks again.
+        if (resolved == null || resolved.credentialsVersion != credentials?.cacheIdentity) return null
         return resolved
     }
 
@@ -901,14 +921,19 @@ class PlaybackController(
      */
     private suspend fun writeEpisodeToCache(key: String, url: String) = cacheWrite.withLock {
         val factory = cacheWriter ?: return@withLock
+        // Already there in full: fetching it again would only read the same bytes a second time.
+        if (factory.cache?.isCached(key, 0, C.LENGTH_UNSET.toLong()) == true) return@withLock
         val writer = CacheWriter(
             factory.createDataSourceForDownloading(), DataSpec.Builder().setUri(Uri.parse(url)).setKey(key).build(),
             null, null,
         )
+        prefetchWriter = writer
         try {
-            runInterruptible { writer.cache() }
+            // The whole episode is copied here: off the main thread, or the app stops responding while it arrives.
+            runInterruptible(Dispatchers.IO) { writer.cache() }
         } finally {
             writer.cancel()
+            if (prefetchWriter === writer) prefetchWriter = null
         }
     }
 
@@ -1049,6 +1074,8 @@ class PlaybackController(
         // song starting meanwhile cannot hand the player back once this episode finally loads.
         onStart()
         val request = supersede()
+        // What was read ahead was read for another album: left alone it would keep arriving for nothing.
+        if (prefetch?.albumId != null && prefetch?.albumId != selection.album.id) dropPrefetch()
         pendingAccount = null
         val restoreIntent = cloudIntent
         mutableSkip.value = skips.get(selection.album.id)
