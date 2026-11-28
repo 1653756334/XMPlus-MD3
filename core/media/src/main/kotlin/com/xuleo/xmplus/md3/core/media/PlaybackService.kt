@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
 interface PlaybackOwner {
     val playback: PlaybackController
     val music: MusicPlayback
+    /** The cache episodes are read and written through; songs have a cache of their own. */
+    val episodeCache: EpisodeMediaCache
 }
 
 /** Hosts the only ExoPlayer. The service stays foreground while media is playing. */
@@ -35,7 +37,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        player = createPlayer(this)
+        val cache = (application as PlaybackOwner).episodeCache
+        player = createPlayer(this, cache)
         sessionPlayer = SessionPlayer(player, playback, music)
         val builder = MediaSession.Builder(this, sessionPlayer)
         packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
@@ -46,7 +49,7 @@ class PlaybackService : MediaSessionService() {
             builder.setSessionActivity(openApp)
         }
         session = builder.build()
-        playback.attach(player)
+        playback.attach(player, cacheSourceFactory(this, audioDataSource(), cache))
         music.attach(player)
         // Whether a next episode exists comes from the album, not the player, so the session is told when that changes.
         scope.launch { playback.queue.map { it.hasNext }.distinctUntilChanged().collect { sessionPlayer.refreshCommands() } }

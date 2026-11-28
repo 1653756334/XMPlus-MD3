@@ -9,6 +9,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.exoplayer.ExoPlayer
 import com.xuleo.xmplus.md3.core.account.AccountRepository
 import com.xuleo.xmplus.md3.core.account.UsageLedger
@@ -37,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -129,6 +133,12 @@ class PlaybackController(
     private var opened: OpenSource? = null
     private var cloudRestore: Job? = null
     private var cloudIntent = 0L
+    /** The next episode's cache job, started near the end of the one playing so switching to it barely waits. */
+    private var prefetching: Job? = null
+    /** Writes the next episode into the cache; set by [attach] from the player's own data source. */
+    private var cacheWriter: CacheDataSource.Factory? = null
+    /** The revision the next episode was already cached for; the episode after it is not asked again. */
+    private var prefetchedFor = -1L
     private var restoreProgressOnRetry = false
     /** The account of an episode that is not loaded (restored, or left by a detached service). Its bookmarks stay with it until play. */
     private var pendingAccount: String? = null
@@ -170,8 +180,13 @@ class PlaybackController(
 
     init { restoreSession() }
 
-    internal fun attach(player: ExoPlayer) {
+    /**
+     * [cacheWriter] writes an episode into the disk cache ahead of play, built from the player's own data source so the
+     * same redirects and headers apply. Null keeps only what playing itself caches.
+     */
+    internal fun attach(player: ExoPlayer, cacheWriter: CacheDataSource.Factory? = null) {
         check(engine.value == null)
+        this.cacheWriter = cacheWriter
         player.addListener(listener)
         engine.value = player
         clock = scope.launch {
@@ -183,6 +198,7 @@ class PlaybackController(
                         observeProgress(player, source)
                         checkpointProgress(source)
                         skipOutro(player, source)
+                        prefetchNext(player, source)
                         if (cloudRestore == null && player.playbackState == Player.STATE_READY) {
                             val selection = mutableState.value.selection
                             val position = source.observation?.positionMs
@@ -210,6 +226,8 @@ class PlaybackController(
         engine.value = null
         pendingAccount = opened?.authorization?.accountIdentity ?: pendingAccount
         opened = null
+        prefetching?.cancel()
+        prefetchedFor = -1L
         clock?.cancel()
         val current = mutableState.value
         if (current.phase != PlaybackPhase.Failed && current.selection != null) {
@@ -762,6 +780,62 @@ class PlaybackController(
         return if (skipApplies(durationMs) && positionMs < intro) intro else positionMs
     }
 
+    /**
+     * Caches the episode after this one once it is close to ending, so changing to it barely waits. The point is the
+     * real end of the episode, which the outro skip brings forward, not the file's last frame; [PrefetchLeadMs] before
+     * that, but never past [PrefetchAt] of the episode. Only the next one is read, not the rest of the queue.
+     *
+     * The link is asked for the way playing it would ask, and a failure is left alone: the cache is an optimisation, and
+     * changing episodes finds its own link.
+     */
+    private fun prefetchNext(player: ExoPlayer, source: OpenSource) {
+        if (prefetchedFor == revision) return
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
+        val skip = mutableSkip.value
+        val outro = if (skipApplies(duration, skip)) skip.outroSeconds * 1_000L else 0L
+        // Where the episode really ends: the outro skip finishes it early.
+        val ending = duration - outro
+        val from = minOf((duration * PrefetchAt).toLong(), ending - PrefetchLeadMs).coerceAtLeast(0L)
+        if (player.currentPosition < from) return
+        if (mutableSleep.value.atEpisodeEnd) return
+        val albumId = mutableState.value.selection?.album?.id ?: return
+        val current = source.authorization.track
+        val next = albumQueue?.neighbor(current.id, forward = true) ?: return
+        // A finished download plays from its own file; there is nothing to cache.
+        if (downloads.completedFile(next.id) != null) return
+        // Marked only now, so an episode with nothing to cache ahead of it tries again on the next tick.
+        prefetchedFor = revision
+        // Read where the current episode is: what follows is asked for once it is actually near its end.
+        val request = revision
+        prefetching?.cancel()
+        prefetching = scope.launch {
+            try {
+                val resolved = resolver.resolve(next.id, accounts.primaryCredentials(), ledger::queryQuota)
+                if (request != revision || resolved.localFile != null) return@launch
+                val url = resolved.url ?: return@launch
+                writeEpisodeToCache("episode:$albumId:${next.id}", url.toString())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The cache is an optimisation: changing episodes asks for its own link.
+            }
+        }
+    }
+
+    /** Writes a whole episode into the cache, so opening it reads from disk while the rest is still fetched. */
+    private suspend fun writeEpisodeToCache(key: String, url: String) {
+        val factory = cacheWriter ?: return
+        val writer = CacheWriter(
+            factory.createDataSourceForDownloading(), DataSpec.Builder().setUri(Uri.parse(url)).setKey(key).build(),
+            null, null,
+        )
+        try {
+            runInterruptible { writer.cache() }
+        } finally {
+            writer.cancel()
+        }
+    }
+
     /** Reaching the outro ends the episode the way its last frame would. */
     private fun skipOutro(player: ExoPlayer, source: OpenSource) {
         val skip = mutableSkip.value
@@ -950,8 +1024,11 @@ class PlaybackController(
                 .setArtworkUri(selection.coverUrl?.let(Uri::parse))
                 .build()
             val mediaId = request.toString()
-            val item = MediaItem.Builder().setMediaId(mediaId)
-                .setUri(resolved.localFile?.let { Uri.fromFile(it).toString() } ?: requireNotNull(resolved.url).toString()).setMediaMetadata(metadata).build()
+            // Written down so hearing the same episode again opens from disk, without asking for its link again.
+            val uri = resolved.localFile?.let { Uri.fromFile(it).toString() } ?: requireNotNull(resolved.url).toString()
+            val item = MediaItem.Builder().setMediaId(mediaId).setUri(uri).setMediaMetadata(metadata)
+                .setCustomCacheKey(cacheKey(selection, resolved))
+                .build()
             val source = OpenSource(mediaId, resolved, refreshes = refreshing?.let { it.refreshes + 1 } ?: 0, startPositionMs = start)
             if (refreshing != null) {
                 source.skipOff = refreshing.skipOff
@@ -1063,6 +1140,9 @@ class PlaybackController(
     private fun supersede(): Long {
         revision++
         command?.cancel()
+        // The next episode is cached for the episode that is playing; another one starts its own.
+        prefetching?.cancel()
+        prefetchedFor = -1L
         mute()
         return revision
     }
@@ -1095,6 +1175,13 @@ class PlaybackController(
 
     private fun isCurrent(player: Player) = player === engine.value &&
         opened?.let { it.mediaId == player.currentMediaItem?.mediaId } == true
+
+    /**
+     * The cache key of an episode: the album and track, so the same episode heard again plays from disk whatever link
+     * the server handed out this time. A finished download is read from its own file and is not cached again.
+     */
+    private fun cacheKey(selection: PlaybackSelection, resolved: PlaybackAuthorization): String? =
+        if (resolved.localFile != null) null else "episode:${selection.album.id}:${selection.track.id}"
 
     private fun recordPlaying(player: Player, positionChanged: Boolean = false) {
         val playing = admitted && player.isPlaying
@@ -1263,6 +1350,13 @@ class PlaybackController(
         const val MaxAuthorizationRefreshes = 3
         const val ProgressIntervalMs = 5_000L
         const val CloudStartupWindowMs = 2_000L
+
+        /** How far into an episode the next one is cached, when its outro does not end it sooner. */
+        const val PrefetchAt = 0.9
+
+        /** How long before the episode's real end the next one is cached. */
+        const val PrefetchLeadMs = 30_000L
+
         val AccountSettlementErrors = setOf("login_required", "login_expired", "insufficient_quota")
     }
 }
