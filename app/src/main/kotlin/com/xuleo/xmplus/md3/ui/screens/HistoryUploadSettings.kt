@@ -2,8 +2,6 @@ package com.xuleo.xmplus.md3.ui.screens
 
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -12,12 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
+import com.xuleo.xmplus.md3.ui.components.SettingsRow
 import com.xuleo.xmplus.md3.core.media.HistoryUploadFeedback
 import com.xuleo.xmplus.md3.core.media.HistoryUploader
 
@@ -26,20 +24,21 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
     val state by uploader.state.collectAsStateWithLifecycle()
     var confirm by rememberSaveable { mutableStateOf(false) }
     val canChange = state.ready && !state.saving && !state.consentError
-    ListItem(
-        modifier = Modifier.toggleable(state.enabled, enabled = canChange, role = Role.Switch) { enabled ->
-            if (enabled) confirm = true else uploader.setEnabled(false)
-        },
-        supportingContent = { Text(stringResource(if (state.enabled) R.string.history_upload_on_hint else R.string.history_upload_off_hint)) },
-        leadingContent = { Icon(XmIcons.Outlined.CloudUpload, contentDescription = null) },
-        trailingContent = { Switch(checked = state.enabled, onCheckedChange = null, enabled = canChange) },
-    ) { Text(stringResource(R.string.history_upload_title)) }
+    SettingsRow(
+        stringResource(R.string.history_upload_title),
+        icon = XmIcons.Outlined.CloudUpload,
+        supporting = stringResource(if (state.enabled) R.string.history_upload_on_hint else R.string.history_upload_off_hint),
+        enabled = canChange,
+        role = Role.Switch,
+        onClick = { if (state.enabled) uploader.setEnabled(false) else confirm = true },
+        trailing = { Switch(checked = state.enabled, onCheckedChange = null, enabled = canChange) },
+    )
 
     if (state.consentError) {
-        ListItem(
+        SettingsRow(
+            stringResource(R.string.action_retry), supporting = stringResource(R.string.history_upload_setting_error),
             onClick = uploader::retryConsent,
-            supportingContent = { Text(stringResource(R.string.history_upload_setting_error)) },
-        ) { Text(stringResource(R.string.action_retry)) }
+        )
     } else if (state.enabled) {
         val feedback = when {
             state.sending -> R.string.history_upload_sending
@@ -48,12 +47,10 @@ internal fun HistoryUploadSettings(uploader: HistoryUploader) {
             state.feedback == HistoryUploadFeedback.SignIn -> R.string.history_upload_sign_in
             else -> R.string.history_upload_waiting
         }
-        ListItem(
-            onClick = uploader::retry,
-            enabled = !state.sending,
-            leadingContent = { Icon(XmIcons.Outlined.Sync, contentDescription = null) },
-            supportingContent = { Text(stringResource(feedback)) },
-        ) { Text(stringResource(R.string.history_upload_retry)) }
+        SettingsRow(
+            stringResource(R.string.history_upload_retry), icon = XmIcons.Outlined.Sync,
+            supporting = stringResource(feedback), enabled = !state.sending, onClick = uploader::retry,
+        )
     }
 
     if (confirm && canChange && !state.enabled) {

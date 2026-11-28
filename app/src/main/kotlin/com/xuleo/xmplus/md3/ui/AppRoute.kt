@@ -38,10 +38,10 @@ internal sealed interface AppRoute : NavKey {
     /** One 听书 collection of 听过; [section] is a `LibrarySection` name. */
     @Serializable data class LibraryPage(val section: String) : AppRoute
     @Serializable data object Player : AppRoute
+    /** 下载, opened from 通用 settings. */
+    @Serializable data object Downloads : AppRoute
     @Serializable data object Accounts : AppRoute
     @Serializable data object Plugins : AppRoute
-    /** 音乐 settings, opened from 我的. */
-    @Serializable data object MusicSettings : AppRoute
     @Serializable data object PhoneLogin : AppRoute
     @Serializable data class ImportLogin(val recoveryIdentity: String? = null) : AppRoute
 }

@@ -18,13 +18,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 import com.xuleo.xmplus.md3.R
 
-/** A pushed page of browsing content: a back arrow and a title above whatever [content] shows. */
+/**
+ * A pushed page of browsing content: a back arrow and a title above whatever [content] shows. [navigation] shows the
+ * back arrow; a page opened as the only place to go passes false.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowsePage(
     title: String,
     onBack: () -> Unit,
     snackbarHost: @Composable () -> Unit = {},
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+    navigation: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Scaffold(
@@ -33,8 +38,9 @@ fun BrowsePage(
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onBack) { Icon(XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back)) }
+                    if (navigation) IconButton(onBack) { Icon(XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back)) }
                 },
+                actions = actions,
             )
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),

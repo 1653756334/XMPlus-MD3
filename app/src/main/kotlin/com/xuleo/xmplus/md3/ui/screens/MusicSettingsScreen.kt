@@ -1,80 +1,98 @@
 package com.xuleo.xmplus.md3.ui.screens
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xuleo.xmplus.md3.R
 import com.xuleo.xmplus.md3.core.designsystem.XmLayout
+import com.xuleo.xmplus.md3.core.media.EpisodeMediaCache
 import com.xuleo.xmplus.md3.core.media.MusicMediaCache
 import com.xuleo.xmplus.md3.core.media.MusicQualitySettings
-import com.xuleo.xmplus.md3.ui.components.SectionCard
+import com.xuleo.xmplus.md3.settings.AppLanguage
+import com.xuleo.xmplus.md3.ui.components.SettingsCard
+import com.xuleo.xmplus.md3.ui.components.SettingsDivider
+import com.xuleo.xmplus.md3.ui.components.SettingsRow
 import com.xuleo.xmplus.md3.ui.icons.XmIcons
 
-/** 音乐 settings: the plugins, the qualities songs play and download in, and the room they may take on the phone. */
+/**
+ * What 我的 holds under its account: 通用 first, the things both kinds of content share, then 听书 and 音乐 for what is
+ * particular to each. A group with nothing to show is left out, so a version without a cache has no empty heading.
+ */
 @Composable
-internal fun MusicSettingsScreen(
+internal fun SettingsGroups(
+    accountName: String?,
+    historyUpload: @Composable () -> Unit,
+    episodeCache: EpisodeMediaCache?,
     quality: MusicQualitySettings?,
     cache: MusicMediaCache?,
     pluginCount: Int?,
+    language: AppLanguage,
+    onLanguage: () -> Unit,
+    onAccounts: () -> Unit,
     onPlugins: () -> Unit,
-    onBack: () -> Unit,
+    onDownloads: () -> Unit,
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_music), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(XmIcons.Outlined.ArrowBack, stringResource(R.string.action_back)) }
-                },
-            )
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            Column(
-                Modifier.align(Alignment.TopCenter).widthIn(max = XmLayout.ContentWidth).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).padding(vertical = XmLayout.ItemGap),
-                verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap),
-            ) {
-                SectionCard {
-                    ListItem(
-                        onClick = onPlugins,
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(XmIcons.Outlined.QueueMusic, contentDescription = null) },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                if (pluginCount != null && pluginCount > 0) {
-                                    Text(pluginCount.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Icon(XmIcons.Outlined.ChevronRight, contentDescription = null)
-                            }
-                        },
-                    ) { Text(stringResource(R.string.plugins_title)) }
-                }
-                if (quality != null) SectionCard { MusicPlaybackSettings(quality) }
-                if (cache != null) SectionCard { MusicCacheSettings(cache) }
+    Column(verticalArrangement = Arrangement.spacedBy(XmLayout.SectionGap)) {
+        SettingsGroup(R.string.settings_general) {
+            SettingsCard {
+                SettingsRow(stringResource(R.string.downloads_title), icon = XmIcons.Outlined.Download, onClick = onDownloads)
+                SettingsDivider()
+                SettingsRow(stringResource(R.string.setting_language), icon = XmIcons.Outlined.Language,
+                    supporting = languageLabel(language), onClick = onLanguage)
             }
         }
+        SettingsGroup(R.string.settings_listen) {
+            SettingsCard {
+                SettingsRow(
+                    stringResource(if (accountName == null) R.string.account_add else R.string.account_manage),
+                    icon = XmIcons.Outlined.Person, supporting = accountName, onClick = onAccounts,
+                )
+                SettingsDivider()
+                historyUpload()
+                if (episodeCache != null) {
+                    SettingsDivider()
+                    EpisodeCacheSettings(episodeCache)
+                }
+            }
+        }
+        SettingsGroup(R.string.settings_music) {
+            SettingsCard {
+                SettingsRow(
+                    stringResource(R.string.plugins_title), icon = XmIcons.Outlined.QueueMusic,
+                    supporting = pluginCount?.takeIf { it > 0 }?.toString(), onClick = onPlugins,
+                )
+                if (quality != null) {
+                    SettingsDivider()
+                    MusicPlaybackSettings(quality)
+                }
+                if (cache != null) {
+                    SettingsDivider()
+                    MusicCacheSettings(cache)
+                }
+            }
+        }
+    }
+}
+
+/** One titled group of cards, headed the way 我的 heads its own rows. */
+@Composable
+internal fun SettingsGroup(@StringRes label: Int, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(XmLayout.ItemGap)) {
+        Text(
+            stringResource(label), style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = XmLayout.PagePadding),
+        )
+        content()
     }
 }
